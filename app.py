@@ -1,8 +1,9 @@
-import os
-
 from flask import Flask
 
+from config import settings
+
 app = Flask(__name__)
+app.config["SECRET_KEY"] = settings.secret_key
 
 
 @app.route("/")
@@ -11,4 +12,4 @@ def index():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+    app.run(host="0.0.0.0", port=settings.port, debug=settings.debug)
