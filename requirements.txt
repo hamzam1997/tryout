@@ -2,5 +2,8 @@ Flask==3.0.3
 gunicorn==22.0.0
 google-genai==2.25.0
 pydantic==2.13.5
-python-dotenv==1.2.3
+pydantic-settings==2.15.0
 requests==2.34.2
+
+# Pulled in by pydantic-settings; pinned here to keep builds reproducible.
+python-dotenv==1.2.3

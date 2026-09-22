@@ -1,39 +1,35 @@
 import logging
-import os
+import secrets
+from pathlib import Path
 
-from dotenv import load_dotenv
-from pydantic import BaseModel, Field
-
-load_dotenv()
+from pydantic import Field, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
 
-
-def _env(key: str, default: str = "") -> str:
-    return os.environ.get(key, default)
+BASE_DIR = Path(__file__).resolve().parent
 
 
-def _env_int(key: str, default: int) -> int:
-    raw = os.environ.get(key)
-    if not raw:
-        return default
-    try:
-        return int(raw)
-    except ValueError:
-        logger.warning("%s=%r is not an integer, falling back to %d", key, raw, default)
-        return default
-
-
-class Settings(BaseModel):
+class Settings(BaseSettings):
     """Central access to credentials and tunables, loaded from the environment."""
 
+    model_config = SettingsConfigDict(
+        env_file=BASE_DIR / ".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+        # The MODEL_* settings below would otherwise collide with pydantic's
+        # reserved "model_" attribute namespace.
+        protected_namespaces=(),
+    )
+
     gemini_api_key: str = ""
+    secret_key: str = ""
 
     port: int = 8080
-    debug: bool = False
-    secret_key: str = "tryout-dev-secret-key-2026"
+    debug: bool = Field(default=False, validation_alias="FLASK_DEBUG")
 
-    database_path: str = "tryout.db"
+    database_path: Path = BASE_DIR / "tryout.db"
 
     model_extraction: str = "gemini-2.5-flash"
     model_onboarding: str = "gemini-2.5-flash"
@@ -42,20 +38,15 @@ class Settings(BaseModel):
 
     execution_timeout_seconds: int = Field(default=60, gt=0)
 
-    @classmethod
-    def from_env(cls) -> "Settings":
-        return cls(
-            gemini_api_key=_env("GEMINI_API_KEY"),
-            port=_env_int("PORT", 8080),
-            debug=_env("FLASK_DEBUG", "0") not in ("", "0", "false", "False"),
-            secret_key=_env("SECRET_KEY", "tryout-dev-secret-key-2026"),
-            database_path=_env("DATABASE_PATH", "tryout.db"),
-            model_extraction=_env("MODEL_EXTRACTION", "gemini-2.5-flash"),
-            model_onboarding=_env("MODEL_ONBOARDING", "gemini-2.5-flash"),
-            model_planning=_env("MODEL_PLANNING", "gemini-2.5-pro"),
-            model_coding=_env("MODEL_CODING", "gemini-2.5-pro"),
-            execution_timeout_seconds=_env_int("EXECUTION_TIMEOUT_SECONDS", 60),
-        )
+    @model_validator(mode="after")
+    def _fill_secret_key(self) -> "Settings":
+        if not self.secret_key:
+            self.secret_key = secrets.token_urlsafe(32)
+            logger.warning(
+                "SECRET_KEY is not set; using a random key for this process. "
+                "Sessions will not survive a restart or span multiple instances."
+            )
+        return self
 
     @property
     def has_gemini_key(self) -> bool:
@@ -73,7 +64,7 @@ class Settings(BaseModel):
         return self.gemini_api_key
 
 
-settings = Settings.from_env()
+settings = Settings()
 
 if not settings.has_gemini_key:
     logger.warning(
