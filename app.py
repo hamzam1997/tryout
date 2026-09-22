@@ -1,8 +1,10 @@
 from flask import Flask
 
 from config import settings
+from database import init_db
 
 app = Flask(__name__)
+init_db()
 
 
 @app.route("/")
