@@ -21,6 +21,10 @@ build/
 *.db
 *.sqlite3
 
+# Editors
+.idea/
+.vscode/
+
 # Scratch & logs
 scratch/
 *.log

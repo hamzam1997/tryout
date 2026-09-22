@@ -23,9 +23,14 @@ class Settings(BaseSettings):
         protected_namespaces=(),
     )
 
-    gemini_api_key: str = ""
-    secret_key: str = ""
+    # Gemini is reached through Vertex AI, which bills via Google Cloud and
+    # still serves the 2.5 models that the AI Studio API retired for new keys.
+    google_cloud_project: str = ""
+    # "global" is the only location serving both the 2.5 and 3.x families;
+    # regional endpoints such as us-central1 404 on the newer models.
+    google_cloud_location: str = "global"
 
+    secret_key: str = ""
     port: int = 8080
     debug: bool = Field(default=False, validation_alias="FLASK_DEBUG")
 
@@ -49,24 +54,27 @@ class Settings(BaseSettings):
         return self
 
     @property
-    def has_gemini_key(self) -> bool:
-        return bool(self.gemini_api_key)
+    def has_project(self) -> bool:
+        return bool(self.google_cloud_project)
 
-    def require_gemini_key(self) -> str:
-        """Return the API key, raising if it was never configured.
+    def require_project(self) -> str:
+        """Return the Cloud project for Vertex calls, raising if unconfigured.
 
-        Call this from agent code paths so the app still boots without a key.
+        Never fall back to the project Application Default Credentials infers:
+        ADC reads it from the local gcloud config, which may point at an
+        unrelated (and possibly production) project.
         """
-        if not self.gemini_api_key:
+        if not self.google_cloud_project:
             raise RuntimeError(
-                "GEMINI_API_KEY is not set. Add it to .env (see .env.example)."
+                "GOOGLE_CLOUD_PROJECT is not set. Add it to .env (see .env.example)."
             )
-        return self.gemini_api_key
+        return self.google_cloud_project
 
 
 settings = Settings()
 
-if not settings.has_gemini_key:
+if not settings.has_project:
     logger.warning(
-        "GEMINI_API_KEY is not set; agent features will fail until it is configured."
+        "GOOGLE_CLOUD_PROJECT is not set; agent features will fail until it is "
+        "configured."
     )
