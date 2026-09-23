@@ -1,0 +1,31 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Python cache & artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Environment secrets
+.env
+.env.local
+
+# Databases & local state
+*.db
+*.sqlite3
+
+# Editors
+.idea/
+.vscode/
+
+# Scratch & logs
+scratch/
+*.log
+.DS_Store
