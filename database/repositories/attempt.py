@@ -1,83 +1,76 @@
-"""Attempt persistence layer."""
+"""Attempt persistence layer using SQLAlchemy."""
 
-import sqlite3
+from sqlalchemy import desc, select
 
 from database.connection import (
-    connect,
     dump_model,
     load_model,
+    session_scope,
     utc_now_iso,
 )
 from database.models import Attempt, AttemptStatus, TechnicalPlan
+from database.orm import AttemptModel
 
 
-def row_to_attempt(row: sqlite3.Row) -> Attempt:
+def orm_to_attempt(orm: AttemptModel) -> Attempt:
     return Attempt(
-        id=row["id"],
-        idea_id=row["idea_id"],
-        repository_id=row["repository_id"],
-        repo_ref=row["repo_ref"],
-        status=AttemptStatus(row["status"]),
-        plan=load_model(TechnicalPlan, row["plan_json"]),
-        diff=row["diff"],
-        test_exit_code=row["test_exit_code"],
-        test_stdout=row["test_stdout"],
-        test_stderr=row["test_stderr"],
-        error=row["error"],
-        started_at=row["started_at"],
-        finished_at=row["finished_at"],
-        created_at=row["created_at"],
+        id=orm.id,
+        idea_id=orm.idea_id,
+        repository_id=orm.repository_id,
+        repo_ref=orm.repo_ref,
+        status=AttemptStatus(orm.status),
+        plan=load_model(TechnicalPlan, orm.plan_json),
+        diff=orm.diff,
+        test_exit_code=orm.test_exit_code,
+        test_stdout=orm.test_stdout,
+        test_stderr=orm.test_stderr,
+        error=orm.error,
+        started_at=orm.started_at,
+        finished_at=orm.finished_at,
+        created_at=orm.created_at,
     )
+
+
+row_to_attempt = orm_to_attempt
 
 
 def create_attempt(attempt: Attempt) -> Attempt:
     created_at = attempt.created_at or utc_now_iso()
-    with connect() as conn:
-        cur = conn.execute(
-            """INSERT INTO attempt
-               (idea_id, repository_id, repo_ref, status, plan_json, diff,
-                test_exit_code, test_stdout, test_stderr, error,
-                started_at, finished_at, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                attempt.idea_id,
-                attempt.repository_id,
-                attempt.repo_ref,
-                attempt.status.value,
-                dump_model(attempt.plan),
-                attempt.diff,
-                attempt.test_exit_code,
-                attempt.test_stdout,
-                attempt.test_stderr,
-                attempt.error,
-                attempt.started_at,
-                attempt.finished_at,
-                created_at,
-            ),
+    with session_scope() as session:
+        model = AttemptModel(
+            idea_id=attempt.idea_id,
+            repository_id=attempt.repository_id,
+            repo_ref=attempt.repo_ref,
+            status=attempt.status.value,
+            plan_json=dump_model(attempt.plan),
+            diff=attempt.diff,
+            test_exit_code=attempt.test_exit_code,
+            test_stdout=attempt.test_stdout,
+            test_stderr=attempt.test_stderr,
+            error=attempt.error,
+            started_at=attempt.started_at,
+            finished_at=attempt.finished_at,
+            created_at=created_at,
         )
-        return attempt.model_copy(
-            update={"id": cur.lastrowid, "created_at": created_at}
-        )
+        session.add(model)
+        session.flush()
+        return orm_to_attempt(model)
 
 
 def get_attempt(attempt_id: int) -> Attempt | None:
-    with connect() as conn:
-        row = conn.execute(
-            "SELECT * FROM attempt WHERE id = ?", (attempt_id,)
-        ).fetchone()
-    return row_to_attempt(row) if row else None
+    with session_scope() as session:
+        model = session.get(AttemptModel, attempt_id)
+        return orm_to_attempt(model) if model else None
 
 
 def list_attempts(idea_id: int | None = None) -> list[Attempt]:
-    sql = "SELECT * FROM attempt"
-    params: list[object] = []
-    if idea_id is not None:
-        sql += " WHERE idea_id = ?"
-        params.append(idea_id)
-    sql += " ORDER BY id DESC"
-    with connect() as conn:
-        rows = conn.execute(sql, params).fetchall()
-    return [row_to_attempt(row) for row in rows]
+    with session_scope() as session:
+        stmt = select(AttemptModel)
+        if idea_id is not None:
+            stmt = stmt.where(AttemptModel.idea_id == idea_id)
+        stmt = stmt.order_by(desc(AttemptModel.id))
+        models = session.scalars(stmt).all()
+        return [orm_to_attempt(m) for m in models]
 
 
 def set_attempt_status(
@@ -92,65 +85,39 @@ def set_attempt_status(
     )
     is_terminal = status in (AttemptStatus.COMPLETE, AttemptStatus.FAILED)
 
-    with connect() as conn:
-        row = conn.execute(
-            "SELECT started_at, finished_at, error FROM attempt WHERE id = ?",
-            (attempt_id,),
-        ).fetchone()
-        if not row:
+    with session_scope() as session:
+        model = session.get(AttemptModel, attempt_id)
+        if not model:
             return
 
-        existing_started_at = row["started_at"]
-        existing_finished_at = row["finished_at"]
-        existing_error = row["error"]
+        model.status = status.value
 
         if is_active or is_terminal:
-            started_at = existing_started_at or now
-        else:
-            started_at = existing_started_at
+            model.started_at = model.started_at or now
 
         if is_terminal:
-            finished_at = now
+            model.finished_at = now
         else:
-            finished_at = None
+            model.finished_at = None
 
-        new_error = (
-            error
-            if error is not None
-            else (existing_error if status is AttemptStatus.FAILED else None)
-        )
-
-        conn.execute(
-            """UPDATE attempt
-               SET status = ?,
-                   error = ?,
-                   started_at = ?,
-                   finished_at = ?
-               WHERE id = ?""",
-            (status.value, new_error, started_at, finished_at, attempt_id),
-        )
+        if error is not None:
+            model.error = error
+        elif status is AttemptStatus.COMPLETE:
+            model.error = None
 
 
 def update_attempt(attempt: Attempt) -> Attempt:
-    with connect() as conn:
-        conn.execute(
-            """UPDATE attempt
-               SET repo_ref = ?, status = ?, plan_json = ?, diff = ?,
-                   test_exit_code = ?, test_stdout = ?, test_stderr = ?, error = ?,
-                   started_at = ?, finished_at = ?
-               WHERE id = ?""",
-            (
-                attempt.repo_ref,
-                attempt.status.value,
-                dump_model(attempt.plan),
-                attempt.diff,
-                attempt.test_exit_code,
-                attempt.test_stdout,
-                attempt.test_stderr,
-                attempt.error,
-                attempt.started_at,
-                attempt.finished_at,
-                attempt.id,
-            ),
-        )
+    with session_scope() as session:
+        model = session.get(AttemptModel, attempt.id)
+        if model:
+            model.repo_ref = attempt.repo_ref
+            model.status = attempt.status.value
+            model.plan_json = dump_model(attempt.plan)
+            model.diff = attempt.diff
+            model.test_exit_code = attempt.test_exit_code
+            model.test_stdout = attempt.test_stdout
+            model.test_stderr = attempt.test_stderr
+            model.error = attempt.error
+            model.started_at = attempt.started_at
+            model.finished_at = attempt.finished_at
     return attempt

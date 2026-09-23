@@ -1,121 +1,109 @@
-"""Idea persistence layer."""
+"""Idea persistence layer using SQLAlchemy."""
 
-import sqlite3
+from sqlalchemy import select
 
-from database.connection import connect, utc_now_iso
+from database.connection import session_scope, utc_now_iso
 from database.models import Idea, IdeaStatus
+from database.orm import IdeaModel
 
 
-def row_to_idea(row: sqlite3.Row) -> Idea:
+def orm_to_idea(orm: IdeaModel) -> Idea:
     return Idea(
-        id=row["id"],
-        meeting_id=row["meeting_id"],
-        title=row["title"],
-        description=row["description"],
-        source_quote=row["source_quote"],
-        speaker=row["speaker"],
-        timestamp=row["timestamp"],
-        urgency=row["urgency"],
-        feasibility_hypothesis=row["feasibility_hypothesis"],
-        fingerprint=row["fingerprint"],
-        duplicate_of_id=row["duplicate_of_id"],
-        status=IdeaStatus(row["status"]),
-        created_at=row["created_at"],
+        id=orm.id,
+        meeting_id=orm.meeting_id,
+        title=orm.title,
+        description=orm.description,
+        source_quote=orm.source_quote,
+        speaker=orm.speaker,
+        timestamp=orm.timestamp,
+        urgency=orm.urgency,
+        feasibility_hypothesis=orm.feasibility_hypothesis,
+        fingerprint=orm.fingerprint,
+        duplicate_of_id=orm.duplicate_of_id,
+        status=IdeaStatus(orm.status),
+        created_at=orm.created_at,
     )
+
+
+row_to_idea = orm_to_idea
 
 
 def create_idea(idea: Idea) -> Idea:
     created_at = idea.created_at or utc_now_iso()
-    with connect() as conn:
-        cur = conn.execute(
-            """INSERT INTO idea
-               (meeting_id, title, description, source_quote, speaker, timestamp,
-                urgency, feasibility_hypothesis, fingerprint, duplicate_of_id,
-                status, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                idea.meeting_id,
-                idea.title,
-                idea.description,
-                idea.source_quote,
-                idea.speaker,
-                idea.timestamp,
-                idea.urgency,
-                idea.feasibility_hypothesis,
-                idea.fingerprint,
-                idea.duplicate_of_id,
-                idea.status.value,
-                created_at,
-            ),
+    with session_scope() as session:
+        model = IdeaModel(
+            meeting_id=idea.meeting_id,
+            title=idea.title,
+            description=idea.description,
+            source_quote=idea.source_quote,
+            speaker=idea.speaker,
+            timestamp=idea.timestamp,
+            urgency=idea.urgency,
+            feasibility_hypothesis=idea.feasibility_hypothesis,
+            fingerprint=idea.fingerprint,
+            duplicate_of_id=idea.duplicate_of_id,
+            status=idea.status.value,
+            created_at=created_at,
         )
-        return idea.model_copy(update={"id": cur.lastrowid, "created_at": created_at})
+        session.add(model)
+        session.flush()
+        return orm_to_idea(model)
 
 
 def get_idea(idea_id: int) -> Idea | None:
-    with connect() as conn:
-        row = conn.execute("SELECT * FROM idea WHERE id = ?", (idea_id,)).fetchone()
-    return row_to_idea(row) if row else None
+    with session_scope() as session:
+        model = session.get(IdeaModel, idea_id)
+        return orm_to_idea(model) if model else None
 
 
 def list_ideas(
     status: IdeaStatus | None = None, meeting_id: int | None = None
 ) -> list[Idea]:
-    sql = "SELECT * FROM idea"
-    clauses: list[str] = []
-    params: list[object] = []
-    if status is not None:
-        clauses.append("status = ?")
-        params.append(status.value)
-    if meeting_id is not None:
-        clauses.append("meeting_id = ?")
-        params.append(meeting_id)
-    if clauses:
-        sql += " WHERE " + " AND ".join(clauses)
-    sql += " ORDER BY id"
-    with connect() as conn:
-        rows = conn.execute(sql, params).fetchall()
-    return [row_to_idea(row) for row in rows]
+    with session_scope() as session:
+        stmt = select(IdeaModel)
+        if status is not None:
+            stmt = stmt.where(IdeaModel.status == status.value)
+        if meeting_id is not None:
+            stmt = stmt.where(IdeaModel.meeting_id == meeting_id)
+        stmt = stmt.order_by(IdeaModel.id)
+        models = session.scalars(stmt).all()
+        return [orm_to_idea(m) for m in models]
 
 
 def find_idea_by_fingerprint(fingerprint: str) -> Idea | None:
     """Return the earliest idea with this fingerprint, for cross-meeting dedup."""
     if not fingerprint:
         return None
-    with connect() as conn:
-        row = conn.execute(
-            "SELECT * FROM idea WHERE fingerprint = ? ORDER BY id LIMIT 1",
-            (fingerprint,),
-        ).fetchone()
-    return row_to_idea(row) if row else None
+    with session_scope() as session:
+        stmt = (
+            select(IdeaModel)
+            .where(IdeaModel.fingerprint == fingerprint)
+            .order_by(IdeaModel.id)
+            .limit(1)
+        )
+        model = session.scalars(stmt).first()
+        return orm_to_idea(model) if model else None
 
 
 def set_idea_status(idea_id: int, status: IdeaStatus) -> None:
-    with connect() as conn:
-        conn.execute(
-            "UPDATE idea SET status = ? WHERE id = ?", (status.value, idea_id)
-        )
+    with session_scope() as session:
+        model = session.get(IdeaModel, idea_id)
+        if model:
+            model.status = status.value
 
 
 def update_idea(idea: Idea) -> Idea:
-    with connect() as conn:
-        conn.execute(
-            """UPDATE idea
-               SET title = ?, description = ?, source_quote = ?, speaker = ?,
-                   timestamp = ?, urgency = ?, feasibility_hypothesis = ?,
-                   fingerprint = ?, duplicate_of_id = ?, status = ?
-               WHERE id = ?""",
-            (
-                idea.title,
-                idea.description,
-                idea.source_quote,
-                idea.speaker,
-                idea.timestamp,
-                idea.urgency,
-                idea.feasibility_hypothesis,
-                idea.fingerprint,
-                idea.duplicate_of_id,
-                idea.status.value,
-                idea.id,
-            ),
-        )
+    with session_scope() as session:
+        model = session.get(IdeaModel, idea.id)
+        if model:
+            model.title = idea.title
+            model.description = idea.description
+            model.source_quote = idea.source_quote
+            model.speaker = idea.speaker
+            model.timestamp = idea.timestamp
+            model.urgency = idea.urgency
+            model.feasibility_hypothesis = idea.feasibility_hypothesis
+            model.fingerprint = idea.fingerprint
+            model.duplicate_of_id = idea.duplicate_of_id
+            model.status = idea.status.value
     return idea

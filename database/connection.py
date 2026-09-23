@@ -1,31 +1,111 @@
-"""SQLite connection and transaction management."""
+"""SQLAlchemy engine, session management, and connection utilities."""
 
 import json
-import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator, TypeVar
 
 from pydantic import BaseModel, TypeAdapter
+from sqlalchemy import Engine, create_engine, event
+from sqlalchemy.orm import Session, sessionmaker
 
 from config import settings
 
 BUSY_TIMEOUT_MS = 5000
 
 _db_path: Path | None = None
+_engine: Engine | None = None
+_session_factory: sessionmaker[Session] | None = None
+
 T = TypeVar("T", bound=BaseModel)
 
 
 def set_database_path(path: Path | str | None) -> None:
     """Override the database location. Used by tests and runtime config."""
-    global _db_path
+    global _db_path, _engine, _session_factory
     _db_path = Path(path) if path is not None else None
+    if _engine is not None:
+        _engine.dispose()
+    _engine = None
+    _session_factory = None
 
 
 def database_path() -> Path:
     """Return the active database file path."""
     return _db_path if _db_path is not None else settings.database_path
+
+
+def get_engine() -> Engine:
+    """Return or initialize the singleton SQLAlchemy Engine."""
+    global _engine
+    if _engine is None:
+        db_file = database_path()
+        db_file.parent.mkdir(parents=True, exist_ok=True)
+        engine = create_engine(
+            f"sqlite:///{db_file}",
+            connect_args={"timeout": BUSY_TIMEOUT_MS / 1000},
+            echo=False,
+            future=True,
+        )
+
+        @event.listens_for(engine, "connect")
+        def set_sqlite_pragma(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.execute(f"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}")
+            cursor.close()
+
+        _engine = engine
+    return _engine
+
+
+def get_session_factory() -> sessionmaker[Session]:
+    """Return or initialize the sessionmaker."""
+    global _session_factory
+    if _session_factory is None:
+        _session_factory = sessionmaker(
+            bind=get_engine(),
+            autoflush=False,
+            expire_on_commit=False,
+        )
+    return _session_factory
+
+
+@contextmanager
+def session_scope() -> Iterator[Session]:
+    """Context manager for SQLAlchemy database sessions.
+
+    Commits upon successful block completion and rolls back on exception.
+    """
+    factory = get_session_factory()
+    session = factory()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+@contextmanager
+def connect():
+    """Raw DBAPI connection context manager for backward compatibility."""
+    import sqlite3
+
+    raw_conn = get_engine().raw_connection()
+    dbapi_conn = getattr(raw_conn, "driver_connection", raw_conn)
+    dbapi_conn.row_factory = sqlite3.Row
+    try:
+        yield dbapi_conn
+        raw_conn.commit()
+    except Exception:
+        raw_conn.rollback()
+        raise
+    finally:
+        raw_conn.close()
 
 
 def utc_now_iso() -> str:
@@ -54,24 +134,3 @@ def load_model_list(cls: type[T], raw: str | None) -> list[T]:
         return []
     adapter = TypeAdapter(list[cls])
     return adapter.validate_json(raw)
-
-
-@contextmanager
-def connect() -> Iterator[sqlite3.Connection]:
-    """Open an isolated SQLite connection.
-
-    Enables foreign keys and busy timeout per connection. Commits on exit,
-    rolls back on unhandled error, and closes cleanly.
-    """
-    conn = sqlite3.connect(database_path(), timeout=BUSY_TIMEOUT_MS / 1000)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys=ON")
-    conn.execute(f"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}")
-    try:
-        yield conn
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()

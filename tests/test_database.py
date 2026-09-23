@@ -34,11 +34,11 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
         self.assertEqual(db.get_repository(repo.id).name, "acme")
 
         # Unique constraint on repository source
-        with self.assertRaises(sqlite3.IntegrityError):
+        with self.assertRaises((sqlite3.IntegrityError, db.IntegrityError)):
             db.create_repository(db.Repository(name="duplicate", source="https://github.com/acme/store"))
 
         # Foreign key integrity check: cannot create orphan idea
-        with self.assertRaises(sqlite3.IntegrityError):
+        with self.assertRaises((sqlite3.IntegrityError, db.IntegrityError)):
             db.create_idea(db.Idea(meeting_id=9999, title="orphan"))
 
         # Foreign key cascades
@@ -222,6 +222,53 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
         # Invalid column injection rejected
         with self.assertRaises(ValueError):
             db.count_friction_by("attempt_id; DROP TABLE friction_log")
+
+    def test_sqlalchemy_orm_relationships(self):
+        """Verify direct SQLAlchemy 2.0 ORM models, relationships, and session usage."""
+        with db.session_scope() as session:
+            repo = db.RepositoryModel(
+                name="orm-repo", source="/tmp/orm-repo", source_type="local", created_at="2026-01-01"
+            )
+            meeting = db.MeetingModel(
+                title="ORM Design", transcript="Discussing ORM", created_at="2026-01-01"
+            )
+            session.add_all([repo, meeting])
+            session.flush()
+
+            idea = db.IdeaModel(
+                meeting_id=meeting.id,
+                title="SQLAlchemy models",
+                created_at="2026-01-01",
+            )
+            session.add(idea)
+            session.flush()
+
+            attempt = db.AttemptModel(
+                idea_id=idea.id,
+                repository_id=repo.id,
+                status="PLANNING",
+                created_at="2026-01-01",
+            )
+            session.add(attempt)
+            session.flush()
+
+            flog = db.FrictionLogModel(
+                attempt_id=attempt.id,
+                category="PRODUCT_DECISION",
+                created_at="2026-01-01",
+            )
+            session.add(flog)
+
+        # In a new session, verify relationships load seamlessly
+        with db.session_scope() as session:
+            loaded_meeting = session.get(db.MeetingModel, meeting.id)
+            self.assertEqual(len(loaded_meeting.ideas), 1)
+            self.assertEqual(loaded_meeting.ideas[0].title, "SQLAlchemy models")
+
+            loaded_attempt = session.get(db.AttemptModel, attempt.id)
+            self.assertEqual(loaded_attempt.repository.name, "orm-repo")
+            self.assertEqual(loaded_attempt.idea.title, "SQLAlchemy models")
+            self.assertEqual(len(loaded_attempt.friction_logs), 1)
 
 
 if __name__ == "__main__":

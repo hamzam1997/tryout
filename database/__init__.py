@@ -7,6 +7,9 @@ from database.connection import (
     BUSY_TIMEOUT_MS,
     connect,
     database_path,
+    get_engine,
+    get_session_factory,
+    session_scope,
     set_database_path,
     utc_now_iso,
 )
@@ -29,6 +32,14 @@ from database.models import (
     Repository,
     RouteEntry,
     TechnicalPlan,
+)
+from database.orm import (
+    Base,
+    AttemptModel,
+    FrictionLogModel,
+    IdeaModel,
+    MeetingModel,
+    RepositoryModel,
 )
 from database.repositories import (
     catalog_is_current,
@@ -59,23 +70,35 @@ from database.repositories import (
     update_repository,
 )
 from database.schema import SCHEMA, init_db
+from sqlalchemy.exc import IntegrityError
 
 __all__ = [
-    # Connection & Schema
+    # Connection & Session
     "BUSY_TIMEOUT_MS",
+    "IntegrityError",
     "SCHEMA",
     "connect",
     "database_path",
+    "get_engine",
+    "get_session_factory",
     "init_db",
+    "session_scope",
     "set_database_path",
     "utc_now_iso",
+    # SQLAlchemy ORM Models
+    "Base",
+    "RepositoryModel",
+    "MeetingModel",
+    "IdeaModel",
+    "AttemptModel",
+    "FrictionLogModel",
     # Enums
     "RepoSource",
     "MeetingSource",
     "IdeaStatus",
     "AttemptStatus",
     "FrictionCategory",
-    # Models
+    # Pydantic Schemas / DTOs
     "ModelEntry",
     "RouteEntry",
     "IntegrationEntry",

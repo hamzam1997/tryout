@@ -1,84 +1,81 @@
-"""Friction log persistence layer."""
+"""Friction log persistence layer using SQLAlchemy."""
 
-import sqlite3
+from sqlalchemy import desc, func, select
 
 from database.connection import (
-    connect,
     dump_model_list,
     load_model_list,
+    session_scope,
     utc_now_iso,
 )
 from database.models import FrictionCategory, FrictionLog, ReadinessItem
+from database.orm import FrictionLogModel
 
-ALLOWED_GROUPING_COLUMNS = {
-    "category": "category",
-    "service_name": "service_name",
-    "owning_team": "owning_team",
+ALLOWED_COLUMNS = {
+    "category": FrictionLogModel.category,
+    "service_name": FrictionLogModel.service_name,
+    "owning_team": FrictionLogModel.owning_team,
 }
 
 
-def row_to_friction_log(row: sqlite3.Row) -> FrictionLog:
+def orm_to_friction_log(orm: FrictionLogModel) -> FrictionLog:
     return FrictionLog(
-        id=row["id"],
-        attempt_id=row["attempt_id"],
-        category=FrictionCategory(row["category"]),
-        service_name=row["service_name"],
-        owning_team=row["owning_team"],
-        mock_implementation_path=row["mock_implementation_path"],
-        required_action=row["required_action"],
+        id=orm.id,
+        attempt_id=orm.attempt_id,
+        category=FrictionCategory(orm.category),
+        service_name=orm.service_name,
+        owning_team=orm.owning_team,
+        mock_implementation_path=orm.mock_implementation_path,
+        required_action=orm.required_action,
         readiness_checklist=load_model_list(
-            ReadinessItem, row["readiness_checklist_json"]
+            ReadinessItem, orm.readiness_checklist_json
         ),
-        created_at=row["created_at"],
+        created_at=orm.created_at,
     )
+
+
+row_to_friction_log = orm_to_friction_log
 
 
 def create_friction_log(log: FrictionLog) -> FrictionLog:
     created_at = log.created_at or utc_now_iso()
-    with connect() as conn:
-        cur = conn.execute(
-            """INSERT INTO friction_log
-               (attempt_id, category, service_name, owning_team,
-                mock_implementation_path, required_action,
-                readiness_checklist_json, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                log.attempt_id,
-                log.category.value,
-                log.service_name,
-                log.owning_team,
-                log.mock_implementation_path,
-                log.required_action,
-                dump_model_list(log.readiness_checklist),
-                created_at,
-            ),
+    with session_scope() as session:
+        model = FrictionLogModel(
+            attempt_id=log.attempt_id,
+            category=log.category.value,
+            service_name=log.service_name,
+            owning_team=log.owning_team,
+            mock_implementation_path=log.mock_implementation_path,
+            required_action=log.required_action,
+            readiness_checklist_json=dump_model_list(log.readiness_checklist),
+            created_at=created_at,
         )
-        return log.model_copy(update={"id": cur.lastrowid, "created_at": created_at})
+        session.add(model)
+        session.flush()
+        return orm_to_friction_log(model)
 
 
 def list_friction_logs(attempt_id: int | None = None) -> list[FrictionLog]:
-    sql = "SELECT * FROM friction_log"
-    params: list[object] = []
-    if attempt_id is not None:
-        sql += " WHERE attempt_id = ?"
-        params.append(attempt_id)
-    sql += " ORDER BY id"
-    with connect() as conn:
-        rows = conn.execute(sql, params).fetchall()
-    return [row_to_friction_log(row) for row in rows]
+    with session_scope() as session:
+        stmt = select(FrictionLogModel)
+        if attempt_id is not None:
+            stmt = stmt.where(FrictionLogModel.attempt_id == attempt_id)
+        stmt = stmt.order_by(FrictionLogModel.id)
+        models = session.scalars(stmt).all()
+        return [orm_to_friction_log(m) for m in models]
 
 
 def count_friction_by(column: str) -> list[tuple[str, int]]:
-    """Aggregate friction logs for the bottleneck map."""
-    if column not in ALLOWED_GROUPING_COLUMNS:
+    """Aggregate friction logs for the bottleneck map safely via ORM."""
+    if column not in ALLOWED_COLUMNS:
         raise ValueError(f"cannot group friction logs by {column!r}")
-    safe_col = ALLOWED_GROUPING_COLUMNS[column]
-    with connect() as conn:
-        rows = conn.execute(
-            f"""SELECT {safe_col} AS key, COUNT(*) AS total
-                FROM friction_log
-                WHERE {safe_col} != ''
-                GROUP BY {safe_col}
-                ORDER BY total DESC, key"""
-        ).fetchall()
-    return [(row["key"], row["total"]) for row in rows]
+    col = ALLOWED_COLUMNS[column]
+    with session_scope() as session:
+        stmt = (
+            select(col.label("key"), func.count().label("total"))
+            .where(col != "")
+            .group_by(col)
+            .order_by(desc("total"), col)
+        )
+        rows = session.execute(stmt).all()
+        return [(row[0], row[1]) for row in rows]

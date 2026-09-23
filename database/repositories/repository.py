@@ -1,70 +1,68 @@
-"""Repository persistence layer for codebase repositories."""
+"""Repository persistence layer for codebase repositories using SQLAlchemy."""
 
-import sqlite3
+from sqlalchemy import select
 
 from database.connection import (
-    connect,
     dump_model,
     load_model,
+    session_scope,
     utc_now_iso,
 )
 from database.models import ArchitectureCatalog, RepoSource, Repository
+from database.orm import RepositoryModel
 
 
-def row_to_repository(row: sqlite3.Row) -> Repository:
+def orm_to_repository(orm: RepositoryModel) -> Repository:
     return Repository(
-        id=row["id"],
-        name=row["name"],
-        source=row["source"],
-        source_type=RepoSource(row["source_type"]),
-        source_ref=row["source_ref"],
-        catalog=load_model(ArchitectureCatalog, row["catalog_json"]),
-        catalog_generated_at=row["catalog_generated_at"],
-        created_at=row["created_at"],
+        id=orm.id,
+        name=orm.name,
+        source=orm.source,
+        source_type=RepoSource(orm.source_type),
+        source_ref=orm.source_ref,
+        catalog=load_model(ArchitectureCatalog, orm.catalog_json),
+        catalog_generated_at=orm.catalog_generated_at,
+        created_at=orm.created_at,
     )
+
+
+row_to_repository = orm_to_repository
 
 
 def create_repository(repo: Repository) -> Repository:
     created_at = repo.created_at or utc_now_iso()
-    with connect() as conn:
-        cur = conn.execute(
-            """INSERT INTO repository
-               (name, source, source_type, source_ref, catalog_json,
-                catalog_generated_at, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (
-                repo.name,
-                repo.source,
-                repo.source_type.value,
-                repo.source_ref,
-                dump_model(repo.catalog),
-                repo.catalog_generated_at,
-                created_at,
-            ),
+    with session_scope() as session:
+        model = RepositoryModel(
+            name=repo.name,
+            source=repo.source,
+            source_type=repo.source_type.value,
+            source_ref=repo.source_ref,
+            catalog_json=dump_model(repo.catalog),
+            catalog_generated_at=repo.catalog_generated_at,
+            created_at=created_at,
         )
-        return repo.model_copy(update={"id": cur.lastrowid, "created_at": created_at})
+        session.add(model)
+        session.flush()
+        return orm_to_repository(model)
 
 
 def get_repository(repo_id: int) -> Repository | None:
-    with connect() as conn:
-        row = conn.execute(
-            "SELECT * FROM repository WHERE id = ?", (repo_id,)
-        ).fetchone()
-    return row_to_repository(row) if row else None
+    with session_scope() as session:
+        model = session.get(RepositoryModel, repo_id)
+        return orm_to_repository(model) if model else None
 
 
 def get_repository_by_source(source: str) -> Repository | None:
-    with connect() as conn:
-        row = conn.execute(
-            "SELECT * FROM repository WHERE source = ?", (source,)
-        ).fetchone()
-    return row_to_repository(row) if row else None
+    with session_scope() as session:
+        stmt = select(RepositoryModel).where(RepositoryModel.source == source)
+        model = session.scalars(stmt).first()
+        return orm_to_repository(model) if model else None
 
 
 def list_repositories() -> list[Repository]:
-    with connect() as conn:
-        rows = conn.execute("SELECT * FROM repository ORDER BY id").fetchall()
-    return [row_to_repository(row) for row in rows]
+    with session_scope() as session:
+        stmt = select(RepositoryModel).order_by(RepositoryModel.id)
+        models = session.scalars(stmt).all()
+        return [orm_to_repository(m) for m in models]
 
 
 def get_or_create_repository(repo: Repository) -> Repository:
@@ -73,22 +71,15 @@ def get_or_create_repository(repo: Repository) -> Repository:
 
 
 def update_repository(repo: Repository) -> Repository:
-    with connect() as conn:
-        conn.execute(
-            """UPDATE repository
-               SET name = ?, source = ?, source_type = ?, source_ref = ?,
-                   catalog_json = ?, catalog_generated_at = ?
-               WHERE id = ?""",
-            (
-                repo.name,
-                repo.source,
-                repo.source_type.value,
-                repo.source_ref,
-                dump_model(repo.catalog),
-                repo.catalog_generated_at,
-                repo.id,
-            ),
-        )
+    with session_scope() as session:
+        model = session.get(RepositoryModel, repo.id)
+        if model:
+            model.name = repo.name
+            model.source = repo.source
+            model.source_type = repo.source_type.value
+            model.source_ref = repo.source_ref
+            model.catalog_json = dump_model(repo.catalog)
+            model.catalog_generated_at = repo.catalog_generated_at
     return repo
 
 
@@ -96,13 +87,12 @@ def save_catalog(
     repo_id: int, catalog: ArchitectureCatalog, source_ref: str | None = None
 ) -> None:
     """Cache a generated catalog against the repo state it was built from."""
-    with connect() as conn:
-        conn.execute(
-            """UPDATE repository
-               SET catalog_json = ?, catalog_generated_at = ?, source_ref = ?
-               WHERE id = ?""",
-            (catalog.model_dump_json(), utc_now_iso(), source_ref, repo_id),
-        )
+    with session_scope() as session:
+        model = session.get(RepositoryModel, repo_id)
+        if model:
+            model.catalog_json = catalog.model_dump_json()
+            model.catalog_generated_at = utc_now_iso()
+            model.source_ref = source_ref
 
 
 def catalog_is_current(repo: Repository, source_ref: str | None) -> bool:
