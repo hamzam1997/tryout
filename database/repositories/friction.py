@@ -9,7 +9,7 @@ from database.connection import (
     utc_now_iso,
 )
 from database.models import FrictionLog as FrictionLogModel
-from database.schemas import FrictionCategory, FrictionLog, ReadinessItem
+from schemas import FrictionCategory, FrictionLog, ReadinessItem
 
 ALLOWED_COLUMNS = {
     "category": FrictionLogModel.category,

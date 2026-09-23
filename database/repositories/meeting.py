@@ -9,7 +9,7 @@ from database.connection import (
     utc_now_iso,
 )
 from database.models import Meeting as MeetingModel
-from database.schemas import Meeting, MeetingMinutes, MeetingSource
+from schemas import Meeting, MeetingMinutes, MeetingSource
 
 
 def orm_to_meeting(orm: MeetingModel) -> Meeting:

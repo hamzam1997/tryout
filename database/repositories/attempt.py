@@ -9,7 +9,7 @@ from database.connection import (
     utc_now_iso,
 )
 from database.models import Attempt as AttemptModel
-from database.schemas import Attempt, AttemptStatus, TechnicalPlan
+from schemas import Attempt, AttemptStatus, TechnicalPlan
 
 
 def orm_to_attempt(orm: AttemptModel) -> Attempt:

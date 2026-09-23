@@ -4,7 +4,7 @@ from sqlalchemy import select
 
 from database.connection import session_scope, utc_now_iso
 from database.models import Idea as IdeaModel
-from database.schemas import Idea, IdeaStatus
+from schemas import Idea, IdeaStatus
 
 
 def orm_to_idea(orm: IdeaModel) -> Idea:

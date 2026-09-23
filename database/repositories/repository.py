@@ -9,7 +9,7 @@ from database.connection import (
     utc_now_iso,
 )
 from database.models import Repository as RepositoryModel
-from database.schemas import ArchitectureCatalog, RepoSource, Repository
+from schemas import ArchitectureCatalog, RepoSource, Repository
 
 
 def orm_to_repository(orm: RepositoryModel) -> Repository:

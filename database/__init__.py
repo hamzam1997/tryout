@@ -21,7 +21,7 @@ from database.models import (
     Meeting as MeetingModel,
     Repository as RepositoryModel,
 )
-from database.schemas import (
+from schemas import (
     ArchitectureCatalog,
     Attempt,
     AttemptSchema,
