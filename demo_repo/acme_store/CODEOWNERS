@@ -1,0 +1,12 @@
+/models.py              @team-platform
+/store.py               @team-platform
+
+/routes/orders.py       @team-orders
+/routes/checkout.py     @team-payments
+/routes/refunds.py      @team-payments
+/integrations/          @team-payments
+
+/tests/                 @team-platform
+
+# Customer-facing messaging (email, SMS, push) is owned by @team-comms and
+# lives in the notifications-service repository, not here.
