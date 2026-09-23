@@ -8,8 +8,8 @@ from database.connection import (
     session_scope,
     utc_now_iso,
 )
-from database.models import FrictionCategory, FrictionLog, ReadinessItem
-from database.orm import FrictionLogModel
+from database.models import FrictionLog as FrictionLogModel
+from database.schemas import FrictionCategory, FrictionLog, ReadinessItem
 
 ALLOWED_COLUMNS = {
     "category": FrictionLogModel.category,

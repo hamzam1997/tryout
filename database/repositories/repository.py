@@ -8,8 +8,8 @@ from database.connection import (
     session_scope,
     utc_now_iso,
 )
-from database.models import ArchitectureCatalog, RepoSource, Repository
-from database.orm import RepositoryModel
+from database.models import Repository as RepositoryModel
+from database.schemas import ArchitectureCatalog, RepoSource, Repository
 
 
 def orm_to_repository(orm: RepositoryModel) -> Repository:

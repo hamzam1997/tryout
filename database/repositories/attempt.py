@@ -8,8 +8,8 @@ from database.connection import (
     session_scope,
     utc_now_iso,
 )
-from database.models import Attempt, AttemptStatus, TechnicalPlan
-from database.orm import AttemptModel
+from database.models import Attempt as AttemptModel
+from database.schemas import Attempt, AttemptStatus, TechnicalPlan
 
 
 def orm_to_attempt(orm: AttemptModel) -> Attempt:

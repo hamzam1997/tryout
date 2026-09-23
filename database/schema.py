@@ -3,10 +3,10 @@
 from sqlalchemy import text
 
 from database.connection import database_path, get_engine
-from database.orm import Base
+from database.models import Base
 
 SCHEMA = """
--- Managed by SQLAlchemy 2.0 DeclarativeBase (database.orm.Base)
+-- Managed by SQLAlchemy 2.0 DeclarativeBase (database.models.Base)
 -- Tables: repository, meeting, idea, attempt, friction_log
 """
 

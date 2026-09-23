@@ -1,164 +1,155 @@
-"""Domain models and schemas for tryout."""
+"""SQLAlchemy 2.0 ORM database models."""
 
-from enum import Enum
-from pydantic import BaseModel, Field
+from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-
-class RepoSource(str, Enum):
-    GITHUB = "github"
-    LOCAL = "local"
-    DEMO = "demo"
-
-
-class MeetingSource(str, Enum):
-    MEET = "meet"
-    UPLOAD = "upload"
-    PASTE = "paste"
-    SEED = "seed"
+from database.schemas import (
+    AttemptStatus,
+    IdeaStatus,
+    MeetingSource,
+    RepoSource,
+)
 
 
-class IdeaStatus(str, Enum):
-    PENDING = "PENDING"
-    APPROVED = "APPROVED"
-    REJECTED = "REJECTED"
+class Base(DeclarativeBase):
+    """Declarative base class for all database models."""
+    pass
 
 
-class AttemptStatus(str, Enum):
-    QUEUED = "QUEUED"
-    PLANNING = "PLANNING"
-    CODING = "CODING"
-    TESTING = "TESTING"
-    COMPLETE = "COMPLETE"
-    FAILED = "FAILED"
+class Repository(Base):
+    __tablename__ = "repository"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    source: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    source_type: Mapped[str] = mapped_column(
+        String, nullable=False, default=RepoSource.LOCAL.value
+    )
+    source_ref: Mapped[str | None] = mapped_column(String, nullable=True)
+    catalog_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    catalog_generated_at: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+
+    attempts: Mapped[list["Attempt"]] = relationship(
+        back_populates="repository", cascade="all, delete-orphan"
+    )
 
 
-class FrictionCategory(str, Enum):
-    EXTERNAL_SERVICE_DEPENDENCY = "EXTERNAL_SERVICE_DEPENDENCY"
-    AUTH_CREDENTIAL_REQUIRED = "AUTH_CREDENTIAL_REQUIRED"
-    SCHEMA_MIGRATION_REQUIRED = "SCHEMA_MIGRATION_REQUIRED"
-    CROSS_TEAM_CONTRACT = "CROSS_TEAM_CONTRACT"
-    PRODUCT_DECISION = "PRODUCT_DECISION"
+class Meeting(Base):
+    __tablename__ = "meeting"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    occurred_at: Mapped[str | None] = mapped_column(String, nullable=True)
+    external_source: Mapped[str] = mapped_column(
+        String, nullable=False, default=MeetingSource.PASTE.value
+    )
+    external_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    external_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    transcript: Mapped[str] = mapped_column(Text, nullable=False)
+    minutes_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+
+    ideas: Mapped[list["Idea"]] = relationship(
+        back_populates="meeting", cascade="all, delete-orphan"
+    )
 
 
-class ModelEntry(BaseModel):
-    name: str
-    fields: list[str] = Field(default_factory=list)
+class Idea(Base):
+    __tablename__ = "idea"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    meeting_id: Mapped[int] = mapped_column(
+        ForeignKey("meeting.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    source_quote: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    speaker: Mapped[str] = mapped_column(String, nullable=False, default="")
+    timestamp: Mapped[str] = mapped_column(String, nullable=False, default="")
+    urgency: Mapped[str] = mapped_column(String, nullable=False, default="")
+    feasibility_hypothesis: Mapped[str] = mapped_column(
+        Text, nullable=False, default=""
+    )
+    fingerprint: Mapped[str] = mapped_column(
+        String, nullable=False, default="", index=True
+    )
+    duplicate_of_id: Mapped[int | None] = mapped_column(
+        ForeignKey("idea.id", ondelete="SET NULL"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default=IdeaStatus.PENDING.value, index=True
+    )
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+
+    meeting: Mapped["Meeting"] = relationship(back_populates="ideas")
+    duplicate_of: Mapped["Idea | None"] = relationship(
+        remote_side=[id], foreign_keys=[duplicate_of_id]
+    )
+    attempts: Mapped[list["Attempt"]] = relationship(
+        back_populates="idea", cascade="all, delete-orphan"
+    )
 
 
-class RouteEntry(BaseModel):
-    method: str = ""
-    path: str
-    handler: str = ""
+class Attempt(Base):
+    __tablename__ = "attempt"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    idea_id: Mapped[int] = mapped_column(
+        ForeignKey("idea.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    repository_id: Mapped[int] = mapped_column(
+        ForeignKey("repository.id", ondelete="CASCADE"), nullable=False
+    )
+    repo_ref: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String, nullable=False, default=AttemptStatus.QUEUED.value
+    )
+    plan_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    diff: Mapped[str | None] = mapped_column(Text, nullable=True)
+    test_exit_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    test_stdout: Mapped[str | None] = mapped_column(Text, nullable=True)
+    test_stderr: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[str | None] = mapped_column(String, nullable=True)
+    finished_at: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+
+    idea: Mapped["Idea"] = relationship(back_populates="attempts")
+    repository: Mapped["Repository"] = relationship(back_populates="attempts")
+    friction_logs: Mapped[list["FrictionLog"]] = relationship(
+        back_populates="attempt", cascade="all, delete-orphan"
+    )
 
 
-class IntegrationEntry(BaseModel):
-    name: str
-    auth: str = ""
-    env_keys: list[str] = Field(default_factory=list)
+class FrictionLog(Base):
+    __tablename__ = "friction_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    attempt_id: Mapped[int] = mapped_column(
+        ForeignKey("attempt.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    category: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    service_name: Mapped[str] = mapped_column(
+        String, nullable=False, default="", index=True
+    )
+    owning_team: Mapped[str] = mapped_column(
+        String, nullable=False, default="", index=True
+    )
+    mock_implementation_path: Mapped[str] = mapped_column(
+        String, nullable=False, default=""
+    )
+    required_action: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    readiness_checklist_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+
+    attempt: Mapped["Attempt"] = relationship(back_populates="friction_logs")
 
 
-class ArchitectureCatalog(BaseModel):
-    name: str = ""
-    language: str = ""
-    framework: str = ""
-    summary: str = ""
-    internal_models: list[ModelEntry] = Field(default_factory=list)
-    api_routes: list[RouteEntry] = Field(default_factory=list)
-    external_integrations: list[IntegrationEntry] = Field(default_factory=list)
-    config_schema: list[str] = Field(default_factory=list)
-    codeowners: dict[str, str] = Field(default_factory=dict)
-
-
-class MeetingMinutes(BaseModel):
-    summary: str = ""
-    key_points: list[str] = Field(default_factory=list)
-    action_items: list[str] = Field(default_factory=list)
-
-
-class PlanStep(BaseModel):
-    order: int
-    action: str
-    target: str = ""
-    rationale: str = ""
-
-
-class TechnicalPlan(BaseModel):
-    summary: str = ""
-    repo_changes: list[PlanStep] = Field(default_factory=list)
-    external_requirements: list[str] = Field(default_factory=list)
-    mock_strategy: str = ""
-
-
-class ReadinessItem(BaseModel):
-    task: str
-    owner: str = ""
-    done: bool = False
-
-
-class Repository(BaseModel):
-    id: int | None = None
-    name: str
-    source: str
-    source_type: RepoSource = RepoSource.LOCAL
-    source_ref: str | None = None
-    catalog: ArchitectureCatalog | None = None
-    catalog_generated_at: str | None = None
-    created_at: str | None = None
-
-
-class Meeting(BaseModel):
-    id: int | None = None
-    title: str
-    occurred_at: str | None = None
-    external_source: MeetingSource = MeetingSource.PASTE
-    external_id: str | None = None
-    external_url: str | None = None
-    source_type: str | None = None
-    transcript: str
-    minutes: MeetingMinutes | None = None
-    created_at: str | None = None
-
-
-class Idea(BaseModel):
-    id: int | None = None
-    meeting_id: int
-    title: str
-    description: str = ""
-    source_quote: str = ""
-    speaker: str = ""
-    timestamp: str = ""
-    urgency: str = ""
-    feasibility_hypothesis: str = ""
-    fingerprint: str = ""
-    duplicate_of_id: int | None = None
-    status: IdeaStatus = IdeaStatus.PENDING
-    created_at: str | None = None
-
-
-class Attempt(BaseModel):
-    id: int | None = None
-    idea_id: int
-    repository_id: int
-    repo_ref: str | None = None
-    status: AttemptStatus = AttemptStatus.QUEUED
-    plan: TechnicalPlan | None = None
-    diff: str | None = None
-    test_exit_code: int | None = None
-    test_stdout: str | None = None
-    test_stderr: str | None = None
-    error: str | None = None
-    started_at: str | None = None
-    finished_at: str | None = None
-    created_at: str | None = None
-
-
-class FrictionLog(BaseModel):
-    id: int | None = None
-    attempt_id: int
-    category: FrictionCategory
-    service_name: str = ""
-    owning_team: str = ""
-    mock_implementation_path: str = ""
-    required_action: str = ""
-    readiness_checklist: list[ReadinessItem] = Field(default_factory=list)
-    created_at: str | None = None
+# Model aliases for compatibility
+RepositoryModel = Repository
+MeetingModel = Meeting
+IdeaModel = Idea
+AttemptModel = Attempt
+FrictionLogModel = FrictionLog

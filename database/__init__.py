@@ -14,32 +14,37 @@ from database.connection import (
     utc_now_iso,
 )
 from database.models import (
+    Base,
+    Attempt as AttemptModel,
+    FrictionLog as FrictionLogModel,
+    Idea as IdeaModel,
+    Meeting as MeetingModel,
+    Repository as RepositoryModel,
+)
+from database.schemas import (
     ArchitectureCatalog,
     Attempt,
+    AttemptSchema,
     AttemptStatus,
     FrictionCategory,
     FrictionLog,
+    FrictionLogSchema,
     Idea,
+    IdeaSchema,
     IdeaStatus,
     IntegrationEntry,
     Meeting,
     MeetingMinutes,
+    MeetingSchema,
     MeetingSource,
     ModelEntry,
     PlanStep,
     ReadinessItem,
     RepoSource,
     Repository,
+    RepositorySchema,
     RouteEntry,
     TechnicalPlan,
-)
-from database.orm import (
-    Base,
-    AttemptModel,
-    FrictionLogModel,
-    IdeaModel,
-    MeetingModel,
-    RepositoryModel,
 )
 from database.repositories import (
     catalog_is_current,
