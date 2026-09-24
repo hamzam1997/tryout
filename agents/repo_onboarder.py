@@ -21,8 +21,10 @@ from llm import get_client
 from repo_scanner import RepoSkeleton, scan_repo
 from schemas import (
     ArchitectureCatalog,
+    FileRole,
     IntegrationEntry,
     ModelEntry,
+    ModuleDescription,
     RepoSkeleton as RepoSkeletonSchema,
     RepoSource,
     Repository,
@@ -35,24 +37,50 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 REPO_ONBOARDER_SYSTEM_INSTRUCTION = """You are an expert Principal Software Architect and Repository Onboarding Agent.
-Your task is to analyze an architectural code skeleton of a software repository and synthesize a structured ArchitectureCatalog.
+Your task is to analyze an architectural code skeleton of a software repository and synthesize a rich, high-fidelity ArchitectureCatalog designed to guide AI planning and coding agents.
 
 You must extract:
 1. name: Name of the repository or service.
 2. language: Primary programming language (e.g., Python, TypeScript, Go).
 3. framework: The primary web or application framework used (e.g., Flask, FastAPI, Django, Express, Next.js).
-4. summary: A concise architectural overview explaining what this service does and its core domain logic.
-5. internal_models: All internal business entities, data models, and database schemas with their field names.
-6. api_routes: All HTTP/API routes with HTTP method (GET, POST, PUT, DELETE, etc.), route path, and handler function name.
-7. external_integrations: All third-party services, external APIs, payment gateways, message queues, or external services called, including their authentication mechanism and required environment variable keys.
-8. config_keys: All configuration keys and environment variables required by the application (e.g. from .env.example, config files, or os.getenv).
-9. codeowners: Mapping of file path patterns or directories to owning teams/engineers from CODEOWNERS files.
+4. entrypoint: Main application entrypoint file (e.g., app.py, main.py, server.ts).
+5. test_command: Command to execute the automated test suite (e.g., python -m unittest discover -s tests, pytest, npm test).
+6. summary: A concise architectural overview explaining what this service does and its core domain logic.
+7. dependencies: Primary external packages and libraries used (e.g. from requirements.txt, package.json).
+8. modules: The 3 to 7 primary architectural modules / subsystems dividing the repository domain. For each module provide:
+   - name: Clear title of the subsystem (e.g. Orders & Checkout, Payments Adapter, Logistics & Shifts).
+   - path: Primary directory path or key file location (e.g. routes/orders.py, src/libdispatch/).
+   - description: What this module does and the business domain it encapsulates.
+   - responsibilities: Bullet list of specific jobs or capabilities handled by this module.
+   - key_files: Main files belonging to this module.
+   - owner: Owning team or codeowner handle (e.g. @team-orders, @team-payments).
+9. key_files: Key architectural files and their responsibilities.
+10. internal_models: All internal business entities, data models, and database schemas with:
+   - name: Entity name (e.g. Order, Customer).
+   - file_path: File where it is defined.
+   - description: Domain meaning and purpose.
+   - fields: List of field/attribute names.
+11. api_routes: All HTTP/API endpoints with:
+   - method: HTTP method (GET, POST, PUT, DELETE, etc.).
+   - path: Route pattern (e.g. /orders, /refunds).
+   - handler: Controller or handler function name.
+   - file_path: File where the route is implemented.
+   - description: What this endpoint accomplishes.
+12. external_integrations: All third-party services, APIs, payment gateways, message queues, or external services called by the codebase, with:
+   - name: Service name.
+   - file_path: Adapter or client file path.
+   - description: Purpose of integration.
+   - auth: Authentication mechanism.
+   - env_keys: Environment variable keys required.
+13. external_dependencies: Any known external services or microservices referenced or mentioned outside this repository (such as notifications service owned by @team-comms).
+14. config_keys: All configuration keys and environment variables required by the application.
+15. codeowners: Mapping of file path patterns or directories to owning teams/engineers from CODEOWNERS files.
+16. coding_guidelines: Key conventions, testing practices, and patterns for coding agents working in this repository.
 
 Rules:
+- Group the codebase into logical architectural modules/subsystems so planning agents understand domain boundaries.
 - Rely strictly on evidence in the provided skeleton files and directory tree.
-- Do not invent models, endpoints, or integrations not evidenced in the repository.
-- Ensure every detected model includes its relevant field names.
-- Ensure every route includes its HTTP method and path pattern.
+- Ensure every detected model and route indicates the file where it is defined.
 """
 
 
@@ -178,6 +206,26 @@ class RepoOnboarder:
             fallback_codeowners = extract_codeowners_from_skeleton(skeleton_obj)
             if fallback_codeowners:
                 catalog.codeowners = fallback_codeowners
+
+        # Enrich modules with owners from codeowners if missing
+        if catalog.codeowners and catalog.modules:
+            for mod in catalog.modules:
+                if not mod.owner:
+                    for pattern, owner in catalog.codeowners.items():
+                        clean_pat = pattern.lstrip("/")
+                        if mod.path == clean_pat or mod.path.startswith(clean_pat.rstrip("/")):
+                            mod.owner = owner
+                            break
+
+        # Enrich key_files with owners from codeowners if missing
+        if catalog.codeowners and catalog.key_files:
+            for kf in catalog.key_files:
+                if not kf.owner:
+                    for pattern, owner in catalog.codeowners.items():
+                        clean_pat = pattern.lstrip("/")
+                        if kf.path == clean_pat or kf.path.startswith(clean_pat.rstrip("/")):
+                            kf.owner = owner
+                            break
 
         return catalog
 

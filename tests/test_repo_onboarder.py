@@ -19,8 +19,10 @@ from repo_scanner import scan_repo
 from schemas import (
     ArchitectureCatalog,
     FileCategory,
+    FileRole,
     IntegrationEntry,
     ModelEntry,
+    ModuleDescription,
     RepoSkeleton,
     RepoSource,
     Repository,
@@ -40,24 +42,52 @@ class TestRepoOnboarder(unittest.TestCase):
             name="acme_store",
             language="Python",
             framework="Flask",
+            entrypoint="app.py",
+            test_command="python -m unittest discover -s tests",
             summary="E-commerce store backend handling orders, refunds, and payments.",
+            dependencies=["Flask==3.0.3"],
+            modules=[
+                ModuleDescription(
+                    name="Orders & Checkout",
+                    path="routes/orders.py",
+                    description="Order creation, checkout processing, and listing",
+                    responsibilities=["Order listing", "Checkout flow"],
+                    key_files=["routes/orders.py", "routes/checkout.py"],
+                    owner="@team-orders",
+                ),
+                ModuleDescription(
+                    name="Payments & Refunds",
+                    path="routes/refunds.py",
+                    description="Payment processing and refunds via external gateway",
+                    responsibilities=["Charge authorization", "Refund processing"],
+                    key_files=["routes/refunds.py", "integrations/payments_gateway.py"],
+                    owner="@team-payments",
+                ),
+            ],
+            key_files=[
+                FileRole(path="app.py", role="Application entrypoint", owner="@team-platform"),
+                FileRole(path="models.py", role="Core dataclasses", owner="@team-platform"),
+                FileRole(path="routes/orders.py", role="Order management endpoints", owner="@team-orders"),
+            ],
             internal_models=[
-                ModelEntry(name="Customer", fields=["id", "name", "email"]),
-                ModelEntry(name="Order", fields=["id", "customer_id", "total", "status"]),
-                ModelEntry(name="Refund", fields=["id", "order_id", "amount", "reason"]),
+                ModelEntry(name="Customer", file_path="models.py", fields=["id", "name", "email"]),
+                ModelEntry(name="Order", file_path="models.py", fields=["id", "customer_id", "total", "status"]),
+                ModelEntry(name="Refund", file_path="models.py", fields=["id", "order_id", "amount", "reason"]),
             ],
             api_routes=[
-                RouteEntry(method="GET", path="/orders", handler="list_orders"),
-                RouteEntry(method="POST", path="/checkout", handler="create_order"),
-                RouteEntry(method="POST", path="/refunds", handler="process_refund"),
+                RouteEntry(method="GET", path="/orders", handler="list_orders", file_path="routes/orders.py"),
+                RouteEntry(method="POST", path="/checkout", handler="create_order", file_path="routes/checkout.py"),
+                RouteEntry(method="POST", path="/refunds", handler="process_refund", file_path="routes/refunds.py"),
             ],
             external_integrations=[
                 IntegrationEntry(
                     name="PaymentsGateway",
+                    file_path="integrations/payments_gateway.py",
                     auth="API Key",
                     env_keys=["PAYMENTS_API_KEY", "PAYMENTS_API_BASE"],
                 )
             ],
+            external_dependencies=["notifications-service (@team-comms)"],
             config_keys=["PORT", "FLASK_DEBUG", "PAYMENTS_API_KEY", "PAYMENTS_API_BASE"],
             codeowners={
                 "/models.py": "@team-platform",
@@ -66,6 +96,7 @@ class TestRepoOnboarder(unittest.TestCase):
                 "/routes/refunds.py": "@team-payments",
                 "/integrations/": "@team-payments",
             },
+            coding_guidelines=["Run tests with python -m unittest discover -s tests"],
         )
 
     def tearDown(self):
@@ -257,6 +288,38 @@ class TestRepoOnboarder(unittest.TestCase):
         acme_dir = BASE_DIR / "demo_repo" / "acme_store"
         onboarded_cat = onboard_repository(acme_dir, client=mock_client)
         self.assertEqual(onboarded_cat.name, "acme_store")
+
+    def test_modules_and_markdown_summary(self):
+        """Verify architectural modules, subsystems, and markdown guide rendering."""
+        mock_client = self._create_mock_client()
+        onboarder = RepoOnboarder(client=mock_client)
+
+        skeleton = RepoSkeleton(
+            repo_name="acme_store",
+            context_string="Dummy context",
+        )
+        catalog = onboarder.generate_catalog(skeleton)
+
+        # Verify modules
+        self.assertEqual(len(catalog.modules), 2)
+        self.assertEqual(catalog.modules[0].name, "Orders & Checkout")
+        self.assertEqual(catalog.modules[0].owner, "@team-orders")
+        self.assertIn("routes/orders.py", catalog.modules[0].key_files)
+        self.assertEqual(catalog.modules[1].name, "Payments & Refunds")
+        self.assertEqual(catalog.modules[1].owner, "@team-payments")
+
+        # Verify markdown guide output
+        md = catalog.to_markdown()
+        self.assertIn("# Architecture Catalog: acme_store", md)
+        self.assertIn("## Architectural Modules & Subsystems", md)
+        self.assertIn("### Orders & Checkout (@team-orders)", md)
+        self.assertIn("### Payments & Refunds (@team-payments)", md)
+        self.assertIn("## Data Models & Schemas", md)
+        self.assertIn("**`Customer`** (`models.py`)", md)
+        self.assertIn("## API Routes", md)
+        self.assertIn("**`GET /orders`** -> `list_orders` (`routes/orders.py`)", md)
+        self.assertIn("## External Integrations & Services", md)
+        self.assertIn("**PaymentsGateway** (`integrations/payments_gateway.py`)", md)
 
 
 if __name__ == "__main__":
