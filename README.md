@@ -2,8 +2,6 @@
 
 An AI agent that turns ideas from team meetings into working prototypes in a staging environment, logging every blocker it hits so teams see real bottlenecks before committing to the work.
 
-Built for the Google Cloud AI Builder Cup 2026, under the Future of Work & Enterprise Productivity theme.
-
 ## Problem
 
 Teams generate ideas in meetings constantly, but most never get acted on. The ones that do often run into blockers weeks into execution: missing data, access issues, dependencies on other teams, or decisions nobody made. By then, time and effort have already been spent. There's no cheap way to test an idea's feasibility right after it's discussed.
