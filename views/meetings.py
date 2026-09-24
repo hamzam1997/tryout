@@ -1,0 +1,103 @@
+"""Meeting ingestion endpoints."""
+
+from __future__ import annotations
+
+from datetime import datetime
+
+from flask import Blueprint, jsonify, request
+
+import database as db
+from agents.note_taker import NoteTakerError, ingest, take_notes
+from agents.transcript import TranscriptError
+from schemas import MeetingSource
+
+bp = Blueprint("meetings", __name__, url_prefix="/meetings")
+
+ALLOWED_SUFFIXES = (".vtt", ".srt", ".txt")
+MAX_TRANSCRIPT_BYTES = 2 * 1024 * 1024
+
+
+def _parse_occurred_at(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError("occurred_at must be ISO-8601") from exc
+
+
+def _serialise(meeting) -> dict:
+    return meeting.model_dump(mode="json")
+
+
+@bp.post("/upload")
+def upload_meeting():
+    """Ingest a .vtt/.srt/.txt transcript, then generate minutes.
+
+    The meeting row is committed before the model runs, so a Gemini failure
+    returns 502 with the transcript already stored and the meeting FAILED.
+    """
+    uploaded = request.files.get("file")
+    if uploaded is None or not uploaded.filename:
+        return jsonify({"error": "a transcript file is required"}), 400
+
+    filename = uploaded.filename
+    if not filename.lower().endswith(ALLOWED_SUFFIXES):
+        return jsonify(
+            {"error": f"unsupported file type; expected one of {ALLOWED_SUFFIXES}"}
+        ), 400
+
+    blob = uploaded.read()
+    if len(blob) > MAX_TRANSCRIPT_BYTES:
+        return jsonify({"error": "transcript exceeds 2MB"}), 413
+    try:
+        raw = blob.decode("utf-8")
+    except UnicodeDecodeError:
+        return jsonify({"error": "transcript must be UTF-8"}), 400
+
+    title = (request.form.get("title") or "").strip() or filename.rsplit(".", 1)[0]
+    try:
+        occurred_at = _parse_occurred_at(request.form.get("occurred_at"))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    try:
+        meeting, parsed = ingest(
+            raw,
+            title=title,
+            filename=filename,
+            source=MeetingSource.UPLOAD,
+            occurred_at=occurred_at,
+        )
+    except TranscriptError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    payload = {
+        "meeting": _serialise(meeting),
+        "speakers": parsed.speakers,
+        "cue_count": len(parsed.cues),
+        "format": parsed.source_format.value,
+    }
+
+    try:
+        meeting = take_notes(meeting.id)
+    except NoteTakerError as exc:
+        payload["meeting"] = _serialise(db.get_meeting(meeting.id))
+        payload["error"] = str(exc)
+        return jsonify(payload), 502
+
+    payload["meeting"] = _serialise(meeting)
+    return jsonify(payload), 201
+
+
+@bp.get("")
+def list_meetings():
+    return jsonify([_serialise(m) for m in db.list_meetings()])
+
+
+@bp.get("/<int:meeting_id>")
+def get_meeting(meeting_id: int):
+    meeting = db.get_meeting(meeting_id)
+    if meeting is None:
+        return jsonify({"error": "meeting not found"}), 404
+    return jsonify(_serialise(meeting))
