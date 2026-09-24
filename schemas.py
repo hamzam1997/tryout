@@ -50,6 +50,61 @@ class FrictionCategory(str, Enum):
     PRODUCT_DECISION = "PRODUCT_DECISION"
 
 
+class FileCategory(str, Enum):
+    MANIFEST = "MANIFEST"
+    CONFIG = "CONFIG"
+    MODEL = "MODEL"
+    ROUTE = "ROUTE"
+    INTEGRATION = "INTEGRATION"
+    ENTRYPOINT = "ENTRYPOINT"
+    DOC = "DOC"
+    OTHER = "OTHER"
+
+
+class ScannedFile(BaseModel):
+    path: str
+    category: FileCategory
+    size_bytes: int = 0
+    content: str = ""
+    truncated: bool = False
+
+
+class RepoSkeleton(BaseModel):
+    repo_name: str = ""
+    root_path: str = ""
+    files: list[ScannedFile] = Field(default_factory=list)
+    tree: str = ""
+    context_string: str = ""
+
+    @property
+    def manifests(self) -> list[ScannedFile]:
+        return [f for f in self.files if f.category == FileCategory.MANIFEST]
+
+    @property
+    def configs(self) -> list[ScannedFile]:
+        return [f for f in self.files if f.category == FileCategory.CONFIG]
+
+    @property
+    def models(self) -> list[ScannedFile]:
+        return [f for f in self.files if f.category == FileCategory.MODEL]
+
+    @property
+    def routes(self) -> list[ScannedFile]:
+        return [f for f in self.files if f.category == FileCategory.ROUTE]
+
+    @property
+    def integrations(self) -> list[ScannedFile]:
+        return [f for f in self.files if f.category == FileCategory.INTEGRATION]
+
+    @property
+    def entrypoints(self) -> list[ScannedFile]:
+        return [f for f in self.files if f.category == FileCategory.ENTRYPOINT]
+
+    @property
+    def docs(self) -> list[ScannedFile]:
+        return [f for f in self.files if f.category == FileCategory.DOC]
+
+
 class ModelEntry(BaseModel):
     name: str
     fields: list[str] = Field(default_factory=list)
