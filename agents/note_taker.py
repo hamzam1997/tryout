@@ -8,6 +8,7 @@ happened.
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime
 
 from google.genai import types
@@ -16,6 +17,7 @@ import database as db
 from agents.transcript import ParsedTranscript, parse_transcript
 from config import settings
 from llm import get_client
+from logging_setup import log_event
 from schemas import Meeting, MeetingMinutes, MeetingSource, MeetingStatus
 
 logger = logging.getLogger(__name__)
@@ -51,13 +53,25 @@ class NoteTakerError(RuntimeError):
     """Raised when minutes cannot be generated for a transcript."""
 
 
-def generate_minutes(transcript: str, title: str = "") -> MeetingMinutes:
+def generate_minutes(
+    transcript: str, title: str = "", meeting_id: int | None = None
+) -> MeetingMinutes:
     """Call Gemini for structured minutes. Raises NoteTakerError on failure."""
     if not transcript.strip():
         raise NoteTakerError("cannot generate minutes for an empty transcript")
 
     prompt = f"Meeting title: {title}\n\nTranscript:\n{transcript}" if title else transcript
 
+    log_event(
+        logger,
+        "note_taker.requested",
+        meeting_id=meeting_id,
+        model=settings.model_extraction,
+        transcript_chars=len(transcript),
+        transcript_lines=transcript.count("\n") + 1,
+    )
+
+    started = time.perf_counter()
     try:
         response = get_client().models.generate_content(
             model=settings.model_extraction,
@@ -74,11 +88,47 @@ def generate_minutes(transcript: str, title: str = "") -> MeetingMinutes:
             ),
         )
     except Exception as exc:
+        log_event(
+            logger,
+            "note_taker.failed",
+            level=logging.ERROR,
+            meeting_id=meeting_id,
+            model=settings.model_extraction,
+            elapsed_ms=round((time.perf_counter() - started) * 1000),
+            error=str(exc),
+        )
         raise NoteTakerError(f"Gemini call failed: {exc}") from exc
+
+    elapsed_ms = round((time.perf_counter() - started) * 1000)
+    usage = getattr(response, "usage_metadata", None)
 
     minutes = response.parsed
     if not isinstance(minutes, MeetingMinutes):
+        log_event(
+            logger,
+            "note_taker.unparsable",
+            level=logging.ERROR,
+            meeting_id=meeting_id,
+            elapsed_ms=elapsed_ms,
+            raw_text=(response.text or "")[:2000],
+        )
         raise NoteTakerError("Gemini returned no usable minutes")
+
+    # The full model output, so it can be read back from Cloud Logging and
+    # compared against what landed in meeting.minutes_json.
+    log_event(
+        logger,
+        "note_taker.completed",
+        meeting_id=meeting_id,
+        model=settings.model_extraction,
+        elapsed_ms=elapsed_ms,
+        prompt_tokens=getattr(usage, "prompt_token_count", None),
+        response_tokens=getattr(usage, "candidates_token_count", None),
+        total_tokens=getattr(usage, "total_token_count", None),
+        key_point_count=len(minutes.key_points),
+        action_item_count=len(minutes.action_items),
+        minutes=minutes.model_dump(),
+    )
     return minutes
 
 
@@ -94,15 +144,22 @@ def take_notes(meeting_id: int) -> Meeting:
 
     db.set_meeting_status(meeting_id, MeetingStatus.PROCESSING)
     try:
-        minutes = generate_minutes(meeting.transcript, meeting.title)
+        minutes = generate_minutes(meeting.transcript, meeting.title, meeting_id)
     except NoteTakerError:
         db.set_meeting_status(meeting_id, MeetingStatus.FAILED)
-        logger.exception("note taker failed for meeting %s", meeting_id)
         raise
 
     meeting.minutes = minutes
     meeting.status = MeetingStatus.PROCESSED
     db.update_meeting(meeting)
+
+    log_event(
+        logger,
+        "note_taker.stored",
+        meeting_id=meeting_id,
+        status=meeting.status.value,
+        minutes_chars=len(minutes.model_dump_json()),
+    )
     return meeting
 
 

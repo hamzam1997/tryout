@@ -2,7 +2,10 @@ from flask import Flask
 
 from config import settings
 from database import init_db
+from logging_setup import configure_logging
 from views.meetings import bp as meetings_bp
+
+configure_logging()
 
 app = Flask(__name__)
 init_db()
