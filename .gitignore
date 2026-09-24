@@ -3,6 +3,10 @@ venv/
 .venv/
 env/
 
+# Node / frontend build
+node_modules/
+frontend/dist/
+
 # Python cache & artifacts
 __pycache__/
 *.pyc
