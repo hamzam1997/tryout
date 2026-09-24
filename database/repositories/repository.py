@@ -6,7 +6,7 @@ from database.connection import (
     dump_model,
     load_model,
     session_scope,
-    utc_now_iso,
+    utc_now,
 )
 from database.models import Repository as RepositoryModel
 from schemas import ArchitectureCatalog, RepoSource, Repository
@@ -29,7 +29,7 @@ row_to_repository = orm_to_repository
 
 
 def create_repository(repo: Repository) -> Repository:
-    created_at = repo.created_at or utc_now_iso()
+    created_at = repo.created_at or utc_now()
     with session_scope() as session:
         model = RepositoryModel(
             name=repo.name,
@@ -91,7 +91,7 @@ def save_catalog(
         model = session.get(RepositoryModel, repo_id)
         if model:
             model.catalog_json = catalog.model_dump_json()
-            model.catalog_generated_at = utc_now_iso()
+            model.catalog_generated_at = utc_now()
             model.source_ref = source_ref
 
 
