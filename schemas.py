@@ -96,32 +96,86 @@ class RepoSkeleton(BaseModel):
 
 
 class ModelEntry(BaseModel):
-    name: str
-    fields: list[str] = Field(default_factory=list)
+    name: str = Field(description="Name of the data model or entity class")
+    fields: list[str] = Field(
+        default_factory=list,
+        description="Field or attribute names belonging to this model",
+    )
 
 
 class RouteEntry(BaseModel):
-    method: str = ""
-    path: str
-    handler: str = ""
+    method: str = Field(
+        default="",
+        description="HTTP method (e.g. GET, POST, PUT, DELETE)",
+    )
+    path: str = Field(description="API endpoint route path pattern")
+    handler: str = Field(
+        default="",
+        description="Handler function or controller name handling this route",
+    )
 
 
 class IntegrationEntry(BaseModel):
-    name: str
-    auth: str = ""
-    env_keys: list[str] = Field(default_factory=list)
+    name: str = Field(
+        description="Name of the external service or third-party integration",
+    )
+    auth: str = Field(
+        default="",
+        description="Authentication type or mechanism (e.g. API Key, Bearer Token, OAuth)",
+    )
+    env_keys: list[str] = Field(
+        default_factory=list,
+        description="Environment variable names required for this integration",
+    )
 
 
 class ArchitectureCatalog(BaseModel):
-    name: str = ""
-    language: str = ""
-    framework: str = ""
-    summary: str = ""
-    internal_models: list[ModelEntry] = Field(default_factory=list)
-    api_routes: list[RouteEntry] = Field(default_factory=list)
-    external_integrations: list[IntegrationEntry] = Field(default_factory=list)
-    config_schema: list[str] = Field(default_factory=list)
-    codeowners: dict[str, str] = Field(default_factory=dict)
+    name: str = Field(
+        default="",
+        description="Name of the repository or service",
+    )
+    language: str = Field(
+        default="",
+        description="Primary programming language (e.g. Python, TypeScript)",
+    )
+    framework: str = Field(
+        default="",
+        description="Web or application framework (e.g. Flask, FastAPI, Django, Express)",
+    )
+    summary: str = Field(
+        default="",
+        description="High-level architecture and responsibility summary",
+    )
+    internal_models: list[ModelEntry] = Field(
+        default_factory=list,
+        description="Internal data models, entities, and database schemas with their field names",
+    )
+    api_routes: list[RouteEntry] = Field(
+        default_factory=list,
+        description="HTTP/API endpoints, HTTP methods, and corresponding controller handlers",
+    )
+    external_integrations: list[IntegrationEntry] = Field(
+        default_factory=list,
+        description="External third-party services, APIs, databases, or payment gateways with required env keys",
+    )
+    config_keys: list[str] = Field(
+        default_factory=list,
+        description="Configuration environment variable keys or settings required by the application",
+    )
+    config_schema: list[str] = Field(
+        default_factory=list,
+        description="Backward-compatible alias for config_keys",
+    )
+    codeowners: dict[str, str] = Field(
+        default_factory=dict,
+        description="Mapping of file paths/directories to owning teams or engineers (from CODEOWNERS)",
+    )
+
+    def model_post_init(self, __context) -> None:
+        if not self.config_keys and self.config_schema:
+            self.config_keys = list(self.config_schema)
+        elif not self.config_schema and self.config_keys:
+            self.config_schema = list(self.config_keys)
 
 
 class MeetingMinutes(BaseModel):
