@@ -108,9 +108,9 @@ def connect():
         raw_conn.close()
 
 
-def utc_now_iso() -> str:
-    """Return current UTC timestamp in ISO-8601 format."""
-    return datetime.now(timezone.utc).isoformat()
+def utc_now() -> datetime:
+    """Return the current time as a timezone-aware UTC datetime."""
+    return datetime.now(timezone.utc)
 
 
 def dump_model(model: BaseModel | None) -> str | None:

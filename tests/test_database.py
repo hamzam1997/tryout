@@ -3,9 +3,12 @@
 import sqlite3
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 import database as db
+
+FIXED_TIME = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
 class DatabaseIntegrationTestCase(unittest.TestCase):
@@ -227,10 +230,10 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
         """Verify direct SQLAlchemy 2.0 ORM models, relationships, and session usage."""
         with db.session_scope() as session:
             repo = db.RepositoryModel(
-                name="orm-repo", source="/tmp/orm-repo", source_type="local", created_at="2026-01-01"
+                name="orm-repo", source="/tmp/orm-repo", source_type="local", created_at=FIXED_TIME
             )
             meeting = db.MeetingModel(
-                title="ORM Design", transcript="Discussing ORM", created_at="2026-01-01"
+                title="ORM Design", transcript="Discussing ORM", created_at=FIXED_TIME
             )
             session.add_all([repo, meeting])
             session.flush()
@@ -238,7 +241,7 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
             idea = db.IdeaModel(
                 meeting_id=meeting.id,
                 title="SQLAlchemy models",
-                created_at="2026-01-01",
+                created_at=FIXED_TIME,
             )
             session.add(idea)
             session.flush()
@@ -247,7 +250,7 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
                 idea_id=idea.id,
                 repository_id=repo.id,
                 status="PLANNING",
-                created_at="2026-01-01",
+                created_at=FIXED_TIME,
             )
             session.add(attempt)
             session.flush()
@@ -255,7 +258,7 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
             flog = db.FrictionLogModel(
                 attempt_id=attempt.id,
                 category="PRODUCT_DECISION",
-                created_at="2026-01-01",
+                created_at=FIXED_TIME,
             )
             session.add(flog)
 

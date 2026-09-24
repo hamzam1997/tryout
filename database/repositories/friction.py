@@ -6,7 +6,7 @@ from database.connection import (
     dump_model_list,
     load_model_list,
     session_scope,
-    utc_now_iso,
+    utc_now,
 )
 from database.models import FrictionLog as FrictionLogModel
 from schemas import FrictionCategory, FrictionLog, ReadinessItem
@@ -38,7 +38,7 @@ row_to_friction_log = orm_to_friction_log
 
 
 def create_friction_log(log: FrictionLog) -> FrictionLog:
-    created_at = log.created_at or utc_now_iso()
+    created_at = log.created_at or utc_now()
     with session_scope() as session:
         model = FrictionLogModel(
             attempt_id=log.attempt_id,

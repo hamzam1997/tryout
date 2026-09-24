@@ -2,7 +2,7 @@
 
 from sqlalchemy import select
 
-from database.connection import session_scope, utc_now_iso
+from database.connection import session_scope, utc_now
 from database.models import Idea as IdeaModel
 from schemas import Idea, IdeaStatus
 
@@ -29,7 +29,7 @@ row_to_idea = orm_to_idea
 
 
 def create_idea(idea: Idea) -> Idea:
-    created_at = idea.created_at or utc_now_iso()
+    created_at = idea.created_at or utc_now()
     with session_scope() as session:
         model = IdeaModel(
             meeting_id=idea.meeting_id,

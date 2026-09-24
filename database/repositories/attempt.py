@@ -6,7 +6,7 @@ from database.connection import (
     dump_model,
     load_model,
     session_scope,
-    utc_now_iso,
+    utc_now,
 )
 from database.models import Attempt as AttemptModel
 from schemas import Attempt, AttemptStatus, TechnicalPlan
@@ -35,7 +35,7 @@ row_to_attempt = orm_to_attempt
 
 
 def create_attempt(attempt: Attempt) -> Attempt:
-    created_at = attempt.created_at or utc_now_iso()
+    created_at = attempt.created_at or utc_now()
     with session_scope() as session:
         model = AttemptModel(
             idea_id=attempt.idea_id,
@@ -77,7 +77,7 @@ def set_attempt_status(
     attempt_id: int, status: AttemptStatus, error: str | None = None
 ) -> None:
     """Advance an attempt, stamping start and finish times at the boundaries."""
-    now = utc_now_iso()
+    now = utc_now()
     is_active = status in (
         AttemptStatus.PLANNING,
         AttemptStatus.CODING,

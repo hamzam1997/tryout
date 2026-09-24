@@ -1,5 +1,6 @@
 """Pydantic schemas and data validation models for tryout."""
 
+from datetime import datetime
 from enum import Enum
 from pydantic import BaseModel, Field
 
@@ -15,6 +16,15 @@ class MeetingSource(str, Enum):
     UPLOAD = "upload"
     PASTE = "paste"
     SEED = "seed"
+
+
+class MeetingStatus(str, Enum):
+    """Where a transcript sits in the ingest -> extract pipeline."""
+
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    PROCESSED = "PROCESSED"
+    FAILED = "FAILED"
 
 
 class IdeaStatus(str, Enum):
@@ -102,21 +112,21 @@ class RepositorySchema(BaseModel):
     source_type: RepoSource = RepoSource.LOCAL
     source_ref: str | None = None
     catalog: ArchitectureCatalog | None = None
-    catalog_generated_at: str | None = None
-    created_at: str | None = None
+    catalog_generated_at: datetime | None = None
+    created_at: datetime | None = None
 
 
 class MeetingSchema(BaseModel):
     id: int | None = None
     title: str
-    occurred_at: str | None = None
+    occurred_at: datetime | None = None
     external_source: MeetingSource = MeetingSource.PASTE
     external_id: str | None = None
     external_url: str | None = None
-    source_type: str | None = None
     transcript: str
     minutes: MeetingMinutes | None = None
-    created_at: str | None = None
+    status: MeetingStatus = MeetingStatus.PENDING
+    created_at: datetime | None = None
 
 
 class IdeaSchema(BaseModel):
@@ -126,13 +136,14 @@ class IdeaSchema(BaseModel):
     description: str = ""
     source_quote: str = ""
     speaker: str = ""
+    # Offset into the transcript ("00:12:30"), not a wall-clock time.
     timestamp: str = ""
     urgency: str = ""
     feasibility_hypothesis: str = ""
     fingerprint: str = ""
     duplicate_of_id: int | None = None
     status: IdeaStatus = IdeaStatus.PENDING
-    created_at: str | None = None
+    created_at: datetime | None = None
 
 
 class AttemptSchema(BaseModel):
@@ -147,9 +158,9 @@ class AttemptSchema(BaseModel):
     test_stdout: str | None = None
     test_stderr: str | None = None
     error: str | None = None
-    started_at: str | None = None
-    finished_at: str | None = None
-    created_at: str | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    created_at: datetime | None = None
 
 
 class FrictionLogSchema(BaseModel):
@@ -161,7 +172,7 @@ class FrictionLogSchema(BaseModel):
     mock_implementation_path: str = ""
     required_action: str = ""
     readiness_checklist: list[ReadinessItem] = Field(default_factory=list)
-    created_at: str | None = None
+    created_at: datetime | None = None
 
 
 # Backward-compatible aliases
