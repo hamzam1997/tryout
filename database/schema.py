@@ -40,16 +40,25 @@ def _recreate_idea_dependent_tables(engine) -> None:
         conn.commit()
 
 
-def _ensure_meeting_ideas_error_column(engine) -> None:
-    """Add meeting.ideas_error on existing SQLite DBs without dropping meetings."""
+def _ensure_meeting_columns(engine) -> None:
+    """Ensure all required columns exist in meeting table."""
     inspector = inspect(engine)
     if "meeting" not in inspector.get_table_names():
         return
     columns = {col["name"] for col in inspector.get_columns("meeting")}
-    if "ideas_error" in columns:
-        return
     with engine.connect() as conn:
-        conn.execute(text("ALTER TABLE meeting ADD COLUMN ideas_error TEXT"))
+        if "status" not in columns:
+            conn.execute(text("ALTER TABLE meeting ADD COLUMN status VARCHAR(32) DEFAULT 'pending' NOT NULL"))
+        if "ideas_error" not in columns:
+            conn.execute(text("ALTER TABLE meeting ADD COLUMN ideas_error TEXT"))
+        if "external_source" not in columns:
+            conn.execute(text("ALTER TABLE meeting ADD COLUMN external_source VARCHAR(64) DEFAULT 'paste' NOT NULL"))
+        if "external_id" not in columns:
+            conn.execute(text("ALTER TABLE meeting ADD COLUMN external_id VARCHAR(256)"))
+        if "external_url" not in columns:
+            conn.execute(text("ALTER TABLE meeting ADD COLUMN external_url TEXT"))
+        if "occurred_at" not in columns:
+            conn.execute(text("ALTER TABLE meeting ADD COLUMN occurred_at DATETIME"))
         conn.commit()
 
 
@@ -64,6 +73,8 @@ def _ensure_repository_status_columns(engine) -> None:
             conn.execute(text("ALTER TABLE repository ADD COLUMN catalog_status VARCHAR(32) DEFAULT 'ready' NOT NULL"))
         if "catalog_error" not in columns:
             conn.execute(text("ALTER TABLE repository ADD COLUMN catalog_error TEXT"))
+        if "catalog_generated_at" not in columns:
+            conn.execute(text("ALTER TABLE repository ADD COLUMN catalog_generated_at DATETIME"))
         conn.commit()
 
 
@@ -85,5 +96,5 @@ def init_db() -> None:
     if not _idea_schema_is_current(engine):
         _recreate_idea_dependent_tables(engine)
     Base.metadata.create_all(bind=engine)
-    _ensure_meeting_ideas_error_column(engine)
+    _ensure_meeting_columns(engine)
     _ensure_repository_status_columns(engine)

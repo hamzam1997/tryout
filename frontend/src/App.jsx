@@ -30,27 +30,58 @@ export default function App() {
     setLoading(true);
     setError("");
     setIdeasError("");
-    try {
-      const [reposData, meetingsData, ideasData] = await Promise.all([
-        listRepositories(),
-        listMeetings(),
-        listIdeas(),
-      ]);
-      setRepositories(reposData);
-      setMeetings(meetingsData);
-      setIdeas(ideasData);
-      setOnline(true);
-    } catch (problem) {
-      setError(problem.message);
-      setOnline(false);
-    } finally {
-      setLoading(false);
+
+    const [reposResult, meetingsResult, ideasResult] = await Promise.allSettled([
+      listRepositories(),
+      listMeetings(),
+      listIdeas(),
+    ]);
+
+    if (reposResult.status === "fulfilled") {
+      setRepositories(reposResult.value);
+    } else {
+      console.error("Failed to load repositories:", reposResult.reason);
+      if (view === "repositories") {
+        setError(`Repositories error: ${reposResult.reason?.message || "Failed to load repositories"}`);
+      }
     }
-  }, []);
+
+    if (meetingsResult.status === "fulfilled") {
+      setMeetings(meetingsResult.value);
+    } else {
+      console.error("Failed to load meetings:", meetingsResult.reason);
+      if (view === "meetings") {
+        setError(`Meetings error: ${meetingsResult.reason?.message || "Failed to load meetings"}`);
+      }
+    }
+
+    if (ideasResult.status === "fulfilled") {
+      setIdeas(ideasResult.value);
+    } else {
+      console.error("Failed to load ideas:", ideasResult.reason);
+      if (view === "ideas") {
+        setIdeasError(`Ideas error: ${ideasResult.reason?.message || "Failed to load ideas"}`);
+      }
+    }
+
+    const anySuccess = [reposResult, meetingsResult, ideasResult].some((r) => r.status === "fulfilled");
+    if (anySuccess) {
+      setOnline(true);
+    } else {
+      try {
+        const isHealthy = await health();
+        setOnline(isHealthy);
+      } catch {
+        setOnline(false);
+      }
+    }
+
+    setLoading(false);
+  }, [view]);
 
   useEffect(() => {
     refresh();
-    health().then(setOnline).catch(() => setOnline(false));
+    health().then((isUp) => setOnline((prev) => (prev === null ? isUp : prev || isUp))).catch(() => {});
   }, [refresh]);
 
   function mergeIdeas(incoming) {
