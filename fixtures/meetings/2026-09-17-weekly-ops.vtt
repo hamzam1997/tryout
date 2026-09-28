@@ -1,0 +1,103 @@
+WEBVTT
+
+NOTE Weekly operations sync. Speakers are support, ops and engineering.
+
+1
+00:00:04.100 --> 00:00:09.800
+<v Marco Reyes>Alright, weekly ops. Dana, you had numbers on the support queue.
+
+2
+00:00:10.200 --> 00:00:17.600
+<v Dana Whitfield>Yeah. Ticket volume was up about twelve percent last week, mostly
+driven by one category.
+
+3
+00:00:18.000 --> 00:00:24.400
+<v Dana Whitfield>Refund status. People place a refund, nothing happens visibly, and
+four days later they write in asking where their money is.
+
+4
+00:00:25.100 --> 00:00:29.300
+<v Marco Reyes>Is that a spike or is it just the usual level and we're noticing it more?
+
+5
+00:00:29.700 --> 00:00:34.900
+<v Dana Whitfield>It's the usual level honestly. It's just the biggest single bucket now
+that shipping complaints have dropped off.
+
+6
+00:00:35.500 --> 00:00:41.200
+<v Priya Raman>The delay itself is mostly the provider. Once we hand a refund to
+payments it can sit for days on their side.
+
+7
+00:00:41.800 --> 00:00:46.000
+<v Marco Reyes>So we can't make it faster, but the customer doesn't know anything is happening.
+
+8
+00:00:46.500 --> 00:00:53.700
+<v Marco Reyes>Can we just tell them? If a refund has been sitting for more than a few
+days, automatically email the customer that it's still in progress.
+
+9
+00:00:54.200 --> 00:00:58.100
+<v Dana Whitfield>That would kill most of these tickets. They're not angry, they just
+don't know anything.
+
+10
+00:00:58.600 --> 00:01:05.300
+<v Priya Raman>We'd need to know why it's delayed though. Right now we know a refund
+was requested and we know when, and that's it.
+
+11
+00:01:05.900 --> 00:01:11.400
+<v Priya Raman>A provider hold, a manual review and a failed callback all look exactly
+the same in our data.
+
+12
+00:01:12.000 --> 00:01:16.800
+<v Marco Reyes>Does it matter for a first version? Even "still processing" is better
+than silence.
+
+13
+00:01:17.300 --> 00:01:22.900
+<v Priya Raman>Maybe. The other problem is we don't send customer email from the store
+service at all. That's notifications-service.
+
+14
+00:01:23.400 --> 00:01:26.700
+<v Dana Whitfield>Which is Ravi's team, right? We'd need them to give us access.
+
+15
+00:01:27.200 --> 00:01:31.500
+<v Priya Raman>Right, comms owns it. We'd need credentials and probably a template approved.
+
+16
+00:01:32.000 --> 00:01:38.400
+<v Marco Reyes>Okay. Let's look at what it takes. Priya, can you scope what's involved
+on the store side before next week?
+
+17
+00:01:38.900 --> 00:01:40.600
+<v Priya Raman>Sure, I'll take a look.
+
+18
+00:01:41.100 --> 00:01:47.800
+<v Dana Whitfield>One more thing while we're here, nobody has actually decided how many
+days counts as "delayed". Support is guessing case by case.
+
+19
+00:01:48.300 --> 00:01:52.100
+<v Marco Reyes>Fair. That's a decision we need to make, not something to build around.
+
+20
+00:01:52.700 --> 00:01:57.400
+<v Marco Reyes>Last thing, the Q3 warehouse audit is done, no findings. Nothing needed there.
+
+21
+00:01:58.000 --> 00:02:01.200
+<v Dana Whitfield>And I'm out Thursday and Friday, Sam is covering the queue.
+
+22
+00:02:01.800 --> 00:02:04.500
+<v Marco Reyes>Noted. That's us, thanks everyone.

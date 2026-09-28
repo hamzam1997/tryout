@@ -1,0 +1,39 @@
+# Secrets. Cloud Run supplies configuration as environment variables.
+.env
+.env.local
+
+# Virtualenv: the image installs from requirements.txt instead.
+venv/
+.venv/
+env/
+
+# Node: the build stage runs npm ci from package-lock.json.
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Local database state.
+*.db
+*.db-wal
+*.db-shm
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Repo and editor metadata
+.git/
+.github/
+.gitignore
+.idea/
+.vscode/
+.claude/
+
+# Not needed at runtime
+tests/
+demo_repo/
+*.log
+.DS_Store
