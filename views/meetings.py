@@ -7,6 +7,7 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 import database as db
+from agents.idea_extractor import IdeaExtractorError, extract_ideas
 from agents.note_taker import NoteTakerError, ingest, take_notes
 from agents.transcript import TranscriptError
 from schemas import MeetingSource
@@ -87,6 +88,15 @@ def upload_meeting():
         return jsonify(payload), 502
 
     payload["meeting"] = _serialise(meeting)
+
+    try:
+        ideas = extract_ideas(meeting.id)
+    except IdeaExtractorError as exc:
+        payload["ideas"] = []
+        payload["ideas_error"] = str(exc)
+    else:
+        payload["ideas"] = [idea.model_dump(mode="json") for idea in ideas]
+
     return jsonify(payload), 201
 
 

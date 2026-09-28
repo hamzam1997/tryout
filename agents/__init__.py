@@ -1,5 +1,11 @@
-"""Gemini-backed agents: meeting notes and repository onboarding."""
+"""Gemini-backed agents: meeting notes, ideas, and repository onboarding."""
 
+from agents.idea_extractor import (
+    IdeaExtractorError,
+    extract_ideas,
+    generate_ideas,
+    normalize_idea_key,
+)
 from agents.note_taker import NoteTakerError, generate_minutes, ingest, take_notes
 from agents.repo_onboarder import (
     RepoOnboarder,
@@ -9,6 +15,10 @@ from agents.repo_onboarder import (
 from agents.transcript import TranscriptError, parse_transcript
 
 __all__ = [
+    "IdeaExtractorError",
+    "extract_ideas",
+    "generate_ideas",
+    "normalize_idea_key",
     "NoteTakerError",
     "TranscriptError",
     "generate_minutes",

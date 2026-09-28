@@ -46,17 +46,19 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
 
         # Foreign key cascades
         meeting = db.create_meeting(db.Meeting(title="Sync", transcript="transcript"))
-        idea1 = db.create_idea(db.Idea(meeting_id=meeting.id, title="Idea 1", fingerprint="fp1"))
-        idea2 = db.create_idea(db.Idea(meeting_id=meeting.id, title="Idea 2", duplicate_of_id=idea1.id))
+        idea1 = db.create_idea(db.Idea(meeting_id=meeting.id, title="Idea 1", idea_key="fp1"))
+        idea2 = db.create_idea(
+            db.Idea(meeting_id=meeting.id, title="Idea 2", original_idea_id=idea1.id)
+        )
         attempt = db.create_attempt(db.Attempt(idea_id=idea1.id, repository_id=repo.id))
         db.create_friction_log(db.FrictionLog(attempt_id=attempt.id, category=db.FrictionCategory.PRODUCT_DECISION))
 
-        # Deleting idea1 sets idea2.duplicate_of_id to NULL and cascades to attempt & friction_log
+        # Deleting idea1 sets idea2.original_idea_id to NULL and cascades to attempt & friction_log
         with db.connect() as conn:
             conn.execute("DELETE FROM idea WHERE id = ?", (idea1.id,))
         self.assertIsNone(db.get_attempt(attempt.id))
         self.assertEqual(len(db.list_friction_logs(attempt_id=attempt.id)), 0)
-        self.assertIsNone(db.get_idea(idea2.id).duplicate_of_id)
+        self.assertIsNone(db.get_idea(idea2.id).original_idea_id)
 
     def test_repository_and_architecture_catalog(self):
         """Verify repository operations and architecture catalog caching."""
@@ -110,29 +112,45 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
                 meeting_id=meeting.id,
                 title="Automate refund webhook",
                 speaker="Alice",
-                timestamp="00:04:15",
-                fingerprint="refund-webhook-auto",
+                cue_time="00:04:15",
+                idea_key="refund-webhook-auto",
             )
         )
-        idea2 = db.create_idea(db.Idea(meeting_id=meeting.id, title="Other feature", fingerprint="other"))
+        idea2 = db.create_idea(db.Idea(meeting_id=meeting.id, title="Other feature", idea_key="other"))
         db.set_idea_status(idea1.id, db.IdeaStatus.APPROVED)
 
         self.assertEqual(len(db.list_ideas(status=db.IdeaStatus.APPROVED)), 1)
         self.assertEqual(len(db.list_ideas(meeting_id=meeting.id)), 2)
 
-        # Cross-meeting duplicate matching via fingerprint
+        # Cross-meeting duplicate matching via idea_key
         second_meeting = db.create_meeting(db.Meeting(title="Follow-up Sync", transcript="Alice: auto-refunds again."))
-        matched_idea = db.find_idea_by_fingerprint("refund-webhook-auto")
+        matched_idea = db.find_idea_by_key("refund-webhook-auto")
         self.assertEqual(matched_idea.id, idea1.id)
         duplicate_idea = db.create_idea(
             db.Idea(
                 meeting_id=second_meeting.id,
                 title="Automate refund webhook",
-                fingerprint="refund-webhook-auto",
-                duplicate_of_id=matched_idea.id,
+                idea_key="refund-webhook-auto",
+                original_idea_id=matched_idea.id,
             )
         )
-        self.assertEqual(db.get_idea(duplicate_idea.id).duplicate_of_id, idea1.id)
+        self.assertEqual(db.get_idea(duplicate_idea.id).original_idea_id, idea1.id)
+
+        with_catalog = db.create_idea(
+            db.Idea(
+                meeting_id=meeting.id,
+                title="Notify on delayed refunds",
+                quote="automatically email the customer",
+                cue_time="00:00:46",
+                priority="high",
+                attempt_hypothesis="Add refund status polling in routes/refunds.py",
+                catalog_refs=["routes/refunds.py", "notifications-service"],
+                idea_key="auto-notify-delayed-refunds",
+            )
+        )
+        loaded = db.get_idea(with_catalog.id)
+        self.assertEqual(loaded.catalog_refs, ["routes/refunds.py", "notifications-service"])
+        self.assertEqual(loaded.attempt_hypothesis, "Add refund status polling in routes/refunds.py")
 
     def test_attempt_lifecycle_and_results(self):
         """Verify attempt execution state machine, execution timestamps, error recording, and plan diffs."""

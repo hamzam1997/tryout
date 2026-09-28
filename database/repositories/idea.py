@@ -1,10 +1,28 @@
 """Idea persistence layer using SQLAlchemy."""
 
+import json
+
 from sqlalchemy import select
 
 from database.connection import session_scope, utc_now
 from database.models import Idea as IdeaModel
 from schemas import Idea, IdeaStatus
+
+
+def _load_catalog_refs(raw: str | None) -> list[str]:
+    if not raw:
+        return []
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value]
+
+
+def _dump_catalog_refs(refs: list[str] | None) -> str:
+    return json.dumps(list(refs or []))
 
 
 def orm_to_idea(orm: IdeaModel) -> Idea:
@@ -13,13 +31,14 @@ def orm_to_idea(orm: IdeaModel) -> Idea:
         meeting_id=orm.meeting_id,
         title=orm.title,
         description=orm.description,
-        source_quote=orm.source_quote,
+        quote=orm.quote,
         speaker=orm.speaker,
-        timestamp=orm.timestamp,
-        urgency=orm.urgency,
-        feasibility_hypothesis=orm.feasibility_hypothesis,
-        fingerprint=orm.fingerprint,
-        duplicate_of_id=orm.duplicate_of_id,
+        cue_time=orm.cue_time,
+        priority=orm.priority,
+        attempt_hypothesis=orm.attempt_hypothesis,
+        catalog_refs=_load_catalog_refs(orm.catalog_refs_json),
+        idea_key=orm.idea_key,
+        original_idea_id=orm.original_idea_id,
         status=IdeaStatus(orm.status),
         created_at=orm.created_at,
     )
@@ -32,13 +51,14 @@ def create_idea(idea: Idea) -> Idea:
             meeting_id=idea.meeting_id,
             title=idea.title,
             description=idea.description,
-            source_quote=idea.source_quote,
+            quote=idea.quote,
             speaker=idea.speaker,
-            timestamp=idea.timestamp,
-            urgency=idea.urgency,
-            feasibility_hypothesis=idea.feasibility_hypothesis,
-            fingerprint=idea.fingerprint,
-            duplicate_of_id=idea.duplicate_of_id,
+            cue_time=idea.cue_time,
+            priority=idea.priority,
+            attempt_hypothesis=idea.attempt_hypothesis,
+            catalog_refs_json=_dump_catalog_refs(idea.catalog_refs),
+            idea_key=idea.idea_key,
+            original_idea_id=idea.original_idea_id,
             status=idea.status.value,
             created_at=created_at,
         )
@@ -67,14 +87,14 @@ def list_ideas(
         return [orm_to_idea(m) for m in models]
 
 
-def find_idea_by_fingerprint(fingerprint: str) -> Idea | None:
-    """Return the earliest idea with this fingerprint, for cross-meeting dedup."""
-    if not fingerprint:
+def find_idea_by_key(idea_key: str) -> Idea | None:
+    """Return the earliest idea with this idea_key, for cross-meeting dedup."""
+    if not idea_key:
         return None
     with session_scope() as session:
         stmt = (
             select(IdeaModel)
-            .where(IdeaModel.fingerprint == fingerprint)
+            .where(IdeaModel.idea_key == idea_key)
             .order_by(IdeaModel.id)
             .limit(1)
         )
@@ -95,12 +115,13 @@ def update_idea(idea: Idea) -> Idea:
         if model:
             model.title = idea.title
             model.description = idea.description
-            model.source_quote = idea.source_quote
+            model.quote = idea.quote
             model.speaker = idea.speaker
-            model.timestamp = idea.timestamp
-            model.urgency = idea.urgency
-            model.feasibility_hypothesis = idea.feasibility_hypothesis
-            model.fingerprint = idea.fingerprint
-            model.duplicate_of_id = idea.duplicate_of_id
+            model.cue_time = idea.cue_time
+            model.priority = idea.priority
+            model.attempt_hypothesis = idea.attempt_hypothesis
+            model.catalog_refs_json = _dump_catalog_refs(idea.catalog_refs)
+            model.idea_key = idea.idea_key
+            model.original_idea_id = idea.original_idea_id
             model.status = idea.status.value
     return idea

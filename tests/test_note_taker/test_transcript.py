@@ -91,7 +91,7 @@ class TestCueHandling(unittest.TestCase):
         self.assertEqual(parsed.cues[1].start, "00:00:10")
 
     def test_cue_times_are_preserved_in_rendered_text(self):
-        """These are what the idea extractor reads to fill Idea.timestamp."""
+        """These are what the idea extractor reads to fill Idea.cue_time."""
         parsed = parse_transcript(VTT)
         self.assertTrue(parsed.text.startswith("[00:00:04] Marco Reyes: Alright"))
 

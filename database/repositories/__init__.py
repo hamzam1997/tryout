@@ -14,7 +14,7 @@ from database.repositories.friction import (
 )
 from database.repositories.idea import (
     create_idea,
-    find_idea_by_fingerprint,
+    find_idea_by_key,
     get_idea,
     list_ideas,
     set_idea_status,
@@ -56,7 +56,7 @@ __all__ = [
     "update_meeting",
     # Idea
     "create_idea",
-    "find_idea_by_fingerprint",
+    "find_idea_by_key",
     "get_idea",
     "list_ideas",
     "set_idea_status",
