@@ -25,6 +25,8 @@ from database.repositories.idea import (
 from database.repositories.meeting import (
     create_meeting,
     delete_meeting,
+    find_meeting_by_external_id,
+    find_meeting_by_transcript,
     get_meeting,
     list_meetings,
     set_meeting_ideas_error,
@@ -60,6 +62,8 @@ __all__ = [
     # Meeting
     "create_meeting",
     "delete_meeting",
+    "find_meeting_by_external_id",
+    "find_meeting_by_transcript",
     "get_meeting",
     "list_meetings",
     "set_meeting_ideas_error",

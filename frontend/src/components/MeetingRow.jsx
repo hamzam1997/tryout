@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { formatRelative, formatSource } from "../lib/format";
+import DeleteIconButton from "./DeleteIconButton";
 
 const BADGES = {
   PROCESSED: ["badge-ok", "Ready"],
@@ -253,17 +254,15 @@ export default function MeetingRow({
             </section>
           )}
 
-          <div className="row-footer">
-            <button
-              type="button"
-              className="btn btn-ghost btn-danger"
-              disabled={deleting || pipelineRunning}
-              onClick={() => onDelete?.(meeting.id)}
-            >
-              {deleting && <span className="spinner spinner-muted" />}
-              {deleting ? "Deleting…" : "Delete meeting"}
-            </button>
-          </div>
+          {!pipelineRunning && (
+            <div className="row-footer">
+              <DeleteIconButton
+                label={`Delete ${meeting.title}`}
+                busy={deleting}
+                onClick={() => onDelete?.(meeting.id)}
+              />
+            </div>
+          )}
         </div>
       )}
     </article>

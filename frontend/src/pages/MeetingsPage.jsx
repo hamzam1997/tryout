@@ -24,6 +24,7 @@ export default function MeetingsPage({
     <div className="container">
       <header className="page-head">
         <div>
+          <p className="page-kicker">Step 2 · Capture signal</p>
           <h1>Meetings</h1>
           <p className="page-sub">
             Drop a transcript — minutes and catalog-grounded ideas run in the

@@ -11,6 +11,10 @@ export default function RepositoriesPage({
   onDeleted,
 }) {
   const [selectedRepo, setSelectedRepo] = useState(null);
+  const readyCount = repositories.filter((repo) => repo.catalog_status === "ready").length;
+  const analyzingCount = repositories.filter(
+    (repo) => repo.catalog_status === "onboarding"
+  ).length;
 
   function handleViewCatalog(repo) {
     setSelectedRepo(repo);
@@ -24,10 +28,11 @@ export default function RepositoriesPage({
     <div className="container">
       <header className="page-head">
         <div>
+          <p className="page-kicker">Step 1 · Ground truth</p>
           <h1>Repositories</h1>
           <p className="page-sub">
-            Onboard a codebase once. Gemini builds an architecture catalog that
-            grounds every meeting idea.
+            Connect a codebase once. Gemini maps architecture into a catalog that
+            every meeting idea has to ground against — so attempts stay buildable.
           </p>
         </div>
         <button
@@ -40,6 +45,30 @@ export default function RepositoriesPage({
         </button>
       </header>
 
+      <div className="page-steps" aria-label="How repositories feed the pipeline">
+        <article className="page-step">
+          <span className="page-step-index">01</span>
+          <strong>Connect</strong>
+          <p>GitHub OAuth or the Acme Store demo sandbox.</p>
+        </article>
+        <article className="page-step">
+          <span className="page-step-index">02</span>
+          <strong>Catalog</strong>
+          <p>Modules, routes, models, and owners — analyzed in the background.</p>
+        </article>
+        <article className="page-step">
+          <span className="page-step-index">03</span>
+          <strong>Ground ideas</strong>
+          <p>
+            {readyCount > 0
+              ? `${readyCount} catalog${readyCount === 1 ? "" : "s"} ready for meetings.`
+              : analyzingCount > 0
+                ? "Analysis running — ideas will use the catalog next."
+                : "Ideas only surface when they map onto this catalog."}
+          </p>
+        </article>
+      </div>
+
       {error && <div className="alert alert-error">{error}</div>}
 
       <RepoOnboarderCard
@@ -49,7 +78,6 @@ export default function RepositoriesPage({
         onViewCatalog={handleViewCatalog}
       />
 
-      {/* Slide-out Architecture Catalog Drawer */}
       {selectedRepo && (
         <ArchitectureCatalogDrawer
           repository={selectedRepo}

@@ -34,6 +34,7 @@ export default function IdeasPage({
     <div className="container">
       <header className="page-head">
         <div>
+          <p className="page-kicker">Step 3 · Human gate</p>
           <h1>Ideas</h1>
           <p className="page-sub">
             Catalog-grounded proposals from meetings. Approve with your name —

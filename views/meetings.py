@@ -33,22 +33,43 @@ def _serialise(meeting) -> dict:
     return meeting.model_dump(mode="json")
 
 
-def _queued_payload(meeting, parsed) -> dict:
+def _meeting_payload(meeting, parsed, *, queued: bool, duplicate: bool = False) -> dict:
+    if duplicate and not queued:
+        message = "This transcript was already uploaded; reusing the existing meeting."
+    elif queued:
+        message = "Meeting stored; minutes and ideas are processing in the background."
+    else:
+        message = "Meeting accepted."
     return {
         "meeting": _serialise(meeting),
         "speakers": parsed.speakers,
         "cue_count": len(parsed.cues),
         "format": parsed.source_format.value,
-        "minutes_queued": True,
-        "message": "Meeting stored; minutes and ideas are processing in the background.",
+        "minutes_queued": queued,
+        "duplicate": duplicate,
+        "message": message,
     }
+
+
+def _accept_meeting(meeting, parsed, *, created: bool):
+    """Queue minutes only for new or failed meetings; never duplicate rows."""
+    should_queue = created or meeting.status == MeetingStatus.FAILED
+    if should_queue and meeting.status != MeetingStatus.PROCESSING:
+        queue_minutes(meeting.id)
+        meeting = db.get_meeting(meeting.id)
+        return jsonify(_meeting_payload(meeting, parsed, queued=True, duplicate=not created)), 202
+
+    return (
+        jsonify(_meeting_payload(meeting, parsed, queued=False, duplicate=not created)),
+        200 if not created else 202,
+    )
 
 
 @bp.post("/upload")
 def upload_meeting():
     """Persist a transcript and queue minutes (then ideas) in the background.
 
-    Returns 202 Accepted immediately, matching repository onboarding.
+    Identical transcripts reuse the existing meeting row.
     """
     uploaded = request.files.get("file")
     if uploaded is None or not uploaded.filename:
@@ -75,7 +96,7 @@ def upload_meeting():
         return jsonify({"error": str(exc)}), 400
 
     try:
-        meeting, parsed = ingest(
+        meeting, parsed, created = ingest(
             raw,
             title=title,
             filename=filename,
@@ -85,9 +106,7 @@ def upload_meeting():
     except TranscriptError as exc:
         return jsonify({"error": str(exc)}), 400
 
-    queue_minutes(meeting.id)
-    meeting = db.get_meeting(meeting.id)
-    return jsonify(_queued_payload(meeting, parsed)), 202
+    return _accept_meeting(meeting, parsed, created=created)
 
 
 @bp.post("/demo")
@@ -99,16 +118,14 @@ def load_demo_meeting():
     raw = fixture_path.read_text(encoding="utf-8")
     title = "Weekly Ops Sync (Acme Store Demo)"
 
-    meeting, parsed = ingest(
+    meeting, parsed, created = ingest(
         raw,
         title=title,
         filename="2026-09-17-weekly-ops.vtt",
         source=MeetingSource.SEED,
         occurred_at=datetime(2026, 9, 17, 10, 0),
     )
-    queue_minutes(meeting.id)
-    meeting = db.get_meeting(meeting.id)
-    return jsonify(_queued_payload(meeting, parsed)), 202
+    return _accept_meeting(meeting, parsed, created=created)
 
 
 @bp.post("/<int:meeting_id>/extract-ideas")

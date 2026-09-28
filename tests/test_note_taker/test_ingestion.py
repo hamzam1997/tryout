@@ -175,6 +175,20 @@ class TestReadEndpoints(IngestionTestCase):
         self.assertEqual(self.client.get("/meetings/9999").status_code, 404)
 
     @mock.patch("agents.note_taker.generate_minutes", return_value=MINUTES)
+    def test_duplicate_transcript_reuses_meeting(self, _):
+        first = upload(self.client, title="Weekly Ops")
+        self.assertEqual(first.status_code, 202)
+        first_id = first.get_json()["meeting"]["id"]
+
+        second = upload(self.client, title="Weekly Ops again")
+        self.assertEqual(second.status_code, 200)
+        body = second.get_json()
+        self.assertTrue(body["duplicate"])
+        self.assertFalse(body["minutes_queued"])
+        self.assertEqual(body["meeting"]["id"], first_id)
+        self.assertEqual(len(db.list_meetings()), 1)
+
+    @mock.patch("agents.note_taker.generate_minutes", return_value=MINUTES)
     def test_delete_meeting_cascades_ideas(self, _):
         meeting_id = upload(self.client).get_json()["meeting"]["id"]
         db.create_idea(
