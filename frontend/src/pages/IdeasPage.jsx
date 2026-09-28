@@ -18,7 +18,6 @@ export default function IdeasPage({
   onApprove,
   onReject,
   onDelete,
-  onRefresh,
 }) {
   const [filter, setFilter] = useState("PENDING");
 
@@ -41,9 +40,6 @@ export default function IdeasPage({
             nothing attempts until you do.
           </p>
         </div>
-        <button type="button" className="btn btn-ghost" onClick={onRefresh} disabled={loading}>
-          {loading ? "Refreshing…" : "Refresh"}
-        </button>
       </header>
 
       <div className="filter-bar" role="tablist" aria-label="Idea status">

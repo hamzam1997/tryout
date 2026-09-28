@@ -35,7 +35,10 @@ export default function IdeaRow({ idea, busy, deleting, onApprove, onReject, onD
         onClick={() => setOpen((value) => !value)}
       >
         <span className="row-main">
-          <span className="row-title">{idea.title}</span>
+          <span className="row-title-line">
+            <span className="row-title">{idea.title}</span>
+            <span className={`badge badge-inline ${badgeClass}`}>{badgeLabel}</span>
+          </span>
           <span className="row-meta">
             {idea.meeting_title && <span>{idea.meeting_title}</span>}
             {idea.meeting_title && idea.speaker && <span className="sep">·</span>}
@@ -68,8 +71,6 @@ export default function IdeaRow({ idea, busy, deleting, onApprove, onReject, onD
             )}
           </span>
         </span>
-
-        <span className={`badge ${badgeClass}`}>{badgeLabel}</span>
 
         <svg className="chevron" viewBox="0 0 20 20" aria-hidden="true">
           <path d="m6 8 4 4 4-4" />

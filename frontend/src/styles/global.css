@@ -110,34 +110,6 @@ svg { flex: none; }
   letter-spacing: 0.01em;
 }
 
-.brand-flow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: var(--s-3);
-  padding-top: var(--s-3);
-  border-top: 1px solid color-mix(in srgb, var(--primary) 10%, var(--outline-faint));
-}
-
-.brand-flow span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--on-primary-container);
-}
-
-.brand-flow span::after {
-  content: "→";
-  color: var(--outline-variant);
-  font-weight: 400;
-}
-
-.brand-flow span:last-child::after { content: none; }
-
 .nav { display: flex; flex-direction: column; gap: var(--s-1); }
 
 .nav-label {
@@ -418,6 +390,7 @@ svg { flex: none; }
   font-family: var(--font);
   font-size: var(--text-body-sm);
   font-weight: 500;
+  line-height: 1;
   cursor: pointer;
   white-space: nowrap;
   transition: background 150ms var(--ease), box-shadow 150ms var(--ease),
@@ -425,6 +398,12 @@ svg { flex: none; }
 }
 
 .btn:disabled { opacity: 0.38; cursor: not-allowed; }
+
+.btn-sm {
+  height: 32px;
+  padding: 0 var(--s-4);
+  font-size: var(--text-label);
+}
 
 .btn-primary { background: var(--primary); color: var(--on-primary); }
 .btn-primary:hover:not(:disabled) { background: var(--primary-hover); box-shadow: var(--elev-1); }
@@ -438,6 +417,7 @@ svg { flex: none; }
 
 .btn-ghost { background: transparent; color: var(--primary); padding: 0 var(--s-4); }
 .btn-ghost:hover:not(:disabled) { background: var(--primary-container); }
+.btn-ghost.btn-sm { padding: 0 var(--s-3); }
 
 /* ── Dropzone ──────────────────────────────────────────── */
 
@@ -660,7 +640,7 @@ svg { flex: none; }
 
 .row-header {
   display: grid;
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto;
   align-items: center;
   gap: var(--s-4);
   width: 100%;
@@ -674,11 +654,20 @@ svg { flex: none; }
 
 .row-main { display: flex; flex-direction: column; gap: var(--s-1); min-width: 0; }
 
+.row-title-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2) var(--s-3);
+  min-width: 0;
+}
+
 .row-title {
   font-family: var(--font-display);
   font-size: var(--text-title-sm);
   font-weight: 500;
   color: var(--on-surface);
+  min-width: 0;
 }
 
 .row-meta {
@@ -848,6 +837,14 @@ svg { flex: none; }
   height: 12px;
   border-color: color-mix(in srgb, currentColor 35%, transparent);
   border-top-color: currentColor;
+}
+
+.badge-inline {
+  flex: none;
+  align-self: center;
+  height: 22px;
+  padding: 0 var(--s-2);
+  font-size: 11px;
 }
 
 /* ── Ideas inbox ───────────────────────────────────────── */
@@ -1105,7 +1102,12 @@ svg { flex: none; }
     background: var(--surface);
   }
   .nav { flex-direction: row; flex: 1; }
-  .nav-label, .sidebar-foot, .brand-tag, .brand-flow { display: none; }
+  .nav-label, .sidebar-foot, .brand-tag { display: none; }
+  .repo-search-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--s-2);
+  }
   .brand {
     padding: var(--s-2);
     border: 0;
@@ -1217,6 +1219,30 @@ svg { flex: none; }
 .avatar { width: 28px; height: 28px; border-radius: var(--r-full); }
 
 .repo-selection-form { display: flex; flex-direction: column; gap: var(--s-4); }
+
+.repo-search-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  min-width: 0;
+}
+
+.repo-search-row label {
+  flex: none;
+  margin: 0;
+  font-size: var(--text-body-sm);
+  font-weight: 500;
+  color: var(--on-surface-variant);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.repo-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 40px;
+  line-height: 1;
+}
 
 .repo-picker-list {
   display: flex;
@@ -1370,8 +1396,9 @@ svg { flex: none; }
 }
 
 .repo-catalog-link {
-  padding-left: 0;
   height: 32px;
+  padding: 0 var(--s-3);
+  line-height: 1;
 }
 
 /* ── Architecture Catalog Drawer ───────────────────────── */

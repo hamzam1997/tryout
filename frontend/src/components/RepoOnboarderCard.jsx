@@ -254,15 +254,15 @@ export default function RepoOnboarderCard({
                   <div className="loading-repos">Loading repositories from GitHub…</div>
                 ) : (
                   <div className="repo-selection-form">
-                    <div className="form-group">
-                      <label htmlFor="repo-search">Select Repository</label>
+                    <div className="repo-search-row">
+                      <label htmlFor="repo-search">Select repository</label>
                       <input
                         id="repo-search"
-                        type="text"
+                        type="search"
                         placeholder="Search your repositories…"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="input"
+                        className="input repo-search-input"
                       />
                     </div>
 

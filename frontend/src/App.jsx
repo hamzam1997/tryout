@@ -266,7 +266,6 @@ export default function App() {
             repositories={repositories}
             loading={loading}
             error={error}
-            onRefresh={refresh}
             onOnboarded={handleRepoOnboarded}
             onDeleted={handleRepoDeleted}
           />
@@ -282,7 +281,6 @@ export default function App() {
                 : null
             }
             onUploaded={handleUploaded}
-            onRefresh={refresh}
             onRetryIdeas={handleRetryIdeas}
             onDelete={handleDeleteMeeting}
           />
@@ -300,7 +298,6 @@ export default function App() {
             onApprove={handleApprove}
             onReject={handleReject}
             onDelete={handleDeleteIdea}
-            onRefresh={refresh}
           />
         )}
       </main>
