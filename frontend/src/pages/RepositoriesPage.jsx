@@ -6,7 +6,6 @@ export default function RepositoriesPage({
   repositories,
   loading,
   error,
-  onRefresh,
   onOnboarded,
   onDeleted,
 }) {
@@ -35,14 +34,6 @@ export default function RepositoriesPage({
             every meeting idea has to ground against — so attempts stay buildable.
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost"
-          onClick={onRefresh}
-          disabled={loading}
-        >
-          {loading ? "Refreshing…" : "Refresh"}
-        </button>
       </header>
 
       <div className="page-steps" aria-label="How repositories feed the pipeline">
@@ -70,6 +61,10 @@ export default function RepositoriesPage({
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
+
+      {loading && repositories.length === 0 ? (
+        <p className="detail-note">Loading repositories…</p>
+      ) : null}
 
       <RepoOnboarderCard
         repositories={repositories}

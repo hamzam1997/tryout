@@ -61,7 +61,13 @@ export default function MeetingRow({
         onClick={() => setOpen((v) => !v)}
       >
         <span className="row-main">
-          <span className="row-title">{meeting.title}</span>
+          <span className="row-title-line">
+            <span className="row-title">{meeting.title}</span>
+            <span className={`badge badge-inline ${pipelineRunning ? "badge-warn" : badgeClass}`}>
+              {pipelineRunning && <span className="spinner" />}
+              {statusLabel}
+            </span>
+          </span>
           <span className="row-meta">
             {when && (
               <time dateTime={meeting.occurred_at ?? meeting.created_at}>{when}</time>
@@ -84,30 +90,13 @@ export default function MeetingRow({
                 </span>
               </>
             )}
-            {minutesRunning && (
-              <>
-                <span className="sep">·</span>
-                <span className="meta-live">Writing minutes…</span>
-              </>
-            )}
-            {!minutesRunning && ideasRunning && (
-              <>
-                <span className="sep">·</span>
-                <span className="meta-live">Extracting ideas…</span>
-              </>
-            )}
-            {ideasFailed && (
+            {ideasFailed && !pipelineRunning && (
               <>
                 <span className="sep">·</span>
                 <span className="meta-warn">Ideas failed</span>
               </>
             )}
           </span>
-        </span>
-
-        <span className={`badge ${pipelineRunning ? "badge-warn" : badgeClass}`}>
-          {pipelineRunning && <span className="spinner" />}
-          {statusLabel}
         </span>
 
         <svg className="chevron" viewBox="0 0 20 20" aria-hidden="true">
@@ -117,32 +106,6 @@ export default function MeetingRow({
 
       {open && (
         <div className="row-detail">
-          {minutesRunning && (
-            <section className="detail status-panel">
-              <div className="status-panel-head">
-                <span className="spinner spinner-muted" />
-                <h4 className="detail-label">Generating minutes</h4>
-              </div>
-              <p className="detail-note">
-                Gemini is summarizing the transcript. Catalog-grounded ideas start
-                automatically when minutes land — keep this tab open or come back later.
-              </p>
-            </section>
-          )}
-
-          {!minutesRunning && ideasRunning && (
-            <section className="detail status-panel">
-              <div className="status-panel-head">
-                <span className="spinner spinner-muted" />
-                <h4 className="detail-label">Extracting ideas</h4>
-              </div>
-              <p className="detail-note">
-                Matching meeting proposals to the repository catalog. New ideas will
-                show up in the Ideas inbox when this finishes.
-              </p>
-            </section>
-          )}
-
           {ideasFailed && (
             <section className="detail ideas-failure">
               <h4 className="detail-label">Idea extraction failed</h4>

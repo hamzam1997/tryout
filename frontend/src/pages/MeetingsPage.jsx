@@ -9,7 +9,6 @@ export default function MeetingsPage({
   retryingId,
   deletingId,
   onUploaded,
-  onRefresh,
   onRetryIdeas,
   onDelete,
 }) {
@@ -31,9 +30,6 @@ export default function MeetingsPage({
             background so you can keep uploading.
           </p>
         </div>
-        <button type="button" className="btn btn-ghost" onClick={onRefresh} disabled={loading}>
-          {loading ? "Refreshing…" : "Refresh"}
-        </button>
       </header>
 
       <Uploader onUploaded={onUploaded} />
