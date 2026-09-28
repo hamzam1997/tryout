@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest import mock
 
 import database as db
+from agents import meeting_jobs
 
 # The app calls init_db() at import, so point it somewhere disposable first.
 _BOOTSTRAP = tempfile.TemporaryDirectory()
@@ -15,7 +16,7 @@ db.set_database_path(Path(_BOOTSTRAP.name) / "bootstrap.db")
 
 import app as flask_app  # noqa: E402
 from agents.note_taker import NoteTakerError  # noqa: E402
-from schemas import MeetingMinutes, MeetingSource, MeetingStatus  # noqa: E402
+from schemas import Idea, MeetingMinutes, MeetingSource, MeetingStatus  # noqa: E402
 
 VTT = """WEBVTT
 
@@ -48,12 +49,16 @@ class IngestionTestCase(unittest.TestCase):
         self.client = flask_app.app.test_client()
         # The failure-path tests exercise logger.exception on purpose.
         logging.getLogger("agents.note_taker").setLevel(logging.CRITICAL)
+        logging.getLogger("agents.meeting_jobs").setLevel(logging.CRITICAL)
+        # Run minutes inline so assertions see the finished state.
+        meeting_jobs.set_force_sync(True)
         # Idea extraction is a background event after minutes; keep note tests focused.
         self._ideas_patch = mock.patch("agents.idea_jobs.on_minutes_ready")
         self._ideas_patch.start()
 
     def tearDown(self):
         self._ideas_patch.stop()
+        meeting_jobs.set_force_sync(False)
         db.set_database_path(None)
         self._tmp.cleanup()
 
@@ -62,7 +67,8 @@ class TestSuccessfulUpload(IngestionTestCase):
     @mock.patch("agents.note_taker.generate_minutes", return_value=MINUTES)
     def test_upload_stores_meeting_and_minutes(self, _):
         response = upload(self.client, title="Weekly Ops")
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 202)
+        self.assertTrue(response.get_json()["minutes_queued"])
 
         body = response.get_json()
         self.assertEqual(body["format"], "vtt")
@@ -108,7 +114,8 @@ class TestModelFailure(IngestionTestCase):
     def test_transcript_survives_a_failed_model_call(self, _):
         """Persist-before-extract: a Gemini failure must not lose the upload."""
         response = upload(self.client, title="Weekly Ops")
-        self.assertEqual(response.status_code, 502)
+        # Upload accepts immediately; the background job records the failure.
+        self.assertEqual(response.status_code, 202)
 
         stored = db.list_meetings()
         self.assertEqual(len(stored), 1)
@@ -166,6 +173,24 @@ class TestReadEndpoints(IngestionTestCase):
 
     def test_get_unknown_meeting_is_404(self):
         self.assertEqual(self.client.get("/meetings/9999").status_code, 404)
+
+    @mock.patch("agents.note_taker.generate_minutes", return_value=MINUTES)
+    def test_delete_meeting_cascades_ideas(self, _):
+        meeting_id = upload(self.client).get_json()["meeting"]["id"]
+        db.create_idea(
+            Idea(
+                meeting_id=meeting_id,
+                title="Notify delayed refunds",
+                idea_key="notify-delayed-refunds",
+            )
+        )
+        self.assertEqual(len(db.list_ideas(meeting_id=meeting_id)), 1)
+
+        response = self.client.delete(f"/meetings/{meeting_id}")
+        self.assertEqual(response.status_code, 204)
+        self.assertIsNone(db.get_meeting(meeting_id))
+        self.assertEqual(db.list_ideas(meeting_id=meeting_id), [])
+        self.assertEqual(self.client.delete("/meetings/9999").status_code, 404)
 
 
 if __name__ == "__main__":

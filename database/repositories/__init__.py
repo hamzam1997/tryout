@@ -15,6 +15,7 @@ from database.repositories.friction import (
 from database.repositories.idea import (
     approve_idea,
     create_idea,
+    delete_idea,
     find_idea_by_key,
     get_idea,
     list_ideas,
@@ -23,6 +24,7 @@ from database.repositories.idea import (
 )
 from database.repositories.meeting import (
     create_meeting,
+    delete_meeting,
     get_meeting,
     list_meetings,
     set_meeting_ideas_error,
@@ -57,6 +59,7 @@ __all__ = [
     "update_repository",
     # Meeting
     "create_meeting",
+    "delete_meeting",
     "get_meeting",
     "list_meetings",
     "set_meeting_ideas_error",
@@ -66,6 +69,7 @@ __all__ = [
     # Idea
     "approve_idea",
     "create_idea",
+    "delete_idea",
     "find_idea_by_key",
     "get_idea",
     "list_ideas",

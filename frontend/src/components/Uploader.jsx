@@ -21,7 +21,7 @@ export default function Uploader({ onUploaded }) {
   const [title, setTitle] = useState("");
   const [occurredAt, setOccurredAt] = useState("");
   const [dragging, setDragging] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [inFlight, setInFlight] = useState(0);
   const [error, setError] = useState("");
 
   function accept(candidate) {
@@ -41,7 +41,6 @@ export default function Uploader({ onUploaded }) {
 
   function clear() {
     setFile(null);
-    setError("");
     if (inputRef.current) inputRef.current.value = "";
   }
 
@@ -53,26 +52,29 @@ export default function Uploader({ onUploaded }) {
 
   async function onSubmit(event) {
     event.preventDefault();
-    if (!file || busy) return;
+    if (!file) return;
 
-    setBusy(true);
+    // Capture then clear immediately so another file can be queued.
+    const payload = { file, title, occurredAt };
+    clear();
+    setTitle("");
+    setOccurredAt("");
     setError("");
+    setInFlight((count) => count + 1);
+
     try {
-      const result = await uploadTranscript({ file, title, occurredAt });
-      clear();
-      setTitle("");
-      setOccurredAt("");
+      const result = await uploadTranscript(payload);
       onUploaded(result);
     } catch (problem) {
       setError(problem.message);
     } finally {
-      setBusy(false);
+      setInFlight((count) => Math.max(0, count - 1));
     }
   }
 
   async function handleLoadDemo() {
-    setBusy(true);
     setError("");
+    setInFlight((count) => count + 1);
     try {
       const result = await loadDemoMeeting();
       clear();
@@ -80,7 +82,7 @@ export default function Uploader({ onUploaded }) {
     } catch (problem) {
       setError(problem.message);
     } finally {
-      setBusy(false);
+      setInFlight((count) => Math.max(0, count - 1));
     }
   }
 
@@ -89,15 +91,16 @@ export default function Uploader({ onUploaded }) {
       <div className="card-head">
         <div>
           <h2>Upload a transcript</h2>
-          <span className="card-hint">{ACCEPTED.join(", ")} · max 2MB</span>
+          <span className="card-hint">
+            {ACCEPTED.join(", ")} · max 2MB · processes in the background
+          </span>
         </div>
         <button
           type="button"
           className="btn btn-secondary btn-sm"
           onClick={handleLoadDemo}
-          disabled={busy}
         >
-          {busy ? "Loading…" : "Load Demo Transcript (Acme Store)"}
+          Load Demo Transcript (Acme Store)
         </button>
       </div>
 
@@ -168,16 +171,21 @@ export default function Uploader({ onUploaded }) {
 
           <div className="form-foot">
             <p className="form-note">
-              {busy
-                ? "Reading the transcript and writing the minutes…"
-                : "Minutes are generated on upload and take a few seconds."}
+              Minutes and ideas process in the list below — you can upload another file right away.
             </p>
-            <button type="submit" className="btn btn-primary" disabled={!file || busy}>
-              {busy && <span className="spinner" />}
-              {busy ? "Processing" : "Upload"}
+            <button type="submit" className="btn btn-primary" disabled={!file}>
+              Upload
             </button>
           </div>
         </form>
+
+        {inFlight > 0 && (
+          <p className="detail-note upload-inflight">
+            {inFlight === 1
+              ? "Sending transcript… it will appear in Recent below."
+              : `Sending ${inFlight} transcripts… they will appear in Recent below.`}
+          </p>
+        )}
       </div>
     </div>
   );

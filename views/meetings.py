@@ -8,7 +8,8 @@ from flask import Blueprint, jsonify, request
 
 import database as db
 from agents.idea_jobs import on_minutes_ready
-from agents.note_taker import NoteTakerError, ingest, take_notes
+from agents.meeting_jobs import queue_minutes
+from agents.note_taker import ingest
 from agents.transcript import TranscriptError
 from config import BASE_DIR
 from schemas import IdeasExtractStatus, MeetingSource, MeetingStatus
@@ -32,12 +33,22 @@ def _serialise(meeting) -> dict:
     return meeting.model_dump(mode="json")
 
 
+def _queued_payload(meeting, parsed) -> dict:
+    return {
+        "meeting": _serialise(meeting),
+        "speakers": parsed.speakers,
+        "cue_count": len(parsed.cues),
+        "format": parsed.source_format.value,
+        "minutes_queued": True,
+        "message": "Meeting stored; minutes and ideas are processing in the background.",
+    }
+
+
 @bp.post("/upload")
 def upload_meeting():
-    """Ingest a transcript and generate minutes.
+    """Persist a transcript and queue minutes (then ideas) in the background.
 
-    Idea extraction is triggered as a background event when minutes land;
-    this response returns as soon as minutes are ready.
+    Returns 202 Accepted immediately, matching repository onboarding.
     """
     uploaded = request.files.get("file")
     if uploaded is None or not uploaded.filename:
@@ -74,29 +85,14 @@ def upload_meeting():
     except TranscriptError as exc:
         return jsonify({"error": str(exc)}), 400
 
-    payload = {
-        "meeting": _serialise(meeting),
-        "speakers": parsed.speakers,
-        "cue_count": len(parsed.cues),
-        "format": parsed.source_format.value,
-    }
-
-    try:
-        meeting = take_notes(meeting.id)
-    except NoteTakerError as exc:
-        payload["meeting"] = _serialise(db.get_meeting(meeting.id))
-        payload["error"] = str(exc)
-        return jsonify(payload), 502
-
-    payload["meeting"] = _serialise(meeting)
-    payload["ideas"] = []
-    payload["ideas_queued"] = True
-    return jsonify(payload), 201
+    queue_minutes(meeting.id)
+    meeting = db.get_meeting(meeting.id)
+    return jsonify(_queued_payload(meeting, parsed)), 202
 
 
 @bp.post("/demo")
 def load_demo_meeting():
-    """Ingest the bundled weekly-ops demo transcript; ideas extract in background."""
+    """Ingest the bundled weekly-ops demo transcript; minutes/ideas run in background."""
     fixture_path = BASE_DIR / "fixtures" / "meetings" / "2026-09-17-weekly-ops.vtt"
     if not fixture_path.is_file():
         return jsonify({"error": "Demo meeting transcript not found"}), 404
@@ -110,23 +106,9 @@ def load_demo_meeting():
         source=MeetingSource.SEED,
         occurred_at=datetime(2026, 9, 17, 10, 0),
     )
-    payload = {
-        "meeting": _serialise(meeting),
-        "speakers": parsed.speakers,
-        "cue_count": len(parsed.cues),
-        "format": parsed.source_format.value,
-    }
-    try:
-        meeting = take_notes(meeting.id)
-    except NoteTakerError as exc:
-        payload["meeting"] = _serialise(db.get_meeting(meeting.id))
-        payload["error"] = str(exc)
-        return jsonify(payload), 502
-
-    payload["meeting"] = _serialise(meeting)
-    payload["ideas"] = []
-    payload["ideas_queued"] = True
-    return jsonify(payload), 201
+    queue_minutes(meeting.id)
+    meeting = db.get_meeting(meeting.id)
+    return jsonify(_queued_payload(meeting, parsed)), 202
 
 
 @bp.post("/<int:meeting_id>/extract-ideas")
@@ -169,3 +151,11 @@ def get_meeting(meeting_id: int):
     if meeting is None:
         return jsonify({"error": "meeting not found"}), 404
     return jsonify(_serialise(meeting))
+
+
+@bp.delete("/<int:meeting_id>")
+def delete_meeting(meeting_id: int):
+    """Delete a meeting and its cascaded ideas/attempts."""
+    if not db.delete_meeting(meeting_id):
+        return jsonify({"error": "meeting not found"}), 404
+    return "", 204

@@ -24,9 +24,10 @@ export default function RepositoriesPage({
     <div className="container">
       <header className="page-head">
         <div>
-          <h1>Codebase Repositories</h1>
+          <h1>Repositories</h1>
           <p className="page-sub">
-            Onboard repositories via GitHub OAuth or demo sandbox. Gemini synthesizes their architectural catalog.
+            Onboard a codebase once. Gemini builds an architecture catalog that
+            grounds every meeting idea.
           </p>
         </div>
         <button
@@ -35,7 +36,7 @@ export default function RepositoriesPage({
           onClick={onRefresh}
           disabled={loading}
         >
-          Refresh
+          {loading ? "Refreshing…" : "Refresh"}
         </button>
       </header>
 

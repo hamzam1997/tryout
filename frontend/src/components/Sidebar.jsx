@@ -28,8 +28,11 @@ export default function Sidebar({ view, onNavigate, counts, online }) {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <span className="brand-mark">t</span>
-        <span className="brand-name">tryout</span>
+        <span className="brand-mark" aria-hidden="true">t</span>
+        <div className="brand-text">
+          <span className="brand-name">tryout</span>
+          <span className="brand-tag">Meeting → idea → attempt</span>
+        </div>
       </div>
 
       <nav className="nav">
@@ -44,14 +47,22 @@ export default function Sidebar({ view, onNavigate, counts, online }) {
           >
             {ICONS[id]}
             {label}
-            {counts[id] > 0 && <span className="nav-count">{counts[id]}</span>}
+            {counts[id] > 0 && (
+              <span className={`nav-count${id === "ideas" ? " is-alert" : ""}`}>
+                {counts[id]}
+              </span>
+            )}
           </button>
         ))}
       </nav>
 
       <div className="sidebar-foot">
-        <span className={`dot ${online === null ? "" : online ? "is-up" : "is-down"}`} />
-        {online === null ? "Connecting…" : online ? "API connected" : "API unreachable"}
+        <span
+          className={`dot ${online === null ? "" : online ? "is-up" : "is-down"}`}
+        />
+        <span>
+          {online === null ? "Connecting…" : online ? "API connected" : "API unreachable"}
+        </span>
       </div>
     </aside>
   );

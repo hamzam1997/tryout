@@ -118,3 +118,13 @@ def set_meeting_ideas_error(meeting_id: int, ideas_error: str | None) -> None:
                 model.ideas_status = IdeasExtractStatus.FAILED.value
             elif model.ideas_status == IdeasExtractStatus.FAILED.value:
                 model.ideas_status = IdeasExtractStatus.PROCESSED.value
+
+
+def delete_meeting(meeting_id: int) -> bool:
+    """Delete a meeting and cascaded ideas/attempts. Returns False if missing."""
+    with session_scope() as session:
+        model = session.get(MeetingModel, meeting_id)
+        if model is None:
+            return False
+        session.delete(model)
+        return True
