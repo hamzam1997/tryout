@@ -8,6 +8,7 @@ async function parse(response) {
   return body;
 }
 
+// Meetings API
 export function listMeetings() {
   return fetch("/meetings").then(parse);
 }
@@ -38,6 +39,11 @@ export async function extractIdeas(meetingId) {
   return body;
 }
 
+export function loadDemoMeeting() {
+  return fetch("/meetings/demo", { method: "POST" }).then(parse);
+}
+
+// Ideas API
 export function listIdeas(status) {
   const query = status ? `?status=${encodeURIComponent(status)}` : "";
   return fetch(`/ideas${query}`).then(parse);
@@ -53,6 +59,47 @@ export function approveIdea(id, approvedBy = "local") {
 
 export function rejectIdea(id) {
   return fetch(`/ideas/${id}/reject`, { method: "POST" }).then(parse);
+}
+
+// Repositories API
+export function listRepositories() {
+  return fetch("/repositories").then(parse);
+}
+
+export function getRepository(id) {
+  return fetch(`/repositories/${id}`).then(parse);
+}
+
+export function getRepositoryCatalog(id) {
+  return fetch(`/repositories/${id}/catalog`).then(parse);
+}
+
+export function onboardRepository({ sourceType, repoFullName, branch, path, forceRefresh }) {
+  const payload = {
+    source_type: sourceType,
+    repo_full_name: repoFullName,
+    branch: branch,
+    path: path,
+    force_refresh: forceRefresh,
+  };
+  return fetch("/repositories/onboard", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).then(parse);
+}
+
+// GitHub Auth API
+export function getGithubAuthStatus() {
+  return fetch("/api/auth/github/status").then(parse);
+}
+
+export function getGithubRepos() {
+  return fetch("/api/auth/github/repos").then(parse);
+}
+
+export function logoutGithub() {
+  return fetch("/api/auth/github/logout", { method: "POST" }).then(parse);
 }
 
 export function health() {

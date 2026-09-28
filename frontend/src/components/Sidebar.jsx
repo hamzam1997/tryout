@@ -1,4 +1,9 @@
 const ICONS = {
+  repositories: (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.714 1.7.75.75 0 1 1-1.072 1.05A2.495 2.495 0 0 1 2 11.5v-9zm10.5-1h-8a1 1 0 0 0-1 1v6.7c.28-.13.59-.2.928-.2h8.072V1.5z" />
+    </svg>
+  ),
   meetings: (
     <svg viewBox="0 0 16 16" aria-hidden="true">
       <rect x="2.25" y="3.25" width="11.5" height="10.5" rx="1.5" />
@@ -14,6 +19,7 @@ const ICONS = {
 };
 
 const NAV = [
+  { id: "repositories", label: "Repositories" },
   { id: "meetings", label: "Meetings" },
   { id: "ideas", label: "Ideas" },
 ];

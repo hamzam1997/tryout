@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 // The Flask app owns these paths; everything else is the React app.
-const API_ROUTES = ["/meetings", "/ideas", "/health"];
+const API_ROUTES = ["/meetings", "/ideas", "/health", "/repositories", "/api/auth"];
 
 export default defineConfig({
   plugins: [react()],

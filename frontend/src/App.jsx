@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
+import RepositoriesPage from "./pages/RepositoriesPage";
 import MeetingsPage from "./pages/MeetingsPage";
 import IdeasPage from "./pages/IdeasPage";
 import {
@@ -8,12 +9,14 @@ import {
   health,
   listIdeas,
   listMeetings,
+  listRepositories,
   rejectIdea,
 } from "./api";
 import "./styles/global.css";
 
 export default function App() {
-  const [view, setView] = useState("meetings");
+  const [view, setView] = useState("repositories");
+  const [repositories, setRepositories] = useState([]);
   const [meetings, setMeetings] = useState([]);
   const [ideas, setIdeas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,9 +31,14 @@ export default function App() {
     setError("");
     setIdeasError("");
     try {
-      const [nextMeetings, nextIdeas] = await Promise.all([listMeetings(), listIdeas()]);
-      setMeetings(nextMeetings);
-      setIdeas(nextIdeas);
+      const [reposData, meetingsData, ideasData] = await Promise.all([
+        listRepositories(),
+        listMeetings(),
+        listIdeas(),
+      ]);
+      setRepositories(reposData);
+      setMeetings(meetingsData);
+      setIdeas(ideasData);
       setOnline(true);
     } catch (problem) {
       setError(problem.message);
@@ -64,6 +72,13 @@ export default function App() {
     if (Array.isArray(result.ideas) && result.ideas.length > 0) {
       setView("ideas");
     }
+  }
+
+  function handleRepoOnboarded(newRepo) {
+    setRepositories((current) => {
+      const filtered = current.filter((r) => r.id !== newRepo.id);
+      return [newRepo, ...filtered];
+    });
   }
 
   async function handleRetryIdeas(meetingId) {
@@ -139,12 +154,24 @@ export default function App() {
       <Sidebar
         view={view}
         onNavigate={setView}
-        counts={{ meetings: meetings.length, ideas: pendingIdeas }}
+        counts={{
+          repositories: repositories.length,
+          meetings: meetings.length,
+          ideas: pendingIdeas,
+        }}
         online={online}
       />
 
       <main className="main">
-        {view === "meetings" ? (
+        {view === "repositories" ? (
+          <RepositoriesPage
+            repositories={repositories}
+            loading={loading}
+            error={error}
+            onRefresh={refresh}
+            onOnboarded={handleRepoOnboarded}
+          />
+        ) : view === "meetings" ? (
           <MeetingsPage
             meetings={meetings}
             loading={loading}

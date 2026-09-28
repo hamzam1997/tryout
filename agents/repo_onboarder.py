@@ -266,6 +266,14 @@ class RepoOnboarder:
             else:
                 repo_obj = db.get_or_create_repository(repo)
         elif isinstance(repo, (str, Path)):
+            repo_str = str(repo).strip()
+            if repo_str.startswith(("https://github.com", "http://github.com", "git@github.com")):
+                return self.onboard_github(
+                    repo_str,
+                    force_refresh=force_refresh,
+                    source_ref=source_ref,
+                    return_repo=return_repo,
+                )
             resolved_path = str(Path(repo).resolve())
             found = db.get_repository_by_source(resolved_path)
             if found:
@@ -314,6 +322,74 @@ class RepoOnboarder:
         updated_repo = db.get_repository(repo_obj.id)
         if not updated_repo:
             raise RuntimeError(f"Failed to reload repository {repo_obj.id} after saving catalog.")
+
+        if return_repo:
+            return updated_repo, catalog
+        return catalog
+
+    def onboard_github(
+        self,
+        url_or_slug: str,
+        branch: str | None = None,
+        access_token: str | None = None,
+        force_refresh: bool = False,
+        source_ref: str | None = None,
+        return_repo: bool = False,
+    ) -> ArchitectureCatalog | tuple[Repository, ArchitectureCatalog]:
+        """Onboard a GitHub repository by fetching it via OAuth token and generating/caching its catalog."""
+        from agents.git_utils import fetch_github_repository, parse_github_slug
+
+        owner, repo_name = parse_github_slug(url_or_slug)
+        canonical_source = f"https://github.com/{owner}/{repo_name}"
+
+        found = db.get_repository_by_source(canonical_source)
+        if found:
+            repo_obj = found
+        else:
+            repo_obj = db.create_repository(
+                Repository(
+                    name=repo_name,
+                    source=canonical_source,
+                    source_type=RepoSource.GITHUB,
+                )
+            )
+
+        # Fetch/clone the repository locally
+        local_path, commit_sha, _ = fetch_github_repository(
+            url_or_slug=canonical_source,
+            branch=branch,
+            access_token=access_token,
+            force_refresh=force_refresh,
+        )
+        effective_ref = source_ref or commit_sha
+
+        # Check cache freshness against the commit SHA
+        if not force_refresh and repo_obj.catalog is not None:
+            if repo_obj.source_ref == effective_ref:
+                logger.info(
+                    "Reusing cached architecture catalog for GitHub repo %s (%s)",
+                    repo_obj.name,
+                    effective_ref[:8],
+                )
+                if return_repo:
+                    return repo_obj, repo_obj.catalog
+                return repo_obj.catalog
+
+        # Cache miss or forced refresh: scan and generate catalog
+        logger.info(
+            "Scanning and generating architecture catalog for GitHub repo %s (%s)",
+            repo_obj.name,
+            effective_ref[:8],
+        )
+        skeleton = scan_repo(local_path)
+        catalog = self.generate_catalog(skeleton)
+        if not catalog.name:
+            catalog.name = repo_obj.name
+
+        db.save_catalog(repo_obj.id, catalog, source_ref=effective_ref)
+        updated_repo = db.get_repository(repo_obj.id)
+        if not updated_repo:
+            raise RuntimeError(f"Failed to reload repository {repo_obj.id}")
 
         if return_repo:
             return updated_repo, catalog
