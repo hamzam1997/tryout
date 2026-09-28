@@ -55,7 +55,15 @@ def _ensure_meeting_ideas_error_column(engine) -> None:
 
 def init_db() -> None:
     """Create tables and indexes via SQLAlchemy metadata and ensure WAL mode."""
-    database_path().parent.mkdir(parents=True, exist_ok=True)
+    db_file = database_path()
+    if not db_file.exists():
+        try:
+            from database.gcs_sync import restore_db_from_gcs
+            restore_db_from_gcs()
+        except Exception:
+            pass
+
+    db_file.parent.mkdir(parents=True, exist_ok=True)
     engine = get_engine()
     with engine.connect() as conn:
         conn.execute(text("PRAGMA journal_mode=WAL"))

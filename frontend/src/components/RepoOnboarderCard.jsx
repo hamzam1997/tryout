@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   getGithubAuthStatus,
   getGithubRepos,
+  listRepositories,
   logoutGithub,
   onboardRepository,
 } from "../api";
@@ -11,14 +12,13 @@ export default function RepoOnboarderCard({
   onOnboarded,
   onViewCatalog,
 }) {
-  const [tab, setTab] = useState("github"); // "github" | "demo" | "local"
+  const [tab, setTab] = useState("github"); // "github" | "demo"
   const [authStatus, setAuthStatus] = useState({ configured: false, authenticated: false, user: null });
   const [ghRepos, setGhRepos] = useState([]);
   const [loadingGhRepos, setLoadingGhRepos] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedRepoFullName, setSelectedRepoFullName] = useState("");
   const [branch, setBranch] = useState("");
-  const [localPath, setLocalPath] = useState("");
   const [onboarding, setOnboarding] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState(() => {
@@ -62,6 +62,26 @@ export default function RepoOnboarderCard({
       .catch(() => {});
   }, [fetchUserRepos]);
 
+  // Background polling: If any repo is currently onboarding, poll every 2.5 seconds
+  const hasOnboardingRepo = repositories?.some((r) => r.catalog_status === "onboarding");
+
+  useEffect(() => {
+    if (!hasOnboardingRepo) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const latestRepos = await listRepositories();
+        latestRepos.forEach((repo) => {
+          if (onOnboarded) onOnboarded(repo);
+        });
+      } catch {
+        // Ignore polling errors
+      }
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [hasOnboardingRepo, onOnboarded]);
+
   async function handleLogout() {
     try {
       await logoutGithub();
@@ -80,7 +100,7 @@ export default function RepoOnboarderCard({
     }
     setErrorMsg("");
     setOnboarding(true);
-    setStatusMsg(`Connecting to ${selectedRepoFullName} and analyzing architecture with Gemini 2.5 Flash…`);
+    setStatusMsg(`Analyzing ${selectedRepoFullName} with Gemini in the background…`);
 
     try {
       const res = await onboardRepository({
@@ -89,13 +109,12 @@ export default function RepoOnboarderCard({
         branch: branch || undefined,
         forceRefresh: true,
       });
-      setStatusMsg("Architecture catalog generated successfully!");
       if (onOnboarded) onOnboarded(res.repository);
+      setStatusMsg("Onboarding is running in the background. You can refresh safely.");
       setTimeout(() => {
         setOnboarding(false);
         setStatusMsg("");
-        if (onViewCatalog) onViewCatalog(res.repository);
-      }, 600);
+      }, 3000);
     } catch (err) {
       setErrorMsg(err.message);
       setOnboarding(false);
@@ -106,49 +125,19 @@ export default function RepoOnboarderCard({
   async function handleOnboardDemo() {
     setErrorMsg("");
     setOnboarding(true);
-    setStatusMsg("Scanning Acme Store and synthesizing Architecture Catalog with Gemini 2.5 Flash…");
+    setStatusMsg("Analyzing Acme Store sandbox in the background with Gemini…");
 
     try {
       const res = await onboardRepository({
         sourceType: "demo",
         forceRefresh: true,
       });
-      setStatusMsg("Demo repository onboarded successfully!");
       if (onOnboarded) onOnboarded(res.repository);
+      setStatusMsg("Onboarding is running in the background. You can refresh safely.");
       setTimeout(() => {
         setOnboarding(false);
         setStatusMsg("");
-        if (onViewCatalog) onViewCatalog(res.repository);
-      }, 600);
-    } catch (err) {
-      setErrorMsg(err.message);
-      setOnboarding(false);
-      setStatusMsg("");
-    }
-  }
-
-  async function handleOnboardLocal() {
-    if (!localPath.trim()) {
-      setErrorMsg("Please provide a local directory path.");
-      return;
-    }
-    setErrorMsg("");
-    setOnboarding(true);
-    setStatusMsg("Scanning local directory and synthesizing catalog with Gemini…");
-
-    try {
-      const res = await onboardRepository({
-        sourceType: "local",
-        path: localPath.trim(),
-        forceRefresh: true,
-      });
-      setStatusMsg("Repository onboarded successfully!");
-      if (onOnboarded) onOnboarded(res.repository);
-      setTimeout(() => {
-        setOnboarding(false);
-        setStatusMsg("");
-        if (onViewCatalog) onViewCatalog(res.repository);
-      }, 600);
+      }, 3000);
     } catch (err) {
       setErrorMsg(err.message);
       setOnboarding(false);
@@ -168,7 +157,7 @@ export default function RepoOnboarderCard({
         <div>
           <h2>Repository Onboarding</h2>
           <p className="card-hint">
-            Connect a codebase. Gemini 2.5 Flash analyzes its architecture and builds a shared catalog for all prototype attempts.
+            Connect a codebase. Gemini 2.5 Flash analyzes its architecture in the background and builds a shared catalog.
           </p>
         </div>
       </div>
@@ -193,13 +182,6 @@ export default function RepoOnboarderCard({
           >
             One-Click Demo Repo
           </button>
-          <button
-            type="button"
-            className={`tab-btn ${tab === "local" ? "is-active" : ""}`}
-            onClick={() => { setTab("local"); setErrorMsg(""); }}
-          >
-            Local Server Path
-          </button>
         </div>
 
         {errorMsg && <div className="alert alert-error">{errorMsg}</div>}
@@ -210,7 +192,7 @@ export default function RepoOnboarderCard({
             {!authStatus.authenticated ? (
               <div className="github-connect-box">
                 <div className="connect-prompt">
-                  <h3>Connect your GitHub Account</h3>
+                  <h3>Connect with GitHub</h3>
                   <p>
                     Authenticate securely via OAuth to select and onboard any of your public or private repositories.
                   </p>
@@ -225,7 +207,7 @@ export default function RepoOnboarderCard({
                 ) : (
                   <div className="notice-banner">
                     <p>
-                      <strong>GitHub OAuth App not yet configured.</strong> Configure <code>GITHUB_CLIENT_ID</code> and <code>GITHUB_CLIENT_SECRET</code> in the environment, or use the <strong>One-Click Demo Repo</strong> below.
+                      <strong>GitHub OAuth App not yet configured.</strong> Configure <code>GITHUB_CLIENT_ID</code> and <code>GITHUB_CLIENT_SECRET</code> in the environment, or use the <strong>One-Click Demo Repo</strong>.
                     </p>
                   </div>
                 )}
@@ -313,7 +295,7 @@ export default function RepoOnboarderCard({
                         onClick={handleOnboardGithub}
                         disabled={onboarding || !selectedRepoFullName}
                       >
-                        {onboarding ? "Synthesizing Catalog…" : "Onboard Repository"}
+                        {onboarding ? "Starting…" : "Onboard Repository"}
                       </button>
                     </div>
                   </div>
@@ -344,34 +326,7 @@ export default function RepoOnboarderCard({
                 onClick={handleOnboardDemo}
                 disabled={onboarding}
               >
-                {onboarding ? "Synthesizing Catalog…" : "Connect Demo Repo (acme-store)"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Tab 3: Local Directory */}
-        {tab === "local" && (
-          <div className="tab-pane">
-            <div className="local-box">
-              <div className="form-group">
-                <label htmlFor="local-path">Filesystem Directory Path</label>
-                <input
-                  id="local-path"
-                  type="text"
-                  placeholder="/Users/.../my-service or ./demo_repo/acme_store"
-                  value={localPath}
-                  onChange={(e) => setLocalPath(e.target.value)}
-                  className="input"
-                />
-              </div>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleOnboardLocal}
-                disabled={onboarding || !localPath.trim()}
-              >
-                {onboarding ? "Synthesizing Catalog…" : "Scan & Onboard Local Repo"}
+                {onboarding ? "Starting…" : "Connect Demo Repo (acme-store)"}
               </button>
             </div>
           </div>
@@ -390,36 +345,64 @@ export default function RepoOnboarderCard({
           <div className="onboarded-repos-section">
             <h3>Connected Codebases</h3>
             <div className="repos-grid">
-              {repositories.map((repo) => (
-                <div key={repo.id} className="repo-summary-card">
-                  <div className="repo-card-head">
-                    <div className="repo-card-title">
-                      <strong>{repo.name}</strong>
-                      <span className={`badge badge-${repo.source_type}`}>{repo.source_type}</span>
+              {repositories.map((repo) => {
+                const isOnboarding = repo.catalog_status === "onboarding";
+                const isFailed = repo.catalog_status === "failed";
+
+                return (
+                  <div key={repo.id} className="repo-summary-card">
+                    <div className="repo-card-head">
+                      <div className="repo-card-title">
+                        <strong>{repo.name}</strong>
+                        <span className={`badge badge-${repo.source_type}`}>{repo.source_type}</span>
+                      </div>
+
+                      {isOnboarding ? (
+                        <span className="badge badge-warn status-pulse">
+                          <span className="spinner spinner-xs" /> Analyzing…
+                        </span>
+                      ) : isFailed ? (
+                        <span className="badge badge-error">Failed</span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => onViewCatalog(repo)}
+                        >
+                          View Catalog →
+                        </button>
+                      )}
                     </div>
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => onViewCatalog(repo)}
-                    >
-                      View Catalog →
-                    </button>
+
+                    <p className="repo-source-sub"><code>{repo.source}</code></p>
+
+                    {isOnboarding && (
+                      <p className="repo-analyzing-note">
+                        Gemini 2.5 Flash is analyzing architecture modules, data models, routes, and team owners in the background…
+                      </p>
+                    )}
+
+                    {isFailed && (
+                      <p className="repo-error-note">
+                        {repo.catalog_error || "Analysis failed."}
+                      </p>
+                    )}
+
+                    {!isOnboarding && !isFailed && repo.catalog && (
+                      <div className="repo-card-stats">
+                        <span>{repo.catalog.language}</span>
+                        {repo.catalog.framework && <span>• {repo.catalog.framework}</span>}
+                        {repo.catalog.modules?.length > 0 && (
+                          <span>• {repo.catalog.modules.length} modules</span>
+                        )}
+                        {repo.catalog.api_routes?.length > 0 && (
+                          <span>• {repo.catalog.api_routes.length} routes</span>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <p className="repo-source-sub"><code>{repo.source}</code></p>
-                  {repo.catalog && (
-                    <div className="repo-card-stats">
-                      <span>{repo.catalog.language}</span>
-                      {repo.catalog.framework && <span>• {repo.catalog.framework}</span>}
-                      {repo.catalog.modules?.length > 0 && (
-                        <span>• {repo.catalog.modules.length} modules</span>
-                      )}
-                      {repo.catalog.api_routes?.length > 0 && (
-                        <span>• {repo.catalog.api_routes.length} routes</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

@@ -58,25 +58,43 @@ class RepositoriesViewTestCase(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.get_json(), [])
 
+    @mock.patch("views.repositories.threading.Thread")
     @mock.patch("agents.repo_onboarder.RepoOnboarder.generate_catalog", return_value=SAMPLE_CATALOG)
-    def test_onboard_demo_repo(self, mock_gen):
+    def test_onboard_demo_repo(self, mock_gen, mock_thread_cls):
+        def run_sync(target=None, args=(), **kwargs):
+            t = mock.MagicMock()
+            t.start.side_effect = lambda: target(*args)
+            return t
+
+        mock_thread_cls.side_effect = run_sync
+
         resp = self.client.post("/repositories/onboard", json={"source_type": "demo"})
-        self.assertIn(resp.status_code, (200, 201))
+        self.assertEqual(resp.status_code, 202)
         data = resp.get_json()
         self.assertIn("repository", data)
-        self.assertIn("catalog", data)
-        self.assertEqual(data["catalog"]["language"], "Python")
+        self.assertEqual(data["status"], "onboarding")
+        self.assertEqual(data["repository"]["name"], "acme_store")
 
-        # Verify it now appears in list
+        # Verify background worker marked catalog ready and it appears in list
         list_resp = self.client.get("/repositories")
         self.assertEqual(list_resp.status_code, 200)
         repos = list_resp.get_json()
         self.assertEqual(len(repos), 1)
         self.assertEqual(repos[0]["name"], "acme_store")
+        self.assertEqual(repos[0]["catalog_status"], "ready")
+        self.assertIsNotNone(repos[0]["catalog"])
 
+    @mock.patch("views.repositories.threading.Thread")
     @mock.patch("agents.git_utils.fetch_github_repository")
     @mock.patch("agents.repo_onboarder.RepoOnboarder.generate_catalog", return_value=SAMPLE_CATALOG)
-    def test_onboard_github_repo(self, mock_gen, mock_fetch):
+    def test_onboard_github_repo(self, mock_gen, mock_fetch, mock_thread_cls):
+        def run_sync(target=None, args=(), **kwargs):
+            t = mock.MagicMock()
+            t.start.side_effect = lambda: target(*args)
+            return t
+
+        mock_thread_cls.side_effect = run_sync
+
         # Create a dummy scanned directory for git fetch mock
         dummy_dir = Path(self._tmp.name) / "dummy_gh_repo"
         dummy_dir.mkdir()
@@ -90,13 +108,12 @@ class RepositoriesViewTestCase(unittest.TestCase):
             "/repositories/onboard",
             json={"source_type": "github", "repo_full_name": "org/payment-service"},
         )
-        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.status_code, 202)
         data = resp.get_json()
         self.assertEqual(data["repository"]["source_type"], "github")
         self.assertEqual(data["repository"]["source"], "https://github.com/org/payment-service")
-        self.assertEqual(data["repository"]["source_ref"], "abc123sha")
 
-        # Retrieve catalog endpoint
+        # Retrieve catalog endpoint after sync completion
         repo_id = data["repository"]["id"]
         cat_resp = self.client.get(f"/repositories/{repo_id}/catalog")
         self.assertEqual(cat_resp.status_code, 200)

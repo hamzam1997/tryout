@@ -366,6 +366,8 @@ class Repository(BaseModel):
     source_type: RepoSource = RepoSource.LOCAL
     source_ref: str | None = None
     catalog: ArchitectureCatalog | None = None
+    catalog_status: str = "ready"
+    catalog_error: str | None = None
     catalog_generated_at: datetime | None = None
     created_at: datetime | None = None
 
