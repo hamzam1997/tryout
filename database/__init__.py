@@ -47,6 +47,7 @@ from database.repositories import (
     set_meeting_ideas_error,
     set_meeting_ideas_state,
     set_meeting_status,
+    set_repository_status,
     update_attempt,
     update_idea,
     update_meeting,

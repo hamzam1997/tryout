@@ -38,6 +38,7 @@ from database.repositories.repository import (
     get_repository_by_source,
     list_repositories,
     save_catalog,
+    set_repository_status,
     update_repository,
 )
 
@@ -50,6 +51,7 @@ __all__ = [
     "get_repository_by_source",
     "list_repositories",
     "save_catalog",
+    "set_repository_status",
     "update_repository",
     # Meeting
     "create_meeting",

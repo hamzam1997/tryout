@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request, session
 
 import database as db
+from agents.git_utils import parse_github_slug
 from agents.repo_onboarder import RepoOnboarder
 from config import BASE_DIR, settings
 from schemas import ArchitectureCatalog, RepoSource, Repository
@@ -53,101 +55,148 @@ def get_repository_catalog(repo_id: int):
     return jsonify(repo.catalog.model_dump(mode="json"))
 
 
+def _run_demo_onboarding(repo_id: int, force_refresh: bool) -> None:
+    """Background worker for Demo repo onboarding."""
+    try:
+        logger.info("Starting background onboarding for demo repo (id=%s)...", repo_id)
+        onboarder = RepoOnboarder()
+        onboarder.onboard(DEMO_REPO_PATH, force_refresh=force_refresh)
+        db.set_repository_status(repo_id, "ready")
+        logger.info("Demo repo onboarding complete for id=%s.", repo_id)
+    except Exception as exc:
+        logger.exception("Demo repo background onboarding failed for id=%s: %s", repo_id, exc)
+        db.set_repository_status(repo_id, "failed", str(exc))
+
+
+def _run_github_onboarding(
+    repo_id: int,
+    repo_slug: str,
+    branch: str | None,
+    token: str | None,
+    force_refresh: bool,
+) -> None:
+    """Background worker for GitHub repo onboarding."""
+    try:
+        logger.info("Starting background onboarding for GitHub repo %s (id=%s)...", repo_slug, repo_id)
+        onboarder = RepoOnboarder()
+        onboarder.onboard_github(
+            url_or_slug=repo_slug,
+            branch=branch,
+            access_token=token,
+            force_refresh=force_refresh,
+        )
+        db.set_repository_status(repo_id, "ready")
+        logger.info("GitHub repo onboarding complete for %s (id=%s).", repo_slug, repo_id)
+    except Exception as exc:
+        logger.exception("GitHub repo background onboarding failed for %s (id=%s): %s", repo_slug, repo_id, exc)
+        db.set_repository_status(repo_id, "failed", str(exc))
+
+
 @bp.post("/onboard")
 def onboard_repository():
-    """Onboard a repository via GitHub OAuth, Demo Repo, or Local Path."""
+    """Onboard a repository asynchronously in the background.
+
+    Returns 202 Accepted immediately. Status can be polled via GET /repositories.
+    """
     body = request.get_json(silent=True) or {}
     source_type = (body.get("source_type") or "demo").lower()
     force_refresh = bool(body.get("force_refresh", False))
 
-    onboarder = RepoOnboarder()
+    if source_type in ("demo", "acme_store"):
+        if not DEMO_REPO_PATH.is_dir():
+            return jsonify({"error": f"Demo repository not found at {DEMO_REPO_PATH}"}), 500
 
-    try:
-        if source_type in ("demo", "acme_store"):
-            if not DEMO_REPO_PATH.is_dir():
-                return jsonify({"error": f"Demo repository not found at {DEMO_REPO_PATH}"}), 500
-
-            repo, catalog = onboarder.onboard(
-                DEMO_REPO_PATH,
-                force_refresh=force_refresh,
-                return_repo=True,
-            )
-            return (
-                jsonify(
-                    {
-                        "message": "Demo repository onboarded successfully.",
-                        "repository": _serialise_repo(repo),
-                        "catalog": catalog.model_dump(mode="json"),
-                    }
-                ),
-                201 if force_refresh or repo.created_at else 200,
-            )
-
-        elif source_type == "github":
-            repo_slug = (body.get("repo_full_name") or body.get("url") or "").strip()
-            if not repo_slug:
-                return jsonify({"error": "repo_full_name or url is required for GitHub onboarding."}), 400
-
-            branch = body.get("branch") or None
-            # Retrieve token from session or authorization header or fallback to environment
-            token = (
-                session.get("github_token")
-                or request.headers.get("X-GitHub-Token")
-                or None
-            )
-
-            repo, catalog = onboarder.onboard_github(
-                url_or_slug=repo_slug,
-                branch=branch,
-                access_token=token,
-                force_refresh=force_refresh,
-                return_repo=True,
-            )
-            return (
-                jsonify(
-                    {
-                        "message": f"GitHub repository '{repo.name}' onboarded successfully.",
-                        "repository": _serialise_repo(repo),
-                        "catalog": catalog.model_dump(mode="json"),
-                    }
-                ),
-                201,
-            )
-
-        elif source_type == "local":
-            path_str = (body.get("path") or "").strip()
-            if not path_str:
-                return jsonify({"error": "path is required for local repository onboarding."}), 400
-
-            target = Path(path_str).resolve()
-            if not target.is_dir():
-                return jsonify({"error": f"Local path '{path_str}' does not exist or is not a directory."}), 400
-
-            repo, catalog = onboarder.onboard(
-                target,
-                force_refresh=force_refresh,
-                return_repo=True,
-            )
-            return (
-                jsonify(
-                    {
-                        "message": f"Local repository '{repo.name}' onboarded successfully.",
-                        "repository": _serialise_repo(repo),
-                        "catalog": catalog.model_dump(mode="json"),
-                    }
-                ),
-                201,
-            )
-
+        source_path = str(DEMO_REPO_PATH)
+        repo = db.get_repository_by_source(source_path)
+        if repo:
+            db.set_repository_status(repo.id, "onboarding")
+            repo = db.get_repository(repo.id)
         else:
-            return jsonify({"error": f"Unsupported source_type '{source_type}'. Expected 'github', 'demo', or 'local'."}), 400
+            repo = db.create_repository(
+                Repository(
+                    name="acme_store",
+                    source=source_path,
+                    source_type=RepoSource.DEMO,
+                    catalog_status="onboarding",
+                )
+            )
 
-    except PermissionError as perm_err:
-        logger.warning("Permission error onboarding repo: %s", perm_err)
-        return jsonify({"error": str(perm_err)}), 403
-    except ValueError as val_err:
-        logger.warning("Validation error onboarding repo: %s", val_err)
-        return jsonify({"error": str(val_err)}), 400
-    except Exception as exc:
-        logger.exception("Failed to onboard repository: %s", exc)
-        return jsonify({"error": f"Failed to onboard repository: {exc}"}), 500
+        # Launch background thread
+        thread = threading.Thread(
+            target=_run_demo_onboarding,
+            args=(repo.id, force_refresh),
+            daemon=True,
+        )
+        thread.start()
+
+        return (
+            jsonify(
+                {
+                    "message": "Demo repository onboarding started in background.",
+                    "status": "onboarding",
+                    "repository": _serialise_repo(repo),
+                }
+            ),
+            202,
+        )
+
+    elif source_type == "github":
+        repo_slug = (body.get("repo_full_name") or body.get("url") or "").strip()
+        if not repo_slug:
+            return jsonify({"error": "repo_full_name or url is required for GitHub onboarding."}), 400
+
+        try:
+            owner, repo_name = parse_github_slug(repo_slug)
+        except ValueError as val_err:
+            return jsonify({"error": str(val_err)}), 400
+
+        canonical_source = f"https://github.com/{owner}/{repo_name}"
+        branch = body.get("branch") or None
+        token = (
+            session.get("github_token")
+            or request.headers.get("X-GitHub-Token")
+            or None
+        )
+
+        repo = db.get_repository_by_source(canonical_source)
+        if repo:
+            db.set_repository_status(repo.id, "onboarding")
+            repo = db.get_repository(repo.id)
+        else:
+            repo = db.create_repository(
+                Repository(
+                    name=repo_name,
+                    source=canonical_source,
+                    source_type=RepoSource.GITHUB,
+                    catalog_status="onboarding",
+                )
+            )
+
+        # Launch background thread
+        thread = threading.Thread(
+            target=_run_github_onboarding,
+            args=(repo.id, canonical_source, branch, token, force_refresh),
+            daemon=True,
+        )
+        thread.start()
+
+        return (
+            jsonify(
+                {
+                    "message": f"GitHub repository '{repo.name}' onboarding started in background.",
+                    "status": "onboarding",
+                    "repository": _serialise_repo(repo),
+                }
+            ),
+            202,
+        )
+
+    else:
+        return (
+            jsonify(
+                {
+                    "error": f"Unsupported source_type '{source_type}'. Only 'github' and 'demo' are supported."
+                }
+            ),
+            400,
+        )

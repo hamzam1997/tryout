@@ -20,6 +20,8 @@ def orm_to_repository(orm: RepositoryModel) -> Repository:
         source_type=RepoSource(orm.source_type),
         source_ref=orm.source_ref,
         catalog=load_model(ArchitectureCatalog, orm.catalog_json),
+        catalog_status=getattr(orm, "catalog_status", "ready"),
+        catalog_error=getattr(orm, "catalog_error", None),
         catalog_generated_at=orm.catalog_generated_at,
         created_at=orm.created_at,
     )
@@ -34,12 +36,22 @@ def create_repository(repo: Repository) -> Repository:
             source_type=repo.source_type.value,
             source_ref=repo.source_ref,
             catalog_json=dump_model(repo.catalog),
+            catalog_status=repo.catalog_status,
+            catalog_error=repo.catalog_error,
             catalog_generated_at=repo.catalog_generated_at,
             created_at=created_at,
         )
         session.add(model)
         session.flush()
-        return orm_to_repository(model)
+        saved = orm_to_repository(model)
+
+    try:
+        from database.gcs_sync import backup_db_to_gcs_async
+        backup_db_to_gcs_async()
+    except Exception:
+        pass
+
+    return saved
 
 
 def get_repository(repo_id: int) -> Repository | None:
@@ -89,7 +101,32 @@ def save_catalog(
         if model:
             model.catalog_json = catalog.model_dump_json()
             model.catalog_generated_at = utc_now()
+            model.catalog_status = "ready"
+            model.catalog_error = None
             model.source_ref = source_ref
+
+    try:
+        from database.gcs_sync import backup_db_to_gcs_async
+        backup_db_to_gcs_async()
+    except Exception:
+        pass
+
+
+def set_repository_status(
+    repo_id: int, status: str, error: str | None = None
+) -> None:
+    """Update onboarding catalog status ('onboarding', 'ready', 'failed')."""
+    with session_scope() as session:
+        model = session.get(RepositoryModel, repo_id)
+        if model:
+            model.catalog_status = status
+            model.catalog_error = error
+
+    try:
+        from database.gcs_sync import backup_db_to_gcs_async
+        backup_db_to_gcs_async()
+    except Exception:
+        pass
 
 
 def catalog_is_current(repo: Repository, source_ref: str | None) -> bool:

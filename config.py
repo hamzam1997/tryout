@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     github_client_secret: str = ""
     github_redirect_uri: str = ""
     repos_cache_dir: Path = BASE_DIR / "cloned_repos"
+    gcs_db_bucket: str = ""
 
     def require_project(self) -> str:
         """Return the Cloud project, raising if it is not configured."""

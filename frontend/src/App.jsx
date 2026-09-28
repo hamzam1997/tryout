@@ -39,29 +39,70 @@ export default function App() {
       setError("");
       setIdeasError("");
     }
-    try {
-      const [reposData, meetingsData, ideasData] = await Promise.all([
-        listRepositories(),
-        listMeetings(),
-        listIdeas(),
-      ]);
-      setRepositories(reposData);
-      setMeetings(meetingsData);
-      setIdeas(ideasData);
-      setOnline(true);
-      return meetingsData;
-    } catch (problem) {
-      if (!quiet) setError(problem.message);
-      setOnline(false);
-      return null;
-    } finally {
-      if (!quiet) setLoading(false);
+
+    const [reposResult, meetingsResult, ideasResult] = await Promise.allSettled([
+      listRepositories(),
+      listMeetings(),
+      listIdeas(),
+    ]);
+
+    if (reposResult.status === "fulfilled") {
+      setRepositories(reposResult.value);
+    } else {
+      console.error("Failed to load repositories:", reposResult.reason);
+      if (!quiet && view === "repositories") {
+        setError(
+          `Repositories error: ${reposResult.reason?.message || "Failed to load repositories"}`
+        );
+      }
     }
-  }, []);
+
+    let meetingsData = null;
+    if (meetingsResult.status === "fulfilled") {
+      meetingsData = meetingsResult.value;
+      setMeetings(meetingsData);
+    } else {
+      console.error("Failed to load meetings:", meetingsResult.reason);
+      if (!quiet && view === "meetings") {
+        setError(
+          `Meetings error: ${meetingsResult.reason?.message || "Failed to load meetings"}`
+        );
+      }
+    }
+
+    if (ideasResult.status === "fulfilled") {
+      setIdeas(ideasResult.value);
+    } else {
+      console.error("Failed to load ideas:", ideasResult.reason);
+      if (!quiet && view === "ideas") {
+        setIdeasError(
+          `Ideas error: ${ideasResult.reason?.message || "Failed to load ideas"}`
+        );
+      }
+    }
+
+    const anySuccess = [reposResult, meetingsResult, ideasResult].some(
+      (result) => result.status === "fulfilled"
+    );
+    if (anySuccess) {
+      setOnline(true);
+    } else {
+      try {
+        setOnline(await health());
+      } catch {
+        setOnline(false);
+      }
+    }
+
+    if (!quiet) setLoading(false);
+    return meetingsData;
+  }, [view]);
 
   useEffect(() => {
     refresh();
-    health().then(setOnline).catch(() => setOnline(false));
+    health()
+      .then((isUp) => setOnline((prev) => (prev === null ? isUp : prev || isUp)))
+      .catch(() => {});
   }, [refresh]);
 
   // Poll while any meeting has background idea extraction in flight.

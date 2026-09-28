@@ -58,6 +58,8 @@ class Repository(Base):
     # Commit the cached catalog was built from; drives cache invalidation.
     source_ref: Mapped[str | None] = mapped_column(String, nullable=True)
     catalog_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    catalog_status: Mapped[str] = mapped_column(String, nullable=False, default="ready")
+    catalog_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     catalog_generated_at: Mapped[datetime | None] = mapped_column(
         UTCDateTime, nullable=True
     )
