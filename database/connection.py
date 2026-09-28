@@ -39,6 +39,7 @@ def database_path() -> Path:
 def get_engine() -> Engine:
     """Return or initialize the singleton SQLAlchemy Engine."""
     global _engine
+    if _engine is None:
         if _db_path is not None:
             # Explicit path set (e.g. by unit tests)
             db_file = Path(_db_path)
