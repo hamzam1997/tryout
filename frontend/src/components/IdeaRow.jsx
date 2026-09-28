@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { getStoredApprover, setStoredApprover } from "../lib/approver";
 import { formatDateTime, formatPriority, formatRelative } from "../lib/format";
+import DeleteIconButton from "./DeleteIconButton";
 
 const BADGES = {
   PENDING: ["badge-warn", "Needs approval"],
@@ -186,18 +187,15 @@ export default function IdeaRow({ idea, busy, deleting, onApprove, onReject, onD
           )}
 
           <div className="row-footer">
-            <button
-              type="button"
-              className="btn btn-ghost btn-danger"
-              disabled={busy || deleting}
+            <DeleteIconButton
+              label={`Delete ${idea.title}`}
+              busy={deleting}
+              disabled={busy}
               onClick={(event) => {
                 event.stopPropagation();
                 onDelete?.(idea.id);
               }}
-            >
-              {deleting && <span className="spinner spinner-muted" />}
-              {deleting ? "Deleting…" : "Delete idea"}
-            </button>
+            />
           </div>
         </div>
       )}

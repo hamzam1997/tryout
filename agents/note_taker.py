@@ -7,6 +7,7 @@ happened.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import time
 from datetime import datetime
@@ -169,26 +170,52 @@ def take_notes(meeting_id: int) -> Meeting:
     return refreshed if refreshed is not None else meeting
 
 
+def transcript_fingerprint(text: str) -> str:
+    """Stable id for a transcript body so duplicate uploads reuse one meeting."""
+    normalized = "\n".join(
+        line.strip() for line in text.replace("\r\n", "\n").split("\n") if line.strip()
+    )
+    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+    return f"transcript:{digest}"
+
+
 def ingest(
     raw: str,
     title: str,
     filename: str | None = None,
     source: MeetingSource = MeetingSource.UPLOAD,
     occurred_at: datetime | None = None,
-) -> tuple[Meeting, ParsedTranscript]:
+) -> tuple[Meeting, ParsedTranscript, bool]:
     """Parse a transcript and store it. Does not call the model.
+
+    Returns ``(meeting, parsed, created)``. When the same transcript body was
+    uploaded before, returns the existing meeting with ``created=False``.
 
     Parsing happens before the insert so a malformed file is rejected with a
     400 instead of leaving an unusable row behind.
     """
     parsed = parse_transcript(raw, filename)
+    fingerprint = transcript_fingerprint(parsed.text)
+    existing = db.find_meeting_by_external_id(fingerprint)
+    if existing is None:
+        existing = db.find_meeting_by_transcript(parsed.text)
+    if existing is not None:
+        log_event(
+            logger,
+            "note_taker.ingest_duplicate",
+            meeting_id=existing.id,
+            external_id=fingerprint,
+        )
+        return existing, parsed, False
+
     meeting = db.create_meeting(
         Meeting(
             title=title.strip(),
             transcript=parsed.text,
             occurred_at=occurred_at,
             external_source=source,
+            external_id=fingerprint,
             status=MeetingStatus.PENDING,
         )
     )
-    return meeting, parsed
+    return meeting, parsed, True

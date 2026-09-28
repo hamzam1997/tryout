@@ -160,12 +160,6 @@ def _candidate_to_idea(candidate: ExtractedIdeaCandidate, meeting_id: int) -> Id
     if not idea_key and candidate.title.strip():
         idea_key = normalize_idea_key(candidate.title)
 
-    original_idea_id: int | None = None
-    if idea_key:
-        existing = db.find_idea_by_key(idea_key)
-        if existing is not None:
-            original_idea_id = existing.id
-
     return Idea(
         meeting_id=meeting_id,
         title=candidate.title.strip() or idea_key or "Untitled idea",
@@ -177,7 +171,6 @@ def _candidate_to_idea(candidate: ExtractedIdeaCandidate, meeting_id: int) -> Id
         attempt_hypothesis=candidate.attempt_hypothesis.strip(),
         catalog_refs=list(candidate.catalog_refs),
         idea_key=idea_key,
-        original_idea_id=original_idea_id,
         status=IdeaStatus.PENDING,
     )
 
@@ -216,6 +209,7 @@ def extract_ideas(
     )
 
     stored: list[Idea] = []
+    seen_keys: set[str] = set()
     for candidate in batch.ideas:
         if not candidate.catalog_refs:
             log_event(
@@ -225,7 +219,31 @@ def extract_ideas(
                 title=candidate.title,
             )
             continue
-        idea = db.create_idea(_candidate_to_idea(candidate, meeting_id))
+
+        draft = _candidate_to_idea(candidate, meeting_id)
+        if draft.idea_key:
+            if draft.idea_key in seen_keys:
+                log_event(
+                    logger,
+                    "idea_extractor.skipped_duplicate_in_batch",
+                    meeting_id=meeting_id,
+                    idea_key=draft.idea_key,
+                )
+                continue
+            existing = db.find_idea_by_key(draft.idea_key)
+            if existing is not None:
+                log_event(
+                    logger,
+                    "idea_extractor.skipped_existing_idea_key",
+                    meeting_id=meeting_id,
+                    idea_key=draft.idea_key,
+                    existing_idea_id=existing.id,
+                )
+                seen_keys.add(draft.idea_key)
+                continue
+            seen_keys.add(draft.idea_key)
+
+        idea = db.create_idea(draft)
         stored.append(idea)
 
     log_event(

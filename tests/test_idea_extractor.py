@@ -152,7 +152,7 @@ class TestIdeaExtractor(unittest.TestCase):
 
     @patch("agents.idea_extractor.RepoOnboarder")
     @patch("agents.idea_extractor.get_client")
-    def test_idea_key_dedup_sets_original_idea_id(self, mock_get_client, mock_onboarder_cls):
+    def test_idea_key_dedup_skips_existing(self, mock_get_client, mock_onboarder_cls):
         mock_onboarder_cls.return_value.onboard.return_value = self.catalog
         mock_get_client.return_value = self._mock_generate_client()
 
@@ -171,9 +171,14 @@ class TestIdeaExtractor(unittest.TestCase):
         mock_get_client.return_value = self._mock_generate_client()
 
         ideas = extract_ideas(second_meeting.id)
-        self.assertEqual(len(ideas), 1)
-        self.assertEqual(ideas[0].original_idea_id, original.id)
-        self.assertEqual(ideas[0].idea_key, "auto-notify-delayed-refunds")
+        self.assertEqual(ideas, [])
+        matching = [
+            idea
+            for idea in db.list_ideas()
+            if idea.idea_key == "auto-notify-delayed-refunds"
+        ]
+        self.assertEqual(len(matching), 1)
+        self.assertEqual(matching[0].id, original.id)
 
 
 if __name__ == "__main__":

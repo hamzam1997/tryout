@@ -142,7 +142,10 @@ export default function App() {
   }, [meetings, refresh]);
 
   function handleUploaded(result) {
-    setMeetings((current) => [result.meeting, ...current]);
+    setMeetings((current) => {
+      const next = current.filter((meeting) => meeting.id !== result.meeting.id);
+      return [result.meeting, ...next];
+    });
     setView("meetings");
   }
 

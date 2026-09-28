@@ -31,7 +31,13 @@ export default function Sidebar({ view, onNavigate, counts, online }) {
         <span className="brand-mark" aria-hidden="true">t</span>
         <div className="brand-text">
           <span className="brand-name">tryout</span>
-          <span className="brand-tag">Meeting → idea → attempt</span>
+          <span className="brand-tag">Future of work prototype</span>
+          <div className="brand-flow" aria-hidden="true">
+            <span>Repo</span>
+            <span>Meeting</span>
+            <span>Idea</span>
+            <span>Attempt</span>
+          </div>
         </div>
       </div>
 

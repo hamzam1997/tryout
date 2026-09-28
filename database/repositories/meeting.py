@@ -62,6 +62,36 @@ def get_meeting(meeting_id: int) -> Meeting | None:
         return orm_to_meeting(model) if model else None
 
 
+def find_meeting_by_external_id(external_id: str) -> Meeting | None:
+    """Return the earliest meeting with this external_id (transcript fingerprint)."""
+    if not external_id:
+        return None
+    with session_scope() as session:
+        stmt = (
+            select(MeetingModel)
+            .where(MeetingModel.external_id == external_id)
+            .order_by(MeetingModel.id)
+            .limit(1)
+        )
+        model = session.scalars(stmt).first()
+        return orm_to_meeting(model) if model else None
+
+
+def find_meeting_by_transcript(transcript: str) -> Meeting | None:
+    """Return the earliest meeting with an exact transcript match (legacy rows)."""
+    if not transcript:
+        return None
+    with session_scope() as session:
+        stmt = (
+            select(MeetingModel)
+            .where(MeetingModel.transcript == transcript)
+            .order_by(MeetingModel.id)
+            .limit(1)
+        )
+        model = session.scalars(stmt).first()
+        return orm_to_meeting(model) if model else None
+
+
 def list_meetings() -> list[Meeting]:
     with session_scope() as session:
         order_col = func.coalesce(MeetingModel.occurred_at, MeetingModel.created_at)

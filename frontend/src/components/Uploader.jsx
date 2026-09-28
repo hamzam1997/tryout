@@ -23,6 +23,7 @@ export default function Uploader({ onUploaded }) {
   const [dragging, setDragging] = useState(false);
   const [inFlight, setInFlight] = useState(0);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   function accept(candidate) {
     setError("");
@@ -60,11 +61,15 @@ export default function Uploader({ onUploaded }) {
     setTitle("");
     setOccurredAt("");
     setError("");
+    setNotice("");
     setInFlight((count) => count + 1);
 
     try {
       const result = await uploadTranscript(payload);
       onUploaded(result);
+      if (result.duplicate) {
+        setNotice(result.message || "This transcript was already uploaded.");
+      }
     } catch (problem) {
       setError(problem.message);
     } finally {
@@ -74,11 +79,15 @@ export default function Uploader({ onUploaded }) {
 
   async function handleLoadDemo() {
     setError("");
+    setNotice("");
     setInFlight((count) => count + 1);
     try {
       const result = await loadDemoMeeting();
       clear();
       onUploaded(result);
+      if (result.duplicate) {
+        setNotice(result.message || "Demo transcript already loaded.");
+      }
     } catch (problem) {
       setError(problem.message);
     } finally {
@@ -168,6 +177,7 @@ export default function Uploader({ onUploaded }) {
           </div>
 
           {error && <div className="alert alert-error">{error}</div>}
+          {notice && !error && <div className="alert alert-ok">{notice}</div>}
 
           <div className="form-foot">
             <p className="form-note">
