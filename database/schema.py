@@ -107,21 +107,14 @@ def _ensure_repository_status_columns(engine) -> None:
 
 
 def init_db() -> None:
-    """Create tables and indexes via SQLAlchemy metadata and ensure WAL mode."""
-    db_file = database_path()
-    if not db_file.exists():
-        try:
-            from database.gcs_sync import restore_db_from_gcs
-
-            restore_db_from_gcs()
-        except Exception:
-            pass
-
-    db_file.parent.mkdir(parents=True, exist_ok=True)
+    """Create tables and indexes via SQLAlchemy metadata."""
     engine = get_engine()
-    with engine.connect() as conn:
-        conn.execute(text("PRAGMA journal_mode=WAL"))
-        conn.commit()
+    if engine.dialect.name == "sqlite":
+        db_file = database_path()
+        db_file.parent.mkdir(parents=True, exist_ok=True)
+        with engine.connect() as conn:
+            conn.execute(text("PRAGMA journal_mode=WAL"))
+            conn.commit()
     if not _idea_schema_is_current(engine):
         _recreate_idea_dependent_tables(engine)
     Base.metadata.create_all(bind=engine)

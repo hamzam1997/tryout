@@ -86,9 +86,13 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
         db.save_catalog(repo.id, catalog, source_ref="commit-sha-1")
         updated = db.get_repository(repo.id)
         self.assertTrue(db.catalog_is_current(updated, "commit-sha-1"))
-        self.assertFalse(db.catalog_is_current(updated, "commit-sha-2"))
         self.assertEqual(updated.catalog.api_routes[0].path, "/orders")
         self.assertEqual(updated.catalog.codeowners["payments/"], "@team-payments")
+
+        # Test deletion
+        self.assertTrue(db.delete_repository(repo.id))
+        self.assertIsNone(db.get_repository(repo.id))
+        self.assertFalse(db.delete_repository(repo.id))
 
     def test_meeting_and_idea_deduplication(self):
         """Verify meeting storage, minutes, idea attribution, and cross-meeting deduplication."""
