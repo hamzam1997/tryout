@@ -2,21 +2,27 @@ import { useCallback, useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import MeetingsPage from "./pages/MeetingsPage";
 import IdeasPage from "./pages/IdeasPage";
-import { health, listMeetings } from "./api";
+import { approveIdea, health, listIdeas, listMeetings, rejectIdea } from "./api";
 import "./styles/global.css";
 
 export default function App() {
   const [view, setView] = useState("meetings");
   const [meetings, setMeetings] = useState([]);
+  const [ideas, setIdeas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [ideasError, setIdeasError] = useState("");
+  const [busyId, setBusyId] = useState(null);
   const [online, setOnline] = useState(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError("");
+    setIdeasError("");
     try {
-      setMeetings(await listMeetings());
+      const [nextMeetings, nextIdeas] = await Promise.all([listMeetings(), listIdeas()]);
+      setMeetings(nextMeetings);
+      setIdeas(nextIdeas);
       setOnline(true);
     } catch (problem) {
       setError(problem.message);
@@ -32,16 +38,55 @@ export default function App() {
   }, [refresh]);
 
   function handleUploaded(result) {
-    // The response carries the finished meeting, so show it without a round trip.
     setMeetings((current) => [result.meeting, ...current]);
+    if (Array.isArray(result.ideas) && result.ideas.length > 0) {
+      setIdeas((current) => {
+        const existingIds = new Set(current.map((idea) => idea.id));
+        const fresh = result.ideas.filter((idea) => !existingIds.has(idea.id));
+        return [...fresh, ...current];
+      });
+      setView("ideas");
+    }
   }
+
+  async function handleApprove(ideaId) {
+    setBusyId(ideaId);
+    setIdeasError("");
+    try {
+      const updated = await approveIdea(ideaId);
+      setIdeas((current) =>
+        current.map((idea) => (idea.id === updated.id ? { ...idea, ...updated } : idea))
+      );
+    } catch (problem) {
+      setIdeasError(problem.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleReject(ideaId) {
+    setBusyId(ideaId);
+    setIdeasError("");
+    try {
+      const updated = await rejectIdea(ideaId);
+      setIdeas((current) =>
+        current.map((idea) => (idea.id === updated.id ? { ...idea, ...updated } : idea))
+      );
+    } catch (problem) {
+      setIdeasError(problem.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const pendingIdeas = ideas.filter((idea) => idea.status === "PENDING").length;
 
   return (
     <div className="shell">
       <Sidebar
         view={view}
         onNavigate={setView}
-        counts={{ meetings: meetings.length, ideas: 0 }}
+        counts={{ meetings: meetings.length, ideas: pendingIdeas }}
         online={online}
       />
 
@@ -55,7 +100,15 @@ export default function App() {
             onRefresh={refresh}
           />
         ) : (
-          <IdeasPage />
+          <IdeasPage
+            ideas={ideas}
+            loading={loading}
+            error={ideasError || error}
+            busyId={busyId}
+            onApprove={handleApprove}
+            onReject={handleReject}
+            onRefresh={refresh}
+          />
         )}
       </main>
     </div>

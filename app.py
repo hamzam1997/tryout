@@ -5,6 +5,7 @@ from flask import Flask, jsonify, send_from_directory
 from config import settings
 from database import init_db
 from logging_setup import configure_logging
+from views.ideas import bp as ideas_bp
 from views.meetings import bp as meetings_bp
 
 # Written by the Dockerfile's build stage. Absent in local development, where
@@ -16,6 +17,7 @@ configure_logging()
 app = Flask(__name__, static_folder=None)
 init_db()
 app.register_blueprint(meetings_bp)
+app.register_blueprint(ideas_bp)
 
 
 @app.get("/health")

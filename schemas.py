@@ -30,6 +30,7 @@ class MeetingStatus(str, Enum):
 class IdeaStatus(str, Enum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
+    IN_PROCESS = "IN_PROCESS"
     REJECTED = "REJECTED"
 
 
@@ -427,6 +428,8 @@ class Idea(BaseModel):
     idea_key: str = ""
     original_idea_id: int | None = None
     status: IdeaStatus = IdeaStatus.PENDING
+    approved_by: str | None = None
+    approved_at: datetime | None = None
     created_at: datetime | None = None
 
 

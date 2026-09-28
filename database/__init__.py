@@ -21,6 +21,7 @@ from database.models import (
     Repository as RepositoryModel,
 )
 from database.repositories import (
+    approve_idea,
     catalog_is_current,
     count_friction_by,
     create_attempt,
@@ -120,6 +121,7 @@ __all__ = [
     "count_friction_by",
     "create_attempt",
     "create_friction_log",
+    "approve_idea",
     "create_idea",
     "create_meeting",
     "create_repository",

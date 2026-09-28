@@ -20,6 +20,8 @@ def _idea_schema_is_current(engine) -> bool:
         "catalog_refs_json",
         "idea_key",
         "original_idea_id",
+        "approved_by",
+        "approved_at",
     }
     return required.issubset(columns)
 

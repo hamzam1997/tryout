@@ -40,6 +40,8 @@ def orm_to_idea(orm: IdeaModel) -> Idea:
         idea_key=orm.idea_key,
         original_idea_id=orm.original_idea_id,
         status=IdeaStatus(orm.status),
+        approved_by=orm.approved_by,
+        approved_at=orm.approved_at,
         created_at=orm.created_at,
     )
 
@@ -60,6 +62,8 @@ def create_idea(idea: Idea) -> Idea:
             idea_key=idea.idea_key,
             original_idea_id=idea.original_idea_id,
             status=idea.status.value,
+            approved_by=idea.approved_by,
+            approved_at=idea.approved_at,
             created_at=created_at,
         )
         session.add(model)
@@ -109,6 +113,23 @@ def set_idea_status(idea_id: int, status: IdeaStatus) -> None:
             model.status = status.value
 
 
+def approve_idea(idea_id: int, approved_by: str) -> Idea | None:
+    """Approve an idea and move it to IN_PROCESS as work starts."""
+    reviewer = (approved_by or "").strip()
+    if not reviewer:
+        raise ValueError("approved_by is required")
+
+    with session_scope() as session:
+        model = session.get(IdeaModel, idea_id)
+        if model is None:
+            return None
+        model.status = IdeaStatus.IN_PROCESS.value
+        model.approved_by = reviewer
+        model.approved_at = utc_now()
+        session.flush()
+        return orm_to_idea(model)
+
+
 def update_idea(idea: Idea) -> Idea:
     with session_scope() as session:
         model = session.get(IdeaModel, idea.id)
@@ -124,4 +145,6 @@ def update_idea(idea: Idea) -> Idea:
             model.idea_key = idea.idea_key
             model.original_idea_id = idea.original_idea_id
             model.status = idea.status.value
+            model.approved_by = idea.approved_by
+            model.approved_at = idea.approved_at
     return idea

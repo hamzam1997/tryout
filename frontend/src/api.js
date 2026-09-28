@@ -25,6 +25,23 @@ export function uploadTranscript({ file, title, occurredAt }) {
   return fetch("/meetings/upload", { method: "POST", body: form }).then(parse);
 }
 
+export function listIdeas(status) {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return fetch(`/ideas${query}`).then(parse);
+}
+
+export function approveIdea(id, approvedBy = "local") {
+  return fetch(`/ideas/${id}/approve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ approved_by: approvedBy }),
+  }).then(parse);
+}
+
+export function rejectIdea(id) {
+  return fetch(`/ideas/${id}/reject`, { method: "POST" }).then(parse);
+}
+
 export function health() {
   return fetch("/health").then((r) => r.ok);
 }

@@ -126,6 +126,8 @@ class Idea(Base):
     status: Mapped[str] = mapped_column(
         String, nullable=False, default=IdeaStatus.PENDING.value, index=True
     )
+    approved_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
 
     meeting: Mapped["Meeting"] = relationship(back_populates="ideas")

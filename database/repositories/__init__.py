@@ -13,6 +13,7 @@ from database.repositories.friction import (
     list_friction_logs,
 )
 from database.repositories.idea import (
+    approve_idea,
     create_idea,
     find_idea_by_key,
     get_idea,
@@ -55,6 +56,7 @@ __all__ = [
     "set_meeting_status",
     "update_meeting",
     # Idea
+    "approve_idea",
     "create_idea",
     "find_idea_by_key",
     "get_idea",
