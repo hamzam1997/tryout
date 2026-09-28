@@ -5,7 +5,7 @@ Turns an uploaded .vtt/.srt file or pasted text into one normalised form:
     [00:12:28] Ana: Refunds are silently delayed.
 
 Cue times are kept rather than stripped. They are what lets the idea
-extractor fill Idea.timestamp, and they are the only record of when in a
+extractor fill Idea.cue_time, and they are the only record of when in a
 meeting something was said.
 """
 
@@ -93,7 +93,7 @@ def _is_srt(raw: str) -> bool:
 
 
 def normalise_timestamp(value: str) -> str:
-    """Reduce a cue time to HH:MM:SS, matching the form Idea.timestamp uses."""
+    """Reduce a cue time to HH:MM:SS, matching the form Idea.cue_time uses."""
     clock = re.split(r"[.,]", value.strip())[0]
     parts = clock.split(":")
     if len(parts) == 2:

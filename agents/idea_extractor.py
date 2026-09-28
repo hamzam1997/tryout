@@ -1,0 +1,237 @@
+"""Idea extractor agent: catalog-grounded proposals from meeting transcripts."""
+
+from __future__ import annotations
+
+import logging
+import re
+import time
+from pathlib import Path
+
+from google.genai import types
+
+import database as db
+from agents.repo_onboarder import RepoOnboarder
+from config import BASE_DIR, settings
+from llm import get_client
+from logging_setup import log_event
+from schemas import (
+    ArchitectureCatalog,
+    ExtractedIdeaBatch,
+    ExtractedIdeaCandidate,
+    Idea,
+    IdeaStatus,
+    Repository,
+)
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_REPOSITORY_PATH = BASE_DIR / "demo_repo" / "acme_store"
+
+SYSTEM_INSTRUCTION = """\
+You are an idea extractor for engineering and operations meetings.
+
+An idea is a meeting-backed proposal that maps onto the provided ArchitectureCatalog
+for the target repository. You are not a free-form action-item scraper.
+
+Rules:
+- Precision over recall. Only emit ideas that clearly tie to catalog modules, routes,
+  models, integrations, or external_dependencies named in the catalog.
+- attemptable ≠ will ship: keep ideas even when they depend on external services
+  listed in the catalog (for example notifications-service). Say so in attempt_hypothesis.
+- Every idea MUST have a non-empty catalog_refs list naming concrete catalog surfaces
+  (module paths, route paths, model names, integration names, or external_dependencies).
+- Drop status updates, ticket-volume chatter, audit tasks, PTO/scheduling, and bare
+  process decisions with no in-repo code surface.
+- Fill attempt_hypothesis from the catalog: what would change in-repo, what is missing,
+  and which external teams or services block a full implementation.
+- quote must be a verbatim excerpt from the transcript supporting the proposal.
+- cue_time is the transcript offset (HH:MM:SS) for that quote, not wall-clock time.
+- priority is one of low, medium, or high when inferable; otherwise leave empty.
+- idea_key is a stable kebab-case identifier for the underlying proposal across meetings
+  (for example auto-notify-delayed-refunds).
+
+Report only what the transcript and catalog support together.\
+"""
+
+
+class IdeaExtractorError(RuntimeError):
+    """Raised when ideas cannot be extracted for a meeting."""
+
+
+def normalize_idea_key(raw: str) -> str:
+    """Normalize a model-provided key to stable kebab-case."""
+    key = raw.strip().lower()
+    key = re.sub(r"[^a-z0-9]+", "-", key)
+    return key.strip("-")
+
+
+def generate_ideas(
+    transcript: str,
+    catalog: ArchitectureCatalog,
+    title: str = "",
+    meeting_id: int | None = None,
+) -> ExtractedIdeaBatch:
+    """Call Gemini for catalog-grounded ideas. Raises IdeaExtractorError on failure."""
+    if not transcript.strip():
+        raise IdeaExtractorError("cannot extract ideas from an empty transcript")
+
+    catalog_markdown = catalog.to_markdown()
+    if not catalog_markdown.strip():
+        raise IdeaExtractorError("architecture catalog is empty")
+
+    prompt_parts = [
+        "Architecture catalog for the target repository:",
+        catalog_markdown,
+        "",
+    ]
+    if title.strip():
+        prompt_parts.extend([f"Meeting title: {title.strip()}", ""])
+    prompt_parts.extend(["Transcript:", transcript])
+    prompt = "\n".join(prompt_parts)
+
+    log_event(
+        logger,
+        "idea_extractor.requested",
+        meeting_id=meeting_id,
+        model=settings.model_extraction,
+        transcript_chars=len(transcript),
+        catalog_chars=len(catalog_markdown),
+    )
+
+    started = time.perf_counter()
+    try:
+        response = get_client().models.generate_content(
+            model=settings.model_extraction,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_INSTRUCTION,
+                response_mime_type="application/json",
+                response_schema=ExtractedIdeaBatch,
+                temperature=0.2,
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                    disable=True
+                ),
+            ),
+        )
+    except Exception as exc:
+        log_event(
+            logger,
+            "idea_extractor.failed",
+            level=logging.ERROR,
+            meeting_id=meeting_id,
+            model=settings.model_extraction,
+            elapsed_ms=round((time.perf_counter() - started) * 1000),
+            error=str(exc),
+        )
+        raise IdeaExtractorError(f"Gemini call failed: {exc}") from exc
+
+    elapsed_ms = round((time.perf_counter() - started) * 1000)
+    usage = getattr(response, "usage_metadata", None)
+
+    batch = response.parsed
+    if not isinstance(batch, ExtractedIdeaBatch):
+        log_event(
+            logger,
+            "idea_extractor.unparsable",
+            level=logging.ERROR,
+            meeting_id=meeting_id,
+            elapsed_ms=elapsed_ms,
+            raw_text=(response.text or "")[:2000],
+        )
+        raise IdeaExtractorError("Gemini returned no usable ideas")
+
+    log_event(
+        logger,
+        "idea_extractor.completed",
+        meeting_id=meeting_id,
+        model=settings.model_extraction,
+        elapsed_ms=elapsed_ms,
+        prompt_tokens=getattr(usage, "prompt_token_count", None),
+        response_tokens=getattr(usage, "candidates_token_count", None),
+        total_tokens=getattr(usage, "total_token_count", None),
+        idea_count=len(batch.ideas),
+        ideas=batch.model_dump(),
+    )
+    return batch
+
+
+def _candidate_to_idea(candidate: ExtractedIdeaCandidate, meeting_id: int) -> Idea:
+    idea_key = normalize_idea_key(candidate.idea_key)
+    if not idea_key and candidate.title.strip():
+        idea_key = normalize_idea_key(candidate.title)
+
+    original_idea_id: int | None = None
+    if idea_key:
+        existing = db.find_idea_by_key(idea_key)
+        if existing is not None:
+            original_idea_id = existing.id
+
+    return Idea(
+        meeting_id=meeting_id,
+        title=candidate.title.strip() or idea_key or "Untitled idea",
+        description=candidate.description.strip(),
+        quote=candidate.quote.strip(),
+        speaker=candidate.speaker.strip(),
+        cue_time=candidate.cue_time.strip(),
+        priority=candidate.priority.strip(),
+        attempt_hypothesis=candidate.attempt_hypothesis.strip(),
+        catalog_refs=list(candidate.catalog_refs),
+        idea_key=idea_key,
+        original_idea_id=original_idea_id,
+        status=IdeaStatus.PENDING,
+    )
+
+
+def extract_ideas(
+    meeting_id: int,
+    repository: Repository | int | str | Path | None = None,
+) -> list[Idea]:
+    """Extract and persist catalog-grounded ideas for a stored meeting."""
+    meeting = db.get_meeting(meeting_id)
+    if meeting is None:
+        raise IdeaExtractorError(f"no meeting with id {meeting_id}")
+
+    repo_target = repository if repository is not None else DEFAULT_REPOSITORY_PATH
+    onboarder = RepoOnboarder()
+    try:
+        catalog = onboarder.onboard(repo_target)
+    except Exception as exc:
+        log_event(
+            logger,
+            "idea_extractor.onboard_failed",
+            level=logging.ERROR,
+            meeting_id=meeting_id,
+            error=str(exc),
+        )
+        raise IdeaExtractorError(f"repository onboarding failed: {exc}") from exc
+
+    if not isinstance(catalog, ArchitectureCatalog):
+        raise IdeaExtractorError("repository onboarding did not yield a catalog")
+
+    batch = generate_ideas(
+        meeting.transcript,
+        catalog,
+        title=meeting.title,
+        meeting_id=meeting_id,
+    )
+
+    stored: list[Idea] = []
+    for candidate in batch.ideas:
+        if not candidate.catalog_refs:
+            log_event(
+                logger,
+                "idea_extractor.skipped_no_catalog_refs",
+                meeting_id=meeting_id,
+                title=candidate.title,
+            )
+            continue
+        idea = db.create_idea(_candidate_to_idea(candidate, meeting_id))
+        stored.append(idea)
+
+    log_event(
+        logger,
+        "idea_extractor.stored",
+        meeting_id=meeting_id,
+        idea_count=len(stored),
+    )
+    return stored

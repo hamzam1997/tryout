@@ -90,6 +90,8 @@ class Meeting(Base):
     status: Mapped[str] = mapped_column(
         String, nullable=False, default=MeetingStatus.PENDING.value, index=True
     )
+    # Idea extraction is best-effort after minutes; persist the last failure.
+    ideas_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
 
     ideas: Mapped[list["Idea"]] = relationship(
@@ -98,7 +100,7 @@ class Meeting(Base):
 
 
 class Idea(Base):
-    """A concrete proposal extracted from a meeting, awaiting human approval."""
+    """A catalog-grounded proposal extracted from a meeting, awaiting human approval."""
 
     __tablename__ = "idea"
 
@@ -109,30 +111,30 @@ class Idea(Base):
     title: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     # Verbatim quote, kept for auditability.
-    source_quote: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    quote: Mapped[str] = mapped_column(Text, nullable=False, default="")
     speaker: Mapped[str] = mapped_column(String, nullable=False, default="")
     # Offset into the transcript ("00:12:30"), not a wall-clock time.
-    timestamp: Mapped[str] = mapped_column(String, nullable=False, default="")
-    urgency: Mapped[str] = mapped_column(String, nullable=False, default="")
-    feasibility_hypothesis: Mapped[str] = mapped_column(
-        Text, nullable=False, default=""
-    )
-    # Semantic slug linking the same proposal across meetings.
-    fingerprint: Mapped[str] = mapped_column(
-        String, nullable=False, default="", index=True
-    )
-    # The earliest idea sharing this fingerprint; null if original.
-    duplicate_of_id: Mapped[int | None] = mapped_column(
+    cue_time: Mapped[str] = mapped_column(String, nullable=False, default="")
+    priority: Mapped[str] = mapped_column(String, nullable=False, default="")
+    attempt_hypothesis: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    # JSON list of catalog modules/routes/models/integrations this idea would touch.
+    catalog_refs_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    # Stable key linking the same proposal across meetings.
+    idea_key: Mapped[str] = mapped_column(String, nullable=False, default="", index=True)
+    # The earliest idea sharing this idea_key; null if original.
+    original_idea_id: Mapped[int | None] = mapped_column(
         ForeignKey("idea.id", ondelete="SET NULL"), nullable=True
     )
     status: Mapped[str] = mapped_column(
         String, nullable=False, default=IdeaStatus.PENDING.value, index=True
     )
+    approved_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
 
     meeting: Mapped["Meeting"] = relationship(back_populates="ideas")
-    duplicate_of: Mapped["Idea | None"] = relationship(
-        remote_side=[id], foreign_keys=[duplicate_of_id]
+    original_idea: Mapped["Idea | None"] = relationship(
+        remote_side=[id], foreign_keys=[original_idea_id]
     )
     attempts: Mapped[list["Attempt"]] = relationship(
         back_populates="idea", cascade="all, delete-orphan"

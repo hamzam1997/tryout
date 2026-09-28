@@ -30,6 +30,7 @@ class MeetingStatus(str, Enum):
 class IdeaStatus(str, Enum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
+    IN_PROCESS = "IN_PROCESS"
     REJECTED = "REJECTED"
 
 
@@ -379,7 +380,39 @@ class Meeting(BaseModel):
     transcript: str
     minutes: MeetingMinutes | None = None
     status: MeetingStatus = MeetingStatus.PENDING
+    # Last idea-extraction failure for this meeting; cleared on success.
+    ideas_error: str | None = None
     created_at: datetime | None = None
+
+
+class ExtractedIdeaCandidate(BaseModel):
+    """Gemini-facing idea before it is persisted as an Idea row."""
+
+    title: str = ""
+    description: str = ""
+    quote: str = Field(default="", description="Verbatim transcript quote supporting this idea")
+    speaker: str = ""
+    cue_time: str = Field(
+        default="",
+        description="Transcript cue offset such as 00:12:30, not a wall-clock time",
+    )
+    priority: str = Field(default="", description="low, medium, or high")
+    attempt_hypothesis: str = Field(
+        default="",
+        description="Catalog-grounded note of what to change in-repo and what is missing/external",
+    )
+    catalog_refs: list[str] = Field(
+        default_factory=list,
+        description="Catalog modules, routes, models, or integrations this idea would touch",
+    )
+    idea_key: str = Field(
+        default="",
+        description="Stable kebab-case key for the underlying proposal across meetings",
+    )
+
+
+class ExtractedIdeaBatch(BaseModel):
+    ideas: list[ExtractedIdeaCandidate] = Field(default_factory=list)
 
 
 class Idea(BaseModel):
@@ -387,15 +420,18 @@ class Idea(BaseModel):
     meeting_id: int
     title: str
     description: str = ""
-    source_quote: str = ""
+    quote: str = ""
     speaker: str = ""
     # Offset into the transcript ("00:12:30"), not a wall-clock time.
-    timestamp: str = ""
-    urgency: str = ""
-    feasibility_hypothesis: str = ""
-    fingerprint: str = ""
-    duplicate_of_id: int | None = None
+    cue_time: str = ""
+    priority: str = ""
+    attempt_hypothesis: str = ""
+    catalog_refs: list[str] = Field(default_factory=list)
+    idea_key: str = ""
+    original_idea_id: int | None = None
     status: IdeaStatus = IdeaStatus.PENDING
+    approved_by: str | None = None
+    approved_at: datetime | None = None
     created_at: datetime | None = None
 
 

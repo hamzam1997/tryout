@@ -1,0 +1,41 @@
+Marco Reyes: Okay we're recording, sorry I'm two minutes late. Wi‑Fi in the other room is dead again.
+Dana Whitfield: No worries. Quick one from support before we lose the morning — queue is ugly but not in a fun way.
+Priya Raman: Define ugly.
+Dana Whitfield: Same shape as last month. People checking out fine, payments fine, then refunds go into this black hole and they ping us on day three like we stole the money.
+Marco Reyes: Acme store side or the gateway?
+Priya Raman: Once we POST the refund to payments it's their clock. We just sit on "requested" in the in-memory store. Not glamorous.
+Sam Okonkwo: Side note, standup from platform — the staging box got recycled last night, if anyone's tests flake that's why.
+Marco Reyes: Noted. Dana, are they angry or just confused?
+Dana Whitfield: Confused. Tone is "hey did you get this" not "I'm calling my bank." Half of them would go away if something, anything, showed up in their inbox.
+Priya Raman: We don't own inbox. Store doesn't even have a mailer. That's the other service. Comms.
+Dana Whitfield: Yeah I know, Ravi's world. Last time I asked about templates they said queue it.
+Marco Reyes: Annoying. Okay parking that for a second — Sam, anything else burning?
+Sam Okonkwo: Hiring loop for the junior. Also can someone confirm the /health check on store is what uptime uses? Ops asked in Slack and I didn't want to guess.
+Priya Raman: Yeah, /health. Don't invent a second one.
+Dana Whitfield: Can I pull us back? Because the volume isn't going down and I'm not putting another body on refund chat.
+Marco Reyes: Right. So the delay itself we can't fix.
+Priya Raman: Correct. Provider holds, reviews, failed callbacks — we don't even distinguish those. Same two fields. Requested at, and eventually done or not.
+Dana Whitfield: Which is why support invents answers. "Usually three to five business days." Totally made up. Nobody wrote that down.
+Marco Reyes: Please don't put that in a FAQ.
+Dana Whitfield: Too late, it's already in three macros. Different numbers in each. Delightful.
+Sam Okonkwo: Ha.
+Marco Reyes: I'm wondering out loud here — not a commitment — if the customer just got a "still working on it" ping when it's been sitting a while, would that cut the tickets without us pretending we know the provider's brain?
+Dana Whitfield: Yes. Boring email. I'd take boring.
+Priya Raman: Still need a threshold. And still need something that can send. Store talking to notifications is a whole access thing. Env keys, template ID, who knows.
+Marco Reyes: First version could be dumb. "Still processing." No reason code. Reason code is a separate mess.
+Priya Raman: Separate and blocked. We'd be inventing schema we don't have.
+Sam Okonkwo: While we're in order-land, checkout had two weird timeouts Tuesday. Cleared after retry. Probably gateway blip. Not asking for work, just for the log.
+Dana Whitfield: Different bucket. I'm not fighting you on timeouts today.
+Marco Reyes: Priya, if we even sketched the "hey your refund is still cooking" path, what breaks first in acme store?
+Priya Raman: Finding the stale refunds is easy-ish off the payment records. The send is the landmine. And product never said what "stale" means. Four days? Two?
+Dana Whitfield: Support will keep guessing until someone picks a number. That's not an eng ticket, that's a decision.
+Marco Reyes: Agree. Don't build a magic number into code until someone's willing to put their name on it.
+Sam Okonkwo: Lunch is in twelve minutes and the falafel place closes the line early. Priority clarification.
+Marco Reyes: One more then we're done. Dana, anything else buried in the queue that isn't refunds?
+Dana Whitfield: Order detail for support is thin. They open an order, see status, but refund state is basically tribal knowledge. Not asking for a redesign. Just saying.
+Priya Raman: GET order already returns the payment blob sometimes. Maybe. I'd have to look. Don't treat that as a promise.
+Marco Reyes: If it's already half there, exposing it cleaner might be cheaper than the email thing. Or both. Or neither. Priya, poke at store when you have a spare hour — not a formal project, just what's actually on the models today.
+Priya Raman: Sure.
+Dana Whitfield: And I'm remote Thursday. Sam's on the queue if something pages.
+Sam Okonkwo: Copy.
+Marco Reyes: Warehouse audit thread is closed, no action. Shipping metrics look fine. Let's not invent work. Thanks all — falafel, go.

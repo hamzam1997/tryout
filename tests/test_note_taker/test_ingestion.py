@@ -75,7 +75,7 @@ class TestSuccessfulUpload(IngestionTestCase):
 
     @mock.patch("agents.note_taker.generate_minutes", return_value=MINUTES)
     def test_cue_times_survive_into_the_stored_transcript(self, _):
-        """TRY-302 reads these back out to fill Idea.timestamp."""
+        """TRY-302 reads these back out to fill Idea.cue_time."""
         body = upload(self.client).get_json()
         self.assertIn("[00:00:04] Marco Reyes:", body["meeting"]["transcript"])
 

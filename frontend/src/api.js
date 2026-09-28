@@ -26,8 +26,39 @@ export function uploadTranscript({ file, title, occurredAt }) {
   return fetch("/meetings/upload", { method: "POST", body: form }).then(parse);
 }
 
+export async function extractIdeas(meetingId) {
+  const response = await fetch(`/meetings/${meetingId}/extract-ideas`, { method: "POST" });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(
+      body.ideas_error || body.error || `Request failed (${response.status})`
+    );
+    error.payload = body;
+    throw error;
+  }
+  return body;
+}
+
 export function loadDemoMeeting() {
   return fetch("/meetings/demo", { method: "POST" }).then(parse);
+}
+
+// Ideas API
+export function listIdeas(status) {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return fetch(`/ideas${query}`).then(parse);
+}
+
+export function approveIdea(id, approvedBy = "local") {
+  return fetch(`/ideas/${id}/approve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ approved_by: approvedBy }),
+  }).then(parse);
+}
+
+export function rejectIdea(id) {
+  return fetch(`/ideas/${id}/reject`, { method: "POST" }).then(parse);
 }
 
 // Repositories API
