@@ -105,33 +105,231 @@ class RepoSkeleton(BaseModel):
         return [f for f in self.files if f.category == FileCategory.DOC]
 
 
+class ModuleDescription(BaseModel):
+    name: str = Field(description="Name or title of the module or subsystem (e.g. Orders & Checkout, Payments Adapter)")
+    path: str = Field(description="Directory path or primary file location (e.g. routes/orders.py, src/libdispatch/)")
+    description: str = Field(description="High-level purpose and business domain of this module")
+    responsibilities: list[str] = Field(
+        default_factory=list,
+        description="Key capabilities and tasks handled by this module",
+    )
+    key_files: list[str] = Field(
+        default_factory=list,
+        description="Primary files belonging to this module",
+    )
+    owner: str = Field(default="", description="Owning team or codeowner handle (from CODEOWNERS)")
+
+
+class FileRole(BaseModel):
+    path: str = Field(description="Relative file path in the repository (e.g. routes/orders.py)")
+    role: str = Field(description="Architectural role and primary responsibilities of this file")
+    owner: str = Field(default="", description="Owning team or codeowner responsible for this file")
+
+
 class ModelEntry(BaseModel):
-    name: str
-    fields: list[str] = Field(default_factory=list)
+    name: str = Field(description="Name of the data model or entity class")
+    file_path: str = Field(default="", description="File where this model is defined (e.g. models.py)")
+    description: str = Field(default="", description="Description of the entity and its domain purpose")
+    fields: list[str] = Field(
+        default_factory=list,
+        description="Field or attribute names belonging to this model",
+    )
 
 
 class RouteEntry(BaseModel):
-    method: str = ""
-    path: str
-    handler: str = ""
+    method: str = Field(
+        default="",
+        description="HTTP method (e.g. GET, POST, PUT, DELETE)",
+    )
+    path: str = Field(description="API endpoint route path pattern")
+    handler: str = Field(
+        default="",
+        description="Handler function or controller name handling this route",
+    )
+    file_path: str = Field(default="", description="File where this route handler is implemented")
+    description: str = Field(default="", description="Summary of what this endpoint does")
 
 
 class IntegrationEntry(BaseModel):
-    name: str
-    auth: str = ""
-    env_keys: list[str] = Field(default_factory=list)
+    name: str = Field(
+        description="Name of the external service or third-party integration",
+    )
+    file_path: str = Field(default="", description="File where this client or integration adapter is defined")
+    description: str = Field(default="", description="Purpose of integration and operations performed")
+    auth: str = Field(
+        default="",
+        description="Authentication type or mechanism (e.g. API Key, Bearer Token, OAuth)",
+    )
+    env_keys: list[str] = Field(
+        default_factory=list,
+        description="Environment variable names required for this integration",
+    )
 
 
 class ArchitectureCatalog(BaseModel):
-    name: str = ""
-    language: str = ""
-    framework: str = ""
-    summary: str = ""
-    internal_models: list[ModelEntry] = Field(default_factory=list)
-    api_routes: list[RouteEntry] = Field(default_factory=list)
-    external_integrations: list[IntegrationEntry] = Field(default_factory=list)
-    config_schema: list[str] = Field(default_factory=list)
-    codeowners: dict[str, str] = Field(default_factory=dict)
+    name: str = Field(
+        default="",
+        description="Name of the repository or service",
+    )
+    language: str = Field(
+        default="",
+        description="Primary programming language (e.g. Python, TypeScript)",
+    )
+    framework: str = Field(
+        default="",
+        description="Web or application framework (e.g. Flask, FastAPI, Django, Express)",
+    )
+    entrypoint: str = Field(
+        default="",
+        description="Main entrypoint file to run the service (e.g. app.py)",
+    )
+    test_command: str = Field(
+        default="",
+        description="Command to run the automated test suite (e.g. python -m unittest discover -s tests)",
+    )
+    summary: str = Field(
+        default="",
+        description="High-level architecture and responsibility summary",
+    )
+    dependencies: list[str] = Field(
+        default_factory=list,
+        description="Primary libraries and package dependencies (e.g. Flask, requests)",
+    )
+    modules: list[ModuleDescription] = Field(
+        default_factory=list,
+        description="Architectural modules and subsystems dividing the repository domain",
+    )
+    key_files: list[FileRole] = Field(
+        default_factory=list,
+        description="Key architectural files, their responsibilities, and owning teams",
+    )
+    internal_models: list[ModelEntry] = Field(
+        default_factory=list,
+        description="Internal data models, entities, and database schemas with their field names",
+    )
+    api_routes: list[RouteEntry] = Field(
+        default_factory=list,
+        description="HTTP/API endpoints, HTTP methods, and corresponding controller handlers",
+    )
+    external_integrations: list[IntegrationEntry] = Field(
+        default_factory=list,
+        description="External third-party services, APIs, databases, or payment gateways with required env keys",
+    )
+    external_dependencies: list[str] = Field(
+        default_factory=list,
+        description="Known external services or systems called or referenced outside this repository (e.g. separate microservices)",
+    )
+    config_keys: list[str] = Field(
+        default_factory=list,
+        description="Configuration environment variable keys or settings required by the application",
+    )
+    config_schema: list[str] = Field(
+        default_factory=list,
+        description="Backward-compatible alias for config_keys",
+    )
+    codeowners: dict[str, str] = Field(
+        default_factory=dict,
+        description="Mapping of file paths/directories to owning teams or engineers (from CODEOWNERS)",
+    )
+    coding_guidelines: list[str] = Field(
+        default_factory=list,
+        description="Key conventions, testing practices, and patterns for coding agents working in this repo",
+    )
+
+    def to_markdown(self) -> str:
+        """Render a readable markdown summary of the architecture catalog."""
+        lines: list[str] = [
+            f"# Architecture Catalog: {self.name or 'Application'}",
+            "",
+            "## Overview",
+            f"- **Primary Language:** {self.language or 'Not specified'}",
+            f"- **Framework:** {self.framework or 'Not specified'}",
+            f"- **Entrypoint:** `{self.entrypoint}`" if self.entrypoint else "- **Entrypoint:** Not specified",
+            f"- **Test Command:** `{self.test_command}`" if self.test_command else "- **Test Command:** Not specified",
+            f"- **Summary:** {self.summary}",
+            "",
+        ]
+
+        if self.dependencies:
+            lines.extend([
+                "## Dependencies",
+                ", ".join(f"`{d}`" for d in self.dependencies),
+                "",
+            ])
+
+        if self.modules:
+            lines.extend(["## Architectural Modules & Subsystems", ""])
+            for mod in self.modules:
+                owner_str = f" ({mod.owner})" if mod.owner else ""
+                lines.append(f"### {mod.name}{owner_str}")
+                lines.append(f"- **Path:** `{mod.path}`")
+                lines.append(f"- **Description:** {mod.description}")
+                if mod.responsibilities:
+                    lines.append(f"- **Responsibilities:** {', '.join(mod.responsibilities)}")
+                if mod.key_files:
+                    lines.append(f"- **Key Files:** {', '.join(f'`{f}`' for f in mod.key_files)}")
+                lines.append("")
+
+        if self.key_files:
+            lines.extend(["## Key Files", ""])
+            for f in self.key_files:
+                owner_str = f" ({f.owner})" if f.owner else ""
+                lines.append(f"- **`{f.path}`**{owner_str}: {f.role}")
+            lines.append("")
+
+        if self.internal_models:
+            lines.extend(["## Data Models & Schemas", ""])
+            for m in self.internal_models:
+                loc = f" (`{m.file_path}`)" if m.file_path else ""
+                desc = f": {m.description}" if m.description else ""
+                fields = f" (Fields: {', '.join(m.fields)})" if m.fields else ""
+                lines.append(f"- **`{m.name}`**{loc}{desc}{fields}")
+            lines.append("")
+
+        if self.api_routes:
+            lines.extend(["## API Routes", ""])
+            for r in self.api_routes:
+                method = r.method or "ANY"
+                handler_str = f" -> `{r.handler}`" if r.handler else ""
+                loc = f" (`{r.file_path}`)" if r.file_path else ""
+                desc = f" — {r.description}" if r.description else ""
+                lines.append(f"- **`{method} {r.path}`**{handler_str}{loc}{desc}")
+            lines.append("")
+
+        if self.external_integrations or self.external_dependencies:
+            lines.extend(["## External Integrations & Services", ""])
+            for i in self.external_integrations:
+                loc = f" (`{i.file_path}`)" if i.file_path else ""
+                auth = f", Auth: {i.auth}" if i.auth else ""
+                envs = f", Env: {', '.join(i.env_keys)}" if i.env_keys else ""
+                desc = f": {i.description}" if i.description else ""
+                lines.append(f"- **{i.name}**{loc}{auth}{envs}{desc}")
+            if self.external_dependencies:
+                lines.append("- **External services outside repository:**")
+                for ext in self.external_dependencies:
+                    lines.append(f"  - {ext}")
+            lines.append("")
+
+        if self.config_keys:
+            lines.extend([
+                "## Configuration Keys (.env)",
+                ", ".join(f"`{k}`" for k in self.config_keys),
+                "",
+            ])
+
+        if self.coding_guidelines:
+            lines.extend(["## Coding & Testing Guidelines", ""])
+            for rule in self.coding_guidelines:
+                lines.append(f"- {rule}")
+            lines.append("")
+
+        return "\n".join(lines).strip()
+
+    def model_post_init(self, __context) -> None:
+        if not self.config_keys and self.config_schema:
+            self.config_keys = list(self.config_schema)
+        elif not self.config_schema and self.config_keys:
+            self.config_schema = list(self.config_keys)
 
 
 class MeetingMinutes(BaseModel):
