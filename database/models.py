@@ -90,6 +90,8 @@ class Meeting(Base):
     status: Mapped[str] = mapped_column(
         String, nullable=False, default=MeetingStatus.PENDING.value, index=True
     )
+    # Idea extraction is best-effort after minutes; persist the last failure.
+    ideas_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
 
     ideas: Mapped[list["Idea"]] = relationship(

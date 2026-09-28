@@ -10,7 +10,7 @@ import database as db
 from agents.idea_extractor import IdeaExtractorError, extract_ideas
 from agents.note_taker import NoteTakerError, ingest, take_notes
 from agents.transcript import TranscriptError
-from schemas import MeetingSource
+from schemas import MeetingSource, MeetingStatus
 
 bp = Blueprint("meetings", __name__, url_prefix="/meetings")
 
@@ -31,12 +31,25 @@ def _serialise(meeting) -> dict:
     return meeting.model_dump(mode="json")
 
 
+def _run_idea_extraction(meeting_id: int) -> tuple[list, str | None]:
+    """Extract ideas and persist success/failure on the meeting row."""
+    try:
+        ideas = extract_ideas(meeting_id)
+    except IdeaExtractorError as exc:
+        db.set_meeting_ideas_error(meeting_id, str(exc))
+        return [], str(exc)
+
+    db.set_meeting_ideas_error(meeting_id, None)
+    return ideas, None
+
+
 @bp.post("/upload")
 def upload_meeting():
     """Ingest a .vtt/.srt/.txt transcript, then generate minutes.
 
     The meeting row is committed before the model runs, so a Gemini failure
     returns 502 with the transcript already stored and the meeting FAILED.
+    Idea extraction is best-effort: failures are stored on meeting.ideas_error.
     """
     uploaded = request.files.get("file")
     if uploaded is None or not uploaded.filename:
@@ -87,17 +100,42 @@ def upload_meeting():
         payload["error"] = str(exc)
         return jsonify(payload), 502
 
+    ideas, ideas_error = _run_idea_extraction(meeting.id)
+    meeting = db.get_meeting(meeting.id)
     payload["meeting"] = _serialise(meeting)
-
-    try:
-        ideas = extract_ideas(meeting.id)
-    except IdeaExtractorError as exc:
-        payload["ideas"] = []
-        payload["ideas_error"] = str(exc)
-    else:
-        payload["ideas"] = [idea.model_dump(mode="json") for idea in ideas]
+    payload["ideas"] = [idea.model_dump(mode="json") for idea in ideas]
+    if ideas_error:
+        payload["ideas_error"] = ideas_error
 
     return jsonify(payload), 201
+
+
+@bp.post("/<int:meeting_id>/extract-ideas")
+def retry_extract_ideas(meeting_id: int):
+    """Re-run idea extraction for a meeting that already has minutes."""
+    meeting = db.get_meeting(meeting_id)
+    if meeting is None:
+        return jsonify({"error": "meeting not found"}), 404
+    if meeting.status != MeetingStatus.PROCESSED:
+        return jsonify(
+            {
+                "error": (
+                    "idea extraction requires PROCESSED minutes "
+                    f"(current: {meeting.status.value})"
+                )
+            }
+        ), 409
+
+    ideas, ideas_error = _run_idea_extraction(meeting_id)
+    meeting = db.get_meeting(meeting_id)
+    payload = {
+        "meeting": _serialise(meeting),
+        "ideas": [idea.model_dump(mode="json") for idea in ideas],
+    }
+    if ideas_error:
+        payload["ideas_error"] = ideas_error
+        return jsonify(payload), 502
+    return jsonify(payload)
 
 
 @bp.get("")

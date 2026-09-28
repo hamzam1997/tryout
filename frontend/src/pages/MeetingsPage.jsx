@@ -1,14 +1,23 @@
 import MeetingRow from "../components/MeetingRow";
 import Uploader from "../components/Uploader";
 
-export default function MeetingsPage({ meetings, loading, error, onUploaded, onRefresh }) {
+export default function MeetingsPage({
+  meetings,
+  loading,
+  error,
+  retryingId,
+  onUploaded,
+  onRefresh,
+  onRetryIdeas,
+}) {
   return (
     <div className="container">
       <header className="page-head">
         <div>
           <h1>Meetings</h1>
           <p className="page-sub">
-            Upload a transcript and the note taker writes the minutes.
+            Upload a transcript for minutes, then catalog-grounded ideas. Failures
+            stay on the meeting so you can retry.
           </p>
         </div>
         <button type="button" className="btn btn-ghost" onClick={onRefresh} disabled={loading}>
@@ -42,7 +51,12 @@ export default function MeetingsPage({ meetings, loading, error, onUploaded, onR
       ) : (
         <div className="rows">
           {meetings.map((meeting) => (
-            <MeetingRow key={meeting.id} meeting={meeting} />
+            <MeetingRow
+              key={meeting.id}
+              meeting={meeting}
+              retrying={retryingId === meeting.id}
+              onRetryIdeas={onRetryIdeas}
+            />
           ))}
         </div>
       )}

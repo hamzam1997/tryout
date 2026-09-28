@@ -25,8 +25,8 @@ function speakersIn(transcript = "") {
   return [...found];
 }
 
-export default function MeetingRow({ meeting }) {
-  const [open, setOpen] = useState(false);
+export default function MeetingRow({ meeting, retrying, onRetryIdeas }) {
+  const [open, setOpen] = useState(Boolean(meeting.ideas_error));
   const [showTranscript, setShowTranscript] = useState(false);
 
   const [badgeClass, badgeLabel] = BADGES[meeting.status] ?? BADGES.PENDING;
@@ -35,6 +35,7 @@ export default function MeetingRow({ meeting }) {
   const keyPoints = minutes?.key_points ?? [];
   const actions = minutes?.action_items ?? [];
   const speakers = speakersIn(meeting.transcript);
+  const canRetryIdeas = meeting.status === "PROCESSED";
 
   return (
     <article className={`row${open ? " is-open" : ""}`}>
@@ -62,6 +63,12 @@ export default function MeetingRow({ meeting }) {
                 <span>{actions.length} action {actions.length === 1 ? "item" : "items"}</span>
               </>
             )}
+            {meeting.ideas_error && (
+              <>
+                <span className="sep">·</span>
+                <span className="meta-warn">Ideas failed</span>
+              </>
+            )}
           </span>
         </span>
 
@@ -74,6 +81,49 @@ export default function MeetingRow({ meeting }) {
 
       {open && (
         <div className="row-detail">
+          {meeting.ideas_error && (
+            <section className="detail ideas-failure">
+              <h4 className="detail-label">Idea extraction failed</h4>
+              <div className="alert alert-error">{meeting.ideas_error}</div>
+              <p className="detail-note">
+                Minutes were saved. Ideas can be retried without re-uploading the transcript.
+              </p>
+              {canRetryIdeas && (
+                <div className="idea-actions">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={retrying}
+                    onClick={() => onRetryIdeas?.(meeting.id)}
+                  >
+                    {retrying && <span className="spinner" />}
+                    {retrying ? "Retrying" : "Try again"}
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
+
+          {!meeting.ideas_error && canRetryIdeas && (
+            <section className="detail ideas-retry">
+              <h4 className="detail-label">Ideas</h4>
+              <p className="detail-note">
+                Re-run catalog-grounded idea extraction for this meeting if the inbox looks empty.
+              </p>
+              <div className="idea-actions">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={retrying}
+                  onClick={() => onRetryIdeas?.(meeting.id)}
+                >
+                  {retrying && <span className="spinner" />}
+                  {retrying ? "Extracting" : "Extract ideas again"}
+                </button>
+              </div>
+            </section>
+          )}
+
           {!minutes && (
             <p className="detail-none">
               {meeting.status === "FAILED"

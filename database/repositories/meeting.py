@@ -23,6 +23,7 @@ def orm_to_meeting(orm: MeetingModel) -> Meeting:
         transcript=orm.transcript,
         minutes=load_model(MeetingMinutes, orm.minutes_json),
         status=MeetingStatus(orm.status),
+        ideas_error=orm.ideas_error,
         created_at=orm.created_at,
     )
 
@@ -39,6 +40,7 @@ def create_meeting(meeting: Meeting) -> Meeting:
             transcript=meeting.transcript,
             minutes_json=dump_model(meeting.minutes),
             status=meeting.status.value,
+            ideas_error=meeting.ideas_error,
             created_at=created_at,
         )
         session.add(model)
@@ -72,6 +74,7 @@ def update_meeting(meeting: Meeting) -> Meeting:
             model.transcript = meeting.transcript
             model.minutes_json = dump_model(meeting.minutes)
             model.status = meeting.status.value
+            model.ideas_error = meeting.ideas_error
     return meeting
 
 
@@ -81,3 +84,11 @@ def set_meeting_status(meeting_id: int, status: MeetingStatus) -> None:
         model = session.get(MeetingModel, meeting_id)
         if model:
             model.status = status.value
+
+
+def set_meeting_ideas_error(meeting_id: int, ideas_error: str | None) -> None:
+    """Record or clear the last idea-extraction failure for a meeting."""
+    with session_scope() as session:
+        model = session.get(MeetingModel, meeting_id)
+        if model:
+            model.ideas_error = ideas_error

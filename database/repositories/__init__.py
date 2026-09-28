@@ -25,6 +25,7 @@ from database.repositories.meeting import (
     create_meeting,
     get_meeting,
     list_meetings,
+    set_meeting_ideas_error,
     set_meeting_status,
     update_meeting,
 )
@@ -53,6 +54,7 @@ __all__ = [
     "create_meeting",
     "get_meeting",
     "list_meetings",
+    "set_meeting_ideas_error",
     "set_meeting_status",
     "update_meeting",
     # Idea

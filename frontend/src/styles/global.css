@@ -673,6 +673,27 @@ svg { flex: none; }
   border-top: 1px solid var(--outline-faint);
 }
 
+.meta-warn { color: var(--error); font-weight: 500; }
+
+.ideas-failure .alert { margin-top: var(--s-2); }
+
+.ideas-failure .idea-actions,
+.ideas-retry .idea-actions {
+  border-top: 0;
+  padding-top: var(--s-2);
+}
+
+.btn .spinner {
+  border-color: rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  margin-right: var(--s-2);
+}
+
+.btn-secondary .spinner {
+  border-color: rgba(11, 87, 208, 0.25);
+  border-top-color: var(--primary);
+}
+
 /* ── Empty state ───────────────────────────────────────── */
 
 .empty {

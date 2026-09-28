@@ -2,7 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import MeetingsPage from "./pages/MeetingsPage";
 import IdeasPage from "./pages/IdeasPage";
-import { approveIdea, health, listIdeas, listMeetings, rejectIdea } from "./api";
+import {
+  approveIdea,
+  extractIdeas,
+  health,
+  listIdeas,
+  listMeetings,
+  rejectIdea,
+} from "./api";
 import "./styles/global.css";
 
 export default function App() {
@@ -13,6 +20,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [ideasError, setIdeasError] = useState("");
   const [busyId, setBusyId] = useState(null);
+  const [retryingId, setRetryingId] = useState(null);
   const [online, setOnline] = useState(null);
 
   const refresh = useCallback(async () => {
@@ -37,15 +45,60 @@ export default function App() {
     health().then(setOnline).catch(() => setOnline(false));
   }, [refresh]);
 
+  function mergeIdeas(incoming) {
+    if (!Array.isArray(incoming) || incoming.length === 0) return;
+    setIdeas((current) => {
+      const existingIds = new Set(current.map((idea) => idea.id));
+      const fresh = incoming.filter((idea) => !existingIds.has(idea.id));
+      return [...fresh, ...current];
+    });
+  }
+
   function handleUploaded(result) {
     setMeetings((current) => [result.meeting, ...current]);
+    mergeIdeas(result.ideas);
+    if (result.ideas_error || result.meeting?.ideas_error) {
+      setView("meetings");
+      return;
+    }
     if (Array.isArray(result.ideas) && result.ideas.length > 0) {
-      setIdeas((current) => {
-        const existingIds = new Set(current.map((idea) => idea.id));
-        const fresh = result.ideas.filter((idea) => !existingIds.has(idea.id));
-        return [...fresh, ...current];
-      });
       setView("ideas");
+    }
+  }
+
+  async function handleRetryIdeas(meetingId) {
+    setRetryingId(meetingId);
+    setError("");
+    try {
+      const result = await extractIdeas(meetingId);
+      setMeetings((current) =>
+        current.map((meeting) =>
+          meeting.id === result.meeting.id ? { ...meeting, ...result.meeting } : meeting
+        )
+      );
+      mergeIdeas(result.ideas);
+      if (Array.isArray(result.ideas) && result.ideas.length > 0) {
+        setView("ideas");
+      }
+    } catch (problem) {
+      setError(problem.message);
+      if (problem.payload?.meeting) {
+        setMeetings((current) =>
+          current.map((meeting) =>
+            meeting.id === problem.payload.meeting.id
+              ? { ...meeting, ...problem.payload.meeting }
+              : meeting
+          )
+        );
+      } else {
+        try {
+          setMeetings(await listMeetings());
+        } catch {
+          /* keep existing list */
+        }
+      }
+    } finally {
+      setRetryingId(null);
     }
   }
 
@@ -96,8 +149,10 @@ export default function App() {
             meetings={meetings}
             loading={loading}
             error={error}
+            retryingId={retryingId}
             onUploaded={handleUploaded}
             onRefresh={refresh}
+            onRetryIdeas={handleRetryIdeas}
           />
         ) : (
           <IdeasPage

@@ -380,6 +380,8 @@ class Meeting(BaseModel):
     transcript: str
     minutes: MeetingMinutes | None = None
     status: MeetingStatus = MeetingStatus.PENDING
+    # Last idea-extraction failure for this meeting; cleared on success.
+    ideas_error: str | None = None
     created_at: datetime | None = None
 
 
