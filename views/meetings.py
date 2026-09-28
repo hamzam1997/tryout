@@ -9,6 +9,7 @@ from flask import Blueprint, jsonify, request
 import database as db
 from agents.note_taker import NoteTakerError, ingest, take_notes
 from agents.transcript import TranscriptError
+from config import BASE_DIR
 from schemas import MeetingSource
 
 bp = Blueprint("meetings", __name__, url_prefix="/meetings")
@@ -79,6 +80,39 @@ def upload_meeting():
         "format": parsed.source_format.value,
     }
 
+    try:
+        meeting = take_notes(meeting.id)
+    except NoteTakerError as exc:
+        payload["meeting"] = _serialise(db.get_meeting(meeting.id))
+        payload["error"] = str(exc)
+        return jsonify(payload), 502
+
+    payload["meeting"] = _serialise(meeting)
+    return jsonify(payload), 201
+
+
+@bp.post("/demo")
+def load_demo_meeting():
+    """Ingest the bundled weekly-ops demo transcript."""
+    fixture_path = BASE_DIR / "fixtures" / "meetings" / "2026-09-17-weekly-ops.vtt"
+    if not fixture_path.is_file():
+        return jsonify({"error": "Demo meeting transcript not found"}), 404
+    raw = fixture_path.read_text(encoding="utf-8")
+    title = "Weekly Ops Sync (Acme Store Demo)"
+
+    meeting, parsed = ingest(
+        raw,
+        title=title,
+        filename="2026-09-17-weekly-ops.vtt",
+        source=MeetingSource.SEED,
+        occurred_at=datetime(2026, 9, 17, 10, 0),
+    )
+    payload = {
+        "meeting": _serialise(meeting),
+        "speakers": parsed.speakers,
+        "cue_count": len(parsed.cues),
+        "format": parsed.source_format.value,
+    }
     try:
         meeting = take_notes(meeting.id)
     except NoteTakerError as exc:

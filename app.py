@@ -5,7 +5,9 @@ from flask import Flask, jsonify, send_from_directory
 from config import settings
 from database import init_db
 from logging_setup import configure_logging
+from views.auth import bp as auth_bp
 from views.meetings import bp as meetings_bp
+from views.repositories import bp as repositories_bp
 
 # Written by the Dockerfile's build stage. Absent in local development, where
 # Vite serves the frontend on its own port and proxies the API here.
@@ -14,8 +16,12 @@ FRONTEND_DIST = Path(__file__).resolve().parent / "frontend" / "dist"
 configure_logging()
 
 app = Flask(__name__, static_folder=None)
+app.secret_key = settings.secret_key
 init_db()
+
+app.register_blueprint(auth_bp)
 app.register_blueprint(meetings_bp)
+app.register_blueprint(repositories_bp)
 
 
 @app.get("/health")
