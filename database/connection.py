@@ -44,7 +44,11 @@ def get_engine() -> Engine:
         db_file.parent.mkdir(parents=True, exist_ok=True)
         engine = create_engine(
             f"sqlite:///{db_file}",
-            connect_args={"timeout": BUSY_TIMEOUT_MS / 1000},
+            # Background idea extraction runs in worker threads.
+            connect_args={
+                "timeout": BUSY_TIMEOUT_MS / 1000,
+                "check_same_thread": False,
+            },
             echo=False,
             future=True,
         )

@@ -160,7 +160,13 @@ def take_notes(meeting_id: int) -> Meeting:
         status=meeting.status.value,
         minutes_chars=len(minutes.model_dump_json()),
     )
-    return meeting
+
+    # Event: minutes ready → background idea extraction (does not block the caller).
+    from agents.idea_jobs import on_minutes_ready
+
+    on_minutes_ready(meeting_id)
+    refreshed = db.get_meeting(meeting_id)
+    return refreshed if refreshed is not None else meeting
 
 
 def ingest(

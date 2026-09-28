@@ -27,6 +27,15 @@ class MeetingStatus(str, Enum):
     FAILED = "FAILED"
 
 
+class IdeasExtractStatus(str, Enum):
+    """Background idea extraction for a meeting after minutes are ready."""
+
+    PENDING = "PENDING"
+    PROCESSING = "PROCESSING"
+    PROCESSED = "PROCESSED"
+    FAILED = "FAILED"
+
+
 class IdeaStatus(str, Enum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
@@ -382,6 +391,8 @@ class Meeting(BaseModel):
     transcript: str
     minutes: MeetingMinutes | None = None
     status: MeetingStatus = MeetingStatus.PENDING
+    # Background idea extraction lifecycle (separate from minutes status).
+    ideas_status: IdeasExtractStatus = IdeasExtractStatus.PENDING
     # Last idea-extraction failure for this meeting; cleared on success.
     ideas_error: str | None = None
     created_at: datetime | None = None

@@ -6,6 +6,7 @@ from agents.idea_extractor import (
     generate_ideas,
     normalize_idea_key,
 )
+from agents.idea_jobs import on_minutes_ready
 from agents.note_taker import NoteTakerError, generate_minutes, ingest, take_notes
 from agents.repo_onboarder import (
     RepoOnboarder,
@@ -19,6 +20,7 @@ __all__ = [
     "extract_ideas",
     "generate_ideas",
     "normalize_idea_key",
+    "on_minutes_ready",
     "NoteTakerError",
     "TranscriptError",
     "generate_minutes",

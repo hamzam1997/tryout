@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import RepositoriesPage from "./pages/RepositoriesPage";
 import MeetingsPage from "./pages/MeetingsPage";
@@ -14,6 +14,12 @@ import {
 } from "./api";
 import "./styles/global.css";
 
+const IDEAS_POLL_MS = 2500;
+
+function ideasStillRunning(meetings) {
+  return meetings.some((meeting) => meeting.ideas_status === "PROCESSING");
+}
+
 export default function App() {
   const [view, setView] = useState("repositories");
   const [repositories, setRepositories] = useState([]);
@@ -25,11 +31,14 @@ export default function App() {
   const [busyId, setBusyId] = useState(null);
   const [retryingId, setRetryingId] = useState(null);
   const [online, setOnline] = useState(null);
+  const pollRef = useRef(null);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    setIdeasError("");
+  const refresh = useCallback(async ({ quiet = false } = {}) => {
+    if (!quiet) {
+      setLoading(true);
+      setError("");
+      setIdeasError("");
+    }
 
     const [reposResult, meetingsResult, ideasResult] = await Promise.allSettled([
       listRepositories(),
@@ -41,17 +50,23 @@ export default function App() {
       setRepositories(reposResult.value);
     } else {
       console.error("Failed to load repositories:", reposResult.reason);
-      if (view === "repositories") {
-        setError(`Repositories error: ${reposResult.reason?.message || "Failed to load repositories"}`);
+      if (!quiet && view === "repositories") {
+        setError(
+          `Repositories error: ${reposResult.reason?.message || "Failed to load repositories"}`
+        );
       }
     }
 
+    let meetingsData = null;
     if (meetingsResult.status === "fulfilled") {
-      setMeetings(meetingsResult.value);
+      meetingsData = meetingsResult.value;
+      setMeetings(meetingsData);
     } else {
       console.error("Failed to load meetings:", meetingsResult.reason);
-      if (view === "meetings") {
-        setError(`Meetings error: ${meetingsResult.reason?.message || "Failed to load meetings"}`);
+      if (!quiet && view === "meetings") {
+        setError(
+          `Meetings error: ${meetingsResult.reason?.message || "Failed to load meetings"}`
+        );
       }
     }
 
@@ -59,50 +74,68 @@ export default function App() {
       setIdeas(ideasResult.value);
     } else {
       console.error("Failed to load ideas:", ideasResult.reason);
-      if (view === "ideas") {
-        setIdeasError(`Ideas error: ${ideasResult.reason?.message || "Failed to load ideas"}`);
+      if (!quiet && view === "ideas") {
+        setIdeasError(
+          `Ideas error: ${ideasResult.reason?.message || "Failed to load ideas"}`
+        );
       }
     }
 
-    const anySuccess = [reposResult, meetingsResult, ideasResult].some((r) => r.status === "fulfilled");
+    const anySuccess = [reposResult, meetingsResult, ideasResult].some(
+      (result) => result.status === "fulfilled"
+    );
     if (anySuccess) {
       setOnline(true);
     } else {
       try {
-        const isHealthy = await health();
-        setOnline(isHealthy);
+        setOnline(await health());
       } catch {
         setOnline(false);
       }
     }
 
-    setLoading(false);
+    if (!quiet) setLoading(false);
+    return meetingsData;
   }, [view]);
 
   useEffect(() => {
     refresh();
-    health().then((isUp) => setOnline((prev) => (prev === null ? isUp : prev || isUp))).catch(() => {});
+    health()
+      .then((isUp) => setOnline((prev) => (prev === null ? isUp : prev || isUp)))
+      .catch(() => {});
   }, [refresh]);
 
-  function mergeIdeas(incoming) {
-    if (!Array.isArray(incoming) || incoming.length === 0) return;
-    setIdeas((current) => {
-      const existingIds = new Set(current.map((idea) => idea.id));
-      const fresh = incoming.filter((idea) => !existingIds.has(idea.id));
-      return [...fresh, ...current];
-    });
-  }
+  // Poll while any meeting has background idea extraction in flight.
+  useEffect(() => {
+    if (!ideasStillRunning(meetings)) {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+      return undefined;
+    }
+
+    if (pollRef.current) return undefined;
+
+    pollRef.current = setInterval(async () => {
+      const nextMeetings = await refresh({ quiet: true });
+      if (nextMeetings && !ideasStillRunning(nextMeetings)) {
+        const nextIdeas = await listIdeas().catch(() => null);
+        if (nextIdeas) setIdeas(nextIdeas);
+      }
+    }, IDEAS_POLL_MS);
+
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [meetings, refresh]);
 
   function handleUploaded(result) {
     setMeetings((current) => [result.meeting, ...current]);
-    mergeIdeas(result.ideas);
-    if (result.ideas_error || result.meeting?.ideas_error) {
-      setView("meetings");
-      return;
-    }
-    if (Array.isArray(result.ideas) && result.ideas.length > 0) {
-      setView("ideas");
-    }
+    setView("meetings");
   }
 
   function handleRepoOnboarded(newRepo) {
@@ -122,10 +155,6 @@ export default function App() {
           meeting.id === result.meeting.id ? { ...meeting, ...result.meeting } : meeting
         )
       );
-      mergeIdeas(result.ideas);
-      if (Array.isArray(result.ideas) && result.ideas.length > 0) {
-        setView("ideas");
-      }
     } catch (problem) {
       setError(problem.message);
       if (problem.payload?.meeting) {
@@ -136,12 +165,6 @@ export default function App() {
               : meeting
           )
         );
-      } else {
-        try {
-          setMeetings(await listMeetings());
-        } catch {
-          /* keep existing list */
-        }
       }
     } finally {
       setRetryingId(null);
