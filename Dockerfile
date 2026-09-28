@@ -23,4 +23,7 @@ COPY . .
 # Only the built assets cross over; node and the sources stay in stage 1.
 COPY --from=frontend /build/dist ./frontend/dist
 
+# Cloud Run injects PORT; default keeps local `docker run` working.
+ENV PORT=8080
+
 CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 app:app

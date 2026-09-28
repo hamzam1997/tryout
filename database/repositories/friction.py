@@ -34,9 +34,6 @@ def orm_to_friction_log(orm: FrictionLogModel) -> FrictionLog:
     )
 
 
-row_to_friction_log = orm_to_friction_log
-
-
 def create_friction_log(log: FrictionLog) -> FrictionLog:
     created_at = log.created_at or utc_now()
     with session_scope() as session:

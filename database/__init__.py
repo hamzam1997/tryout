@@ -1,7 +1,6 @@
-"""Database package root.
+"""Database package: connection helpers, ORM models, and repository CRUD."""
 
-Exposes models, connection utilities, and repository CRUD functions.
-"""
+from sqlalchemy.exc import IntegrityError
 
 from database.connection import (
     BUSY_TIMEOUT_MS,
@@ -14,40 +13,12 @@ from database.connection import (
     utc_now,
 )
 from database.models import (
-    Base,
     Attempt as AttemptModel,
+    Base,
     FrictionLog as FrictionLogModel,
     Idea as IdeaModel,
     Meeting as MeetingModel,
     Repository as RepositoryModel,
-)
-from schemas import (
-    ArchitectureCatalog,
-    Attempt,
-    AttemptSchema,
-    AttemptStatus,
-    FileRole,
-    FrictionCategory,
-    FrictionLog,
-    FrictionLogSchema,
-    Idea,
-    IdeaSchema,
-    IdeaStatus,
-    IntegrationEntry,
-    Meeting,
-    MeetingMinutes,
-    MeetingSchema,
-    MeetingSource,
-    MeetingStatus,
-    ModelEntry,
-    ModuleDescription,
-    PlanStep,
-    ReadinessItem,
-    RepoSource,
-    Repository,
-    RepositorySchema,
-    RouteEntry,
-    TechnicalPlan,
 )
 from database.repositories import (
     catalog_is_current,
@@ -78,14 +49,35 @@ from database.repositories import (
     update_meeting,
     update_repository,
 )
-from database.schema import SCHEMA, init_db
-from sqlalchemy.exc import IntegrityError
+from database.schema import init_db
+from schemas import (
+    ArchitectureCatalog,
+    Attempt,
+    AttemptStatus,
+    FileRole,
+    FrictionCategory,
+    FrictionLog,
+    Idea,
+    IdeaStatus,
+    IntegrationEntry,
+    Meeting,
+    MeetingMinutes,
+    MeetingSource,
+    MeetingStatus,
+    ModelEntry,
+    ModuleDescription,
+    PlanStep,
+    ReadinessItem,
+    RepoSource,
+    Repository,
+    RouteEntry,
+    TechnicalPlan,
+)
 
 __all__ = [
-    # Connection & Session
+    # Connection & session
     "BUSY_TIMEOUT_MS",
     "IntegrityError",
-    "SCHEMA",
     "connect",
     "database_path",
     "get_engine",
@@ -94,27 +86,26 @@ __all__ = [
     "session_scope",
     "set_database_path",
     "utc_now",
-    # SQLAlchemy ORM Models
+    # ORM models
     "Base",
     "RepositoryModel",
     "MeetingModel",
     "IdeaModel",
     "AttemptModel",
     "FrictionLogModel",
-    # Enums
+    # Domain DTOs & enums
     "RepoSource",
     "MeetingSource",
     "MeetingStatus",
     "IdeaStatus",
     "AttemptStatus",
     "FrictionCategory",
-    # Pydantic Schemas / DTOs
-    "ModelEntry",
-    "RouteEntry",
-    "IntegrationEntry",
-    "FileRole",
-    "ModuleDescription",
     "ArchitectureCatalog",
+    "FileRole",
+    "IntegrationEntry",
+    "ModelEntry",
+    "ModuleDescription",
+    "RouteEntry",
     "MeetingMinutes",
     "PlanStep",
     "TechnicalPlan",

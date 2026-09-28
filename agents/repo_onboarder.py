@@ -8,31 +8,18 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from pathlib import Path
 import subprocess
-from typing import TYPE_CHECKING, overload
+from pathlib import Path
+from typing import overload
 
 from google import genai
 from google.genai import types
 
-from config import settings
 import database as db
+from config import settings
 from llm import get_client
 from repo_scanner import RepoSkeleton, scan_repo
-from schemas import (
-    ArchitectureCatalog,
-    FileRole,
-    IntegrationEntry,
-    ModelEntry,
-    ModuleDescription,
-    RepoSkeleton as RepoSkeletonSchema,
-    RepoSource,
-    Repository,
-    RouteEntry,
-)
-
-if TYPE_CHECKING:
-    pass
+from schemas import ArchitectureCatalog, RepoSource, Repository
 
 logger = logging.getLogger(__name__)
 
