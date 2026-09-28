@@ -48,8 +48,12 @@ class IngestionTestCase(unittest.TestCase):
         self.client = flask_app.app.test_client()
         # The failure-path tests exercise logger.exception on purpose.
         logging.getLogger("agents.note_taker").setLevel(logging.CRITICAL)
+        # Idea extraction is a background event after minutes; keep note tests focused.
+        self._ideas_patch = mock.patch("agents.idea_jobs.on_minutes_ready")
+        self._ideas_patch.start()
 
     def tearDown(self):
+        self._ideas_patch.stop()
         db.set_database_path(None)
         self._tmp.cleanup()
 

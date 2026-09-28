@@ -9,7 +9,13 @@ from database.connection import (
     utc_now,
 )
 from database.models import Meeting as MeetingModel
-from schemas import Meeting, MeetingMinutes, MeetingSource, MeetingStatus
+from schemas import (
+    IdeasExtractStatus,
+    Meeting,
+    MeetingMinutes,
+    MeetingSource,
+    MeetingStatus,
+)
 
 
 def orm_to_meeting(orm: MeetingModel) -> Meeting:
@@ -23,6 +29,7 @@ def orm_to_meeting(orm: MeetingModel) -> Meeting:
         transcript=orm.transcript,
         minutes=load_model(MeetingMinutes, orm.minutes_json),
         status=MeetingStatus(orm.status),
+        ideas_status=IdeasExtractStatus(orm.ideas_status),
         ideas_error=orm.ideas_error,
         created_at=orm.created_at,
     )
@@ -40,6 +47,7 @@ def create_meeting(meeting: Meeting) -> Meeting:
             transcript=meeting.transcript,
             minutes_json=dump_model(meeting.minutes),
             status=meeting.status.value,
+            ideas_status=meeting.ideas_status.value,
             ideas_error=meeting.ideas_error,
             created_at=created_at,
         )
@@ -74,6 +82,7 @@ def update_meeting(meeting: Meeting) -> Meeting:
             model.transcript = meeting.transcript
             model.minutes_json = dump_model(meeting.minutes)
             model.status = meeting.status.value
+            model.ideas_status = meeting.ideas_status.value
             model.ideas_error = meeting.ideas_error
     return meeting
 
@@ -86,9 +95,26 @@ def set_meeting_status(meeting_id: int, status: MeetingStatus) -> None:
             model.status = status.value
 
 
+def set_meeting_ideas_state(
+    meeting_id: int,
+    ideas_status: IdeasExtractStatus,
+    ideas_error: str | None = None,
+) -> None:
+    """Update background idea-extraction status and optional error message."""
+    with session_scope() as session:
+        model = session.get(MeetingModel, meeting_id)
+        if model:
+            model.ideas_status = ideas_status.value
+            model.ideas_error = ideas_error
+
+
 def set_meeting_ideas_error(meeting_id: int, ideas_error: str | None) -> None:
     """Record or clear the last idea-extraction failure for a meeting."""
     with session_scope() as session:
         model = session.get(MeetingModel, meeting_id)
         if model:
             model.ideas_error = ideas_error
+            if ideas_error:
+                model.ideas_status = IdeasExtractStatus.FAILED.value
+            elif model.ideas_status == IdeasExtractStatus.FAILED.value:
+                model.ideas_status = IdeasExtractStatus.PROCESSED.value

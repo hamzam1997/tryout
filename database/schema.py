@@ -40,16 +40,22 @@ def _recreate_idea_dependent_tables(engine) -> None:
         conn.commit()
 
 
-def _ensure_meeting_ideas_error_column(engine) -> None:
-    """Add meeting.ideas_error on existing SQLite DBs without dropping meetings."""
+def _ensure_meeting_idea_columns(engine) -> None:
+    """Add meeting idea-extraction columns on existing SQLite DBs."""
     inspector = inspect(engine)
     if "meeting" not in inspector.get_table_names():
         return
     columns = {col["name"] for col in inspector.get_columns("meeting")}
-    if "ideas_error" in columns:
-        return
     with engine.connect() as conn:
-        conn.execute(text("ALTER TABLE meeting ADD COLUMN ideas_error TEXT"))
+        if "ideas_error" not in columns:
+            conn.execute(text("ALTER TABLE meeting ADD COLUMN ideas_error TEXT"))
+        if "ideas_status" not in columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE meeting ADD COLUMN ideas_status "
+                    "VARCHAR NOT NULL DEFAULT 'PENDING'"
+                )
+            )
         conn.commit()
 
 
@@ -63,4 +69,4 @@ def init_db() -> None:
     if not _idea_schema_is_current(engine):
         _recreate_idea_dependent_tables(engine)
     Base.metadata.create_all(bind=engine)
-    _ensure_meeting_ideas_error_column(engine)
+    _ensure_meeting_idea_columns(engine)

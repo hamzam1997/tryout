@@ -26,7 +26,9 @@ function speakersIn(transcript = "") {
 }
 
 export default function MeetingRow({ meeting, retrying, onRetryIdeas }) {
-  const [open, setOpen] = useState(Boolean(meeting.ideas_error));
+  const ideasFailed = meeting.ideas_status === "FAILED" || Boolean(meeting.ideas_error);
+  const ideasRunning = meeting.ideas_status === "PROCESSING";
+  const [open, setOpen] = useState(ideasFailed);
   const [showTranscript, setShowTranscript] = useState(false);
 
   const [badgeClass, badgeLabel] = BADGES[meeting.status] ?? BADGES.PENDING;
@@ -35,7 +37,8 @@ export default function MeetingRow({ meeting, retrying, onRetryIdeas }) {
   const keyPoints = minutes?.key_points ?? [];
   const actions = minutes?.action_items ?? [];
   const speakers = speakersIn(meeting.transcript);
-  const canRetryIdeas = meeting.status === "PROCESSED";
+  const canRetryIdeas =
+    meeting.status === "PROCESSED" && meeting.ideas_status !== "PROCESSING";
 
   return (
     <article className={`row${open ? " is-open" : ""}`}>
@@ -63,7 +66,13 @@ export default function MeetingRow({ meeting, retrying, onRetryIdeas }) {
                 <span>{actions.length} action {actions.length === 1 ? "item" : "items"}</span>
               </>
             )}
-            {meeting.ideas_error && (
+            {ideasRunning && (
+              <>
+                <span className="sep">·</span>
+                <span className="meta-warn">Extracting ideas…</span>
+              </>
+            )}
+            {ideasFailed && (
               <>
                 <span className="sep">·</span>
                 <span className="meta-warn">Ideas failed</span>
@@ -81,10 +90,22 @@ export default function MeetingRow({ meeting, retrying, onRetryIdeas }) {
 
       {open && (
         <div className="row-detail">
-          {meeting.ideas_error && (
+          {ideasRunning && (
+            <section className="detail">
+              <h4 className="detail-label">Ideas</h4>
+              <p className="detail-note">
+                Idea extraction is running in the background. This page refreshes
+                automatically when it finishes.
+              </p>
+            </section>
+          )}
+
+          {ideasFailed && (
             <section className="detail ideas-failure">
               <h4 className="detail-label">Idea extraction failed</h4>
-              <div className="alert alert-error">{meeting.ideas_error}</div>
+              <div className="alert alert-error">
+                {meeting.ideas_error || "Idea extraction failed."}
+              </div>
               <p className="detail-note">
                 Minutes were saved. Ideas can be retried without re-uploading the transcript.
               </p>
@@ -97,18 +118,18 @@ export default function MeetingRow({ meeting, retrying, onRetryIdeas }) {
                     onClick={() => onRetryIdeas?.(meeting.id)}
                   >
                     {retrying && <span className="spinner" />}
-                    {retrying ? "Retrying" : "Try again"}
+                    {retrying ? "Queuing" : "Try again"}
                   </button>
                 </div>
               )}
             </section>
           )}
 
-          {!meeting.ideas_error && canRetryIdeas && (
+          {!ideasFailed && !ideasRunning && canRetryIdeas && (
             <section className="detail ideas-retry">
               <h4 className="detail-label">Ideas</h4>
               <p className="detail-note">
-                Re-run catalog-grounded idea extraction for this meeting if the inbox looks empty.
+                Re-queue catalog-grounded idea extraction for this meeting if the inbox looks empty.
               </p>
               <div className="idea-actions">
                 <button
@@ -118,7 +139,7 @@ export default function MeetingRow({ meeting, retrying, onRetryIdeas }) {
                   onClick={() => onRetryIdeas?.(meeting.id)}
                 >
                   {retrying && <span className="spinner" />}
-                  {retrying ? "Extracting" : "Extract ideas again"}
+                  {retrying ? "Queuing" : "Extract ideas again"}
                 </button>
               </div>
             </section>

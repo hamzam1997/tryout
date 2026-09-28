@@ -7,6 +7,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from schemas import (
     AttemptStatus,
+    IdeasExtractStatus,
     IdeaStatus,
     MeetingSource,
     MeetingStatus,
@@ -89,6 +90,13 @@ class Meeting(Base):
     # Explicit so a failed extraction is distinguishable from one not yet run.
     status: Mapped[str] = mapped_column(
         String, nullable=False, default=MeetingStatus.PENDING.value, index=True
+    )
+    # Background idea extraction; runs after minutes land.
+    ideas_status: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default=IdeasExtractStatus.PENDING.value,
+        index=True,
     )
     # Idea extraction is best-effort after minutes; persist the last failure.
     ideas_error: Mapped[str | None] = mapped_column(Text, nullable=True)

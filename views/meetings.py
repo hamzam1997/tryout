@@ -7,11 +7,11 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 import database as db
-from agents.idea_extractor import IdeaExtractorError, extract_ideas
+from agents.idea_jobs import on_minutes_ready
 from agents.note_taker import NoteTakerError, ingest, take_notes
 from agents.transcript import TranscriptError
 from config import BASE_DIR
-from schemas import MeetingSource, MeetingStatus
+from schemas import IdeasExtractStatus, MeetingSource, MeetingStatus
 
 bp = Blueprint("meetings", __name__, url_prefix="/meetings")
 
@@ -32,25 +32,12 @@ def _serialise(meeting) -> dict:
     return meeting.model_dump(mode="json")
 
 
-def _run_idea_extraction(meeting_id: int) -> tuple[list, str | None]:
-    """Extract ideas and persist success/failure on the meeting row."""
-    try:
-        ideas = extract_ideas(meeting_id)
-    except IdeaExtractorError as exc:
-        db.set_meeting_ideas_error(meeting_id, str(exc))
-        return [], str(exc)
-
-    db.set_meeting_ideas_error(meeting_id, None)
-    return ideas, None
-
-
 @bp.post("/upload")
 def upload_meeting():
-    """Ingest a .vtt/.srt/.txt transcript, then generate minutes.
+    """Ingest a transcript and generate minutes.
 
-    The meeting row is committed before the model runs, so a Gemini failure
-    returns 502 with the transcript already stored and the meeting FAILED.
-    Idea extraction is best-effort: failures are stored on meeting.ideas_error.
+    Idea extraction is triggered as a background event when minutes land;
+    this response returns as soon as minutes are ready.
     """
     uploaded = request.files.get("file")
     if uploaded is None or not uploaded.filename:
@@ -101,19 +88,15 @@ def upload_meeting():
         payload["error"] = str(exc)
         return jsonify(payload), 502
 
-    ideas, ideas_error = _run_idea_extraction(meeting.id)
-    meeting = db.get_meeting(meeting.id)
     payload["meeting"] = _serialise(meeting)
-    payload["ideas"] = [idea.model_dump(mode="json") for idea in ideas]
-    if ideas_error:
-        payload["ideas_error"] = ideas_error
-
+    payload["ideas"] = []
+    payload["ideas_queued"] = True
     return jsonify(payload), 201
 
 
 @bp.post("/demo")
 def load_demo_meeting():
-    """Ingest the bundled weekly-ops demo transcript, then extract ideas."""
+    """Ingest the bundled weekly-ops demo transcript; ideas extract in background."""
     fixture_path = BASE_DIR / "fixtures" / "meetings" / "2026-09-17-weekly-ops.vtt"
     if not fixture_path.is_file():
         return jsonify({"error": "Demo meeting transcript not found"}), 404
@@ -140,19 +123,15 @@ def load_demo_meeting():
         payload["error"] = str(exc)
         return jsonify(payload), 502
 
-    ideas, ideas_error = _run_idea_extraction(meeting.id)
-    meeting = db.get_meeting(meeting.id)
     payload["meeting"] = _serialise(meeting)
-    payload["ideas"] = [idea.model_dump(mode="json") for idea in ideas]
-    if ideas_error:
-        payload["ideas_error"] = ideas_error
-
+    payload["ideas"] = []
+    payload["ideas_queued"] = True
     return jsonify(payload), 201
 
 
 @bp.post("/<int:meeting_id>/extract-ideas")
 def retry_extract_ideas(meeting_id: int):
-    """Re-run idea extraction for a meeting that already has minutes."""
+    """Queue another background idea-extraction pass for a processed meeting."""
     meeting = db.get_meeting(meeting_id)
     if meeting is None:
         return jsonify({"error": "meeting not found"}), 404
@@ -165,17 +144,18 @@ def retry_extract_ideas(meeting_id: int):
                 )
             }
         ), 409
+    if meeting.ideas_status == IdeasExtractStatus.PROCESSING:
+        return jsonify(
+            {
+                "meeting": _serialise(meeting),
+                "ideas_queued": True,
+                "message": "idea extraction already in progress",
+            }
+        ), 202
 
-    ideas, ideas_error = _run_idea_extraction(meeting_id)
+    on_minutes_ready(meeting_id)
     meeting = db.get_meeting(meeting_id)
-    payload = {
-        "meeting": _serialise(meeting),
-        "ideas": [idea.model_dump(mode="json") for idea in ideas],
-    }
-    if ideas_error:
-        payload["ideas_error"] = ideas_error
-        return jsonify(payload), 502
-    return jsonify(payload)
+    return jsonify({"meeting": _serialise(meeting), "ideas_queued": True}), 202
 
 
 @bp.get("")
