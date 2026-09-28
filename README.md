@@ -59,3 +59,28 @@ Each idea runs in its own ephemeral environment so experiments don't interfere w
 ## Limitations
 
 Staging often differs from production in data volume, configuration, and integrations, so the agent flags assumptions it couldn't verify. Organizational blockers such as priorities, budget, compliance, or another team's willingness to make a change don't surface in code, so the agent's findings should be read alongside human judgment. Since staging may contain copies of real data, the agent's access needs the same care as any engineer's.
+
+## Running locally
+
+```bash
+cp .env.example .env   # set GOOGLE_CLOUD_PROJECT
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+gcloud auth application-default login
+
+# API (http://localhost:8080)
+python app.py
+
+# UI in another terminal (proxies /meetings and /health to Flask)
+cd frontend && npm ci && npm run dev
+```
+
+Upload a transcript at the Meetings page, or use `fixtures/meetings/2026-09-17-weekly-ops.vtt`.
+
+```bash
+# Tests
+python -m unittest discover -s tests
+
+# Production-shaped image (serves the built UI from Flask)
+docker build -t tryout . && docker run --rm -p 8080:8080 --env-file .env tryout
+```

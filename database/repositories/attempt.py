@@ -31,9 +31,6 @@ def orm_to_attempt(orm: AttemptModel) -> Attempt:
     )
 
 
-row_to_attempt = orm_to_attempt
-
-
 def create_attempt(attempt: Attempt) -> Attempt:
     created_at = attempt.created_at or utc_now()
     with session_scope() as session:

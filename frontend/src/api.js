@@ -26,5 +26,5 @@ export function uploadTranscript({ file, title, occurredAt }) {
 }
 
 export function health() {
-  return fetch("/").then((r) => r.ok);
+  return fetch("/health").then((r) => r.ok);
 }

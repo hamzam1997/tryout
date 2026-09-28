@@ -25,9 +25,6 @@ def orm_to_idea(orm: IdeaModel) -> Idea:
     )
 
 
-row_to_idea = orm_to_idea
-
-
 def create_idea(idea: Idea) -> Idea:
     created_at = idea.created_at or utc_now()
     with session_scope() as session:

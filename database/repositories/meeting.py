@@ -27,9 +27,6 @@ def orm_to_meeting(orm: MeetingModel) -> Meeting:
     )
 
 
-row_to_meeting = orm_to_meeting
-
-
 def create_meeting(meeting: Meeting) -> Meeting:
     created_at = meeting.created_at or utc_now()
     with session_scope() as session:

@@ -25,9 +25,6 @@ def orm_to_repository(orm: RepositoryModel) -> Repository:
     )
 
 
-row_to_repository = orm_to_repository
-
-
 def create_repository(repo: Repository) -> Repository:
     created_at = repo.created_at or utc_now()
     with session_scope() as session:

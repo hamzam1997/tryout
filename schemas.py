@@ -1,4 +1,4 @@
-"""Pydantic schemas and data validation models for tryout."""
+"""Domain DTOs and enums shared by agents, API, and persistence."""
 
 from datetime import datetime
 from enum import Enum
@@ -358,7 +358,7 @@ class ReadinessItem(BaseModel):
     done: bool = False
 
 
-class RepositorySchema(BaseModel):
+class Repository(BaseModel):
     id: int | None = None
     name: str
     source: str
@@ -369,7 +369,7 @@ class RepositorySchema(BaseModel):
     created_at: datetime | None = None
 
 
-class MeetingSchema(BaseModel):
+class Meeting(BaseModel):
     id: int | None = None
     title: str
     occurred_at: datetime | None = None
@@ -382,7 +382,7 @@ class MeetingSchema(BaseModel):
     created_at: datetime | None = None
 
 
-class IdeaSchema(BaseModel):
+class Idea(BaseModel):
     id: int | None = None
     meeting_id: int
     title: str
@@ -399,7 +399,7 @@ class IdeaSchema(BaseModel):
     created_at: datetime | None = None
 
 
-class AttemptSchema(BaseModel):
+class Attempt(BaseModel):
     id: int | None = None
     idea_id: int
     repository_id: int
@@ -416,7 +416,7 @@ class AttemptSchema(BaseModel):
     created_at: datetime | None = None
 
 
-class FrictionLogSchema(BaseModel):
+class FrictionLog(BaseModel):
     id: int | None = None
     attempt_id: int
     category: FrictionCategory
@@ -426,11 +426,3 @@ class FrictionLogSchema(BaseModel):
     required_action: str = ""
     readiness_checklist: list[ReadinessItem] = Field(default_factory=list)
     created_at: datetime | None = None
-
-
-# Backward-compatible aliases
-Repository = RepositorySchema
-Meeting = MeetingSchema
-Idea = IdeaSchema
-Attempt = AttemptSchema
-FrictionLog = FrictionLogSchema

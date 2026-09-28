@@ -5,11 +5,6 @@ from sqlalchemy import text
 from database.connection import database_path, get_engine
 from database.models import Base
 
-SCHEMA = """
--- Managed by SQLAlchemy 2.0 DeclarativeBase (database.models.Base)
--- Tables: repository, meeting, idea, attempt, friction_log
-"""
-
 
 def init_db() -> None:
     """Create tables and indexes via SQLAlchemy metadata and ensure WAL mode."""

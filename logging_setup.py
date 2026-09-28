@@ -17,16 +17,12 @@ import sys
 # Cloud Run sets K_SERVICE; its absence means we are on a developer machine.
 ON_CLOUD_RUN = bool(os.environ.get("K_SERVICE"))
 
-# Cloud Logging severity names that differ from Python's.
-_SEVERITY = {"WARNING": "WARNING", "ERROR": "ERROR", "CRITICAL": "CRITICAL"}
-
-
 class CloudLoggingFormatter(logging.Formatter):
     """Render a record as the JSON shape Cloud Logging understands."""
 
     def format(self, record: logging.LogRecord) -> str:
         entry = {
-            "severity": _SEVERITY.get(record.levelname, record.levelname),
+            "severity": record.levelname,
             "message": record.getMessage(),
             "logger": record.name,
         }
