@@ -31,7 +31,9 @@ def _get_redirect_uri() -> str:
 @bp.get("/github/login")
 def github_login():
     """Initiate GitHub OAuth web flow."""
-    if not settings.github_client_id or not settings.github_client_secret:
+    client_id = settings.github_client_id.strip("'\" \t\r\n")
+    client_secret = settings.github_client_secret.strip("'\" \t\r\n")
+    if not client_id or not client_secret:
         return (
             jsonify(
                 {
@@ -48,7 +50,7 @@ def github_login():
     session["oauth_redirect_uri"] = redirect_uri
 
     params = {
-        "client_id": settings.github_client_id,
+        "client_id": client_id,
         "redirect_uri": redirect_uri,
         "scope": "repo,read:user",
         "state": state,
@@ -77,12 +79,14 @@ def github_callback():
         return redirect("/?auth_error=No+code+received+from+GitHub.")
 
     redirect_uri = session.get("oauth_redirect_uri") or _get_redirect_uri()
+    client_id = settings.github_client_id.strip("'\" \t\r\n")
+    client_secret = settings.github_client_secret.strip("'\" \t\r\n")
 
     # Exchange code for access token
     token_url = "https://github.com/login/oauth/access_token"
     token_payload = {
-        "client_id": settings.github_client_id,
-        "client_secret": settings.github_client_secret,
+        "client_id": client_id,
+        "client_secret": client_secret,
         "code": code,
         "redirect_uri": redirect_uri,
     }
