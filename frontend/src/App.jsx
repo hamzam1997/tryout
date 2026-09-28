@@ -14,10 +14,15 @@ import {
 } from "./api";
 import "./styles/global.css";
 
-const IDEAS_POLL_MS = 2500;
+const PIPELINE_POLL_MS = 2500;
 
-function ideasStillRunning(meetings) {
-  return meetings.some((meeting) => meeting.ideas_status === "PROCESSING");
+function pipelineStillRunning(meetings) {
+  return meetings.some(
+    (meeting) =>
+      meeting.status === "PROCESSING" ||
+      meeting.status === "PENDING" ||
+      meeting.ideas_status === "PROCESSING"
+  );
 }
 
 export default function App() {
@@ -105,9 +110,9 @@ export default function App() {
       .catch(() => {});
   }, [refresh]);
 
-  // Poll while any meeting has background idea extraction in flight.
+  // Poll while minutes or idea extraction is running in the background.
   useEffect(() => {
-    if (!ideasStillRunning(meetings)) {
+    if (!pipelineStillRunning(meetings)) {
       if (pollRef.current) {
         clearInterval(pollRef.current);
         pollRef.current = null;
@@ -119,11 +124,11 @@ export default function App() {
 
     pollRef.current = setInterval(async () => {
       const nextMeetings = await refresh({ quiet: true });
-      if (nextMeetings && !ideasStillRunning(nextMeetings)) {
+      if (nextMeetings && !pipelineStillRunning(nextMeetings)) {
         const nextIdeas = await listIdeas().catch(() => null);
         if (nextIdeas) setIdeas(nextIdeas);
       }
-    }, IDEAS_POLL_MS);
+    }, PIPELINE_POLL_MS);
 
     return () => {
       if (pollRef.current) {

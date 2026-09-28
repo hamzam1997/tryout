@@ -26,6 +26,8 @@ function speakersIn(transcript = "") {
 }
 
 export default function MeetingRow({ meeting, retrying, onRetryIdeas }) {
+  const minutesRunning =
+    meeting.status === "PROCESSING" || meeting.status === "PENDING";
   const ideasFailed = meeting.ideas_status === "FAILED" || Boolean(meeting.ideas_error);
   const ideasRunning = meeting.ideas_status === "PROCESSING";
   const [open, setOpen] = useState(ideasFailed);
@@ -66,7 +68,13 @@ export default function MeetingRow({ meeting, retrying, onRetryIdeas }) {
                 <span>{actions.length} action {actions.length === 1 ? "item" : "items"}</span>
               </>
             )}
-            {ideasRunning && (
+            {minutesRunning && (
+              <>
+                <span className="sep">·</span>
+                <span className="meta-warn">Writing minutes…</span>
+              </>
+            )}
+            {!minutesRunning && ideasRunning && (
               <>
                 <span className="sep">·</span>
                 <span className="meta-warn">Extracting ideas…</span>
@@ -90,7 +98,17 @@ export default function MeetingRow({ meeting, retrying, onRetryIdeas }) {
 
       {open && (
         <div className="row-detail">
-          {ideasRunning && (
+          {minutesRunning && (
+            <section className="detail">
+              <h4 className="detail-label">Minutes</h4>
+              <p className="detail-note">
+                Minutes are generating in the background. Ideas will follow
+                automatically when they finish.
+              </p>
+            </section>
+          )}
+
+          {!minutesRunning && ideasRunning && (
             <section className="detail">
               <h4 className="detail-label">Ideas</h4>
               <p className="detail-note">

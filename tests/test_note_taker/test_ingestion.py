@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest import mock
 
 import database as db
+from agents import meeting_jobs
 
 # The app calls init_db() at import, so point it somewhere disposable first.
 _BOOTSTRAP = tempfile.TemporaryDirectory()
@@ -48,12 +49,16 @@ class IngestionTestCase(unittest.TestCase):
         self.client = flask_app.app.test_client()
         # The failure-path tests exercise logger.exception on purpose.
         logging.getLogger("agents.note_taker").setLevel(logging.CRITICAL)
+        logging.getLogger("agents.meeting_jobs").setLevel(logging.CRITICAL)
+        # Run minutes inline so assertions see the finished state.
+        meeting_jobs.set_force_sync(True)
         # Idea extraction is a background event after minutes; keep note tests focused.
         self._ideas_patch = mock.patch("agents.idea_jobs.on_minutes_ready")
         self._ideas_patch.start()
 
     def tearDown(self):
         self._ideas_patch.stop()
+        meeting_jobs.set_force_sync(False)
         db.set_database_path(None)
         self._tmp.cleanup()
 
@@ -62,7 +67,8 @@ class TestSuccessfulUpload(IngestionTestCase):
     @mock.patch("agents.note_taker.generate_minutes", return_value=MINUTES)
     def test_upload_stores_meeting_and_minutes(self, _):
         response = upload(self.client, title="Weekly Ops")
-        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.status_code, 202)
+        self.assertTrue(response.get_json()["minutes_queued"])
 
         body = response.get_json()
         self.assertEqual(body["format"], "vtt")
@@ -108,7 +114,8 @@ class TestModelFailure(IngestionTestCase):
     def test_transcript_survives_a_failed_model_call(self, _):
         """Persist-before-extract: a Gemini failure must not lose the upload."""
         response = upload(self.client, title="Weekly Ops")
-        self.assertEqual(response.status_code, 502)
+        # Upload accepts immediately; the background job records the failure.
+        self.assertEqual(response.status_code, 202)
 
         stored = db.list_meetings()
         self.assertEqual(len(stored), 1)

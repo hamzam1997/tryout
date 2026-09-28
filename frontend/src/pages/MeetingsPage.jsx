@@ -16,8 +16,8 @@ export default function MeetingsPage({
         <div>
           <h1>Meetings</h1>
           <p className="page-sub">
-            Upload a transcript for minutes, then catalog-grounded ideas. Failures
-            stay on the meeting so you can retry.
+            Upload a transcript; minutes and catalog-grounded ideas run in the
+            background. Failures stay on the meeting so you can retry.
           </p>
         </div>
         <button type="button" className="btn btn-ghost" onClick={onRefresh} disabled={loading}>

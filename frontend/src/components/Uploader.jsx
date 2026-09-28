@@ -169,12 +169,12 @@ export default function Uploader({ onUploaded }) {
           <div className="form-foot">
             <p className="form-note">
               {busy
-                ? "Reading the transcript and writing the minutes…"
-                : "Minutes are generated on upload and take a few seconds."}
+                ? "Saving the transcript…"
+                : "Minutes and ideas run in the background after upload."}
             </p>
             <button type="submit" className="btn btn-primary" disabled={!file || busy}>
               {busy && <span className="spinner" />}
-              {busy ? "Processing" : "Upload"}
+              {busy ? "Uploading" : "Upload"}
             </button>
           </div>
         </form>
