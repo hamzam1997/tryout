@@ -45,12 +45,6 @@ def create_repository(repo: Repository) -> Repository:
         session.flush()
         saved = orm_to_repository(model)
 
-    try:
-        from database.gcs_sync import backup_db_to_gcs_async
-        backup_db_to_gcs_async()
-    except Exception:
-        pass
-
     return saved
 
 
@@ -105,12 +99,6 @@ def save_catalog(
             model.catalog_error = None
             model.source_ref = source_ref
 
-    try:
-        from database.gcs_sync import backup_db_to_gcs_async
-        backup_db_to_gcs_async()
-    except Exception:
-        pass
-
 
 def set_repository_status(
     repo_id: int, status: str, error: str | None = None
@@ -122,12 +110,6 @@ def set_repository_status(
             model.catalog_status = status
             model.catalog_error = error
 
-    try:
-        from database.gcs_sync import backup_db_to_gcs_async
-        backup_db_to_gcs_async()
-    except Exception:
-        pass
-
 
 def catalog_is_current(repo: Repository, source_ref: str | None) -> bool:
     """True when a cached catalog exists and the repo has not moved since."""
@@ -136,3 +118,14 @@ def catalog_is_current(repo: Repository, source_ref: str | None) -> bool:
         and repo.source_ref is not None
         and repo.source_ref == source_ref
     )
+
+
+def delete_repository(repo_id: int) -> bool:
+    """Delete a repository and its cascades. Returns True if found and deleted."""
+    with session_scope() as session:
+        model = session.get(RepositoryModel, repo_id)
+        if not model:
+            return False
+        session.delete(model)
+
+    return True

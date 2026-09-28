@@ -32,11 +32,17 @@ def _recreate_idea_dependent_tables(engine) -> None:
     Safe for the hackathon SQLite workflow: local idea/attempt/friction data is
     regenerable. Meeting and repository rows are preserved.
     """
+    is_sqlite = engine.dialect.name == "sqlite"
     with engine.connect() as conn:
-        conn.execute(text("PRAGMA foreign_keys=OFF"))
+        if is_sqlite:
+            conn.execute(text("PRAGMA foreign_keys=OFF"))
         for table in ("friction_log", "attempt", "idea"):
-            conn.execute(text(f"DROP TABLE IF EXISTS {table}"))
-        conn.execute(text("PRAGMA foreign_keys=ON"))
+            if engine.dialect.name == "postgresql":
+                conn.execute(text(f"DROP TABLE IF EXISTS {table} CASCADE"))
+            else:
+                conn.execute(text(f"DROP TABLE IF EXISTS {table}"))
+        if is_sqlite:
+            conn.execute(text("PRAGMA foreign_keys=ON"))
         conn.commit()
 
 
@@ -46,6 +52,7 @@ def _ensure_meeting_columns(engine) -> None:
     if "meeting" not in inspector.get_table_names():
         return
     columns = {col["name"] for col in inspector.get_columns("meeting")}
+    timestamp_type = "DATETIME" if engine.dialect.name == "sqlite" else "TIMESTAMP"
     with engine.connect() as conn:
         if "status" not in columns:
             conn.execute(
@@ -60,7 +67,7 @@ def _ensure_meeting_columns(engine) -> None:
             conn.execute(
                 text(
                     "ALTER TABLE meeting ADD COLUMN ideas_status "
-                    "VARCHAR NOT NULL DEFAULT 'PENDING'"
+                    "VARCHAR(32) NOT NULL DEFAULT 'PENDING'"
                 )
             )
         if "external_source" not in columns:
@@ -77,16 +84,19 @@ def _ensure_meeting_columns(engine) -> None:
         if "external_url" not in columns:
             conn.execute(text("ALTER TABLE meeting ADD COLUMN external_url TEXT"))
         if "occurred_at" not in columns:
-            conn.execute(text("ALTER TABLE meeting ADD COLUMN occurred_at DATETIME"))
+            conn.execute(
+                text(f"ALTER TABLE meeting ADD COLUMN occurred_at {timestamp_type}")
+            )
         conn.commit()
 
 
 def _ensure_repository_status_columns(engine) -> None:
-    """Add repository.catalog_status and catalog_error on existing SQLite DBs."""
+    """Add repository.catalog_status and catalog_error on existing DBs."""
     inspector = inspect(engine)
     if "repository" not in inspector.get_table_names():
         return
     columns = {col["name"] for col in inspector.get_columns("repository")}
+    timestamp_type = "DATETIME" if engine.dialect.name == "sqlite" else "TIMESTAMP"
     with engine.connect() as conn:
         if "catalog_status" not in columns:
             conn.execute(
@@ -100,28 +110,21 @@ def _ensure_repository_status_columns(engine) -> None:
         if "catalog_generated_at" not in columns:
             conn.execute(
                 text(
-                    "ALTER TABLE repository ADD COLUMN catalog_generated_at DATETIME"
+                    f"ALTER TABLE repository ADD COLUMN catalog_generated_at {timestamp_type}"
                 )
             )
         conn.commit()
 
 
 def init_db() -> None:
-    """Create tables and indexes via SQLAlchemy metadata and ensure WAL mode."""
-    db_file = database_path()
-    if not db_file.exists():
-        try:
-            from database.gcs_sync import restore_db_from_gcs
-
-            restore_db_from_gcs()
-        except Exception:
-            pass
-
-    db_file.parent.mkdir(parents=True, exist_ok=True)
+    """Create tables and indexes via SQLAlchemy metadata."""
     engine = get_engine()
-    with engine.connect() as conn:
-        conn.execute(text("PRAGMA journal_mode=WAL"))
-        conn.commit()
+    if engine.dialect.name == "sqlite":
+        db_file = database_path()
+        db_file.parent.mkdir(parents=True, exist_ok=True)
+        with engine.connect() as conn:
+            conn.execute(text("PRAGMA journal_mode=WAL"))
+            conn.commit()
     if not _idea_schema_is_current(engine):
         _recreate_idea_dependent_tables(engine)
     Base.metadata.create_all(bind=engine)

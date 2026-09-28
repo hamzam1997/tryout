@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  deleteRepository,
   getGithubAuthStatus,
   getGithubRepos,
   listRepositories,
@@ -11,9 +12,11 @@ export default function RepoOnboarderCard({
   repositories,
   onOnboarded,
   onViewCatalog,
+  onDeleted,
 }) {
   const [tab, setTab] = useState("github"); // "github" | "demo"
   const [authStatus, setAuthStatus] = useState({ configured: false, authenticated: false, user: null });
+  const [deletingId, setDeletingId] = useState(null);
   const [ghRepos, setGhRepos] = useState([]);
   const [loadingGhRepos, setLoadingGhRepos] = useState(false);
   const [search, setSearch] = useState("");
@@ -142,6 +145,24 @@ export default function RepoOnboarderCard({
       setErrorMsg(err.message);
       setOnboarding(false);
       setStatusMsg("");
+    }
+  }
+
+  async function handleDeleteRepo(repoId, repoName) {
+    if (!window.confirm(`Are you sure you want to remove '${repoName}'?`)) {
+      return;
+    }
+    setDeletingId(repoId);
+    setErrorMsg("");
+    try {
+      await deleteRepository(repoId);
+      if (onDeleted) {
+        onDeleted(repoId);
+      }
+    } catch (err) {
+      setErrorMsg(err.message || "Failed to remove repository");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -365,21 +386,34 @@ export default function RepoOnboarderCard({
                         <span className={`badge badge-${repo.source_type}`}>{repo.source_type}</span>
                       </div>
 
-                      {isOnboarding ? (
-                        <span className="badge badge-warn status-pulse">
-                          <span className="spinner spinner-xs" /> Analyzing…
-                        </span>
-                      ) : isFailed ? (
-                        <span className="badge badge-err">Failed</span>
-                      ) : (
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => onViewCatalog(repo)}
-                        >
-                          View Catalog →
-                        </button>
-                      )}
+                      <div className="repo-card-actions">
+                        {isOnboarding ? (
+                          <span className="badge badge-warn status-pulse">
+                            <span className="spinner spinner-xs" /> Analyzing…
+                          </span>
+                        ) : isFailed ? (
+                          <span className="badge badge-err">Failed</span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => onViewCatalog(repo)}
+                          >
+                            View Catalog →
+                          </button>
+                        )}
+                        {!isOnboarding && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm btn-danger"
+                            title={`Remove ${repo.name}`}
+                            onClick={() => handleDeleteRepo(repo.id, repo.name)}
+                            disabled={deletingId === repo.id}
+                          >
+                            {deletingId === repo.id ? "…" : "Remove"}
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <p className="repo-source-sub"><code>{repo.source}</code></p>

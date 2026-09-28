@@ -8,6 +8,7 @@ export default function RepositoriesPage({
   error,
   onRefresh,
   onOnboarded,
+  onDeleted,
 }) {
   const [selectedRepo, setSelectedRepo] = useState(null);
 
@@ -44,6 +45,7 @@ export default function RepositoriesPage({
       <RepoOnboarderCard
         repositories={repositories}
         onOnboarded={onOnboarded}
+        onDeleted={onDeleted}
         onViewCatalog={handleViewCatalog}
       />
 

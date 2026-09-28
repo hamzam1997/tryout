@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     port: int = 8080
     debug: bool = Field(default=False, validation_alias="FLASK_DEBUG")
 
+    # Database settings: standard SQLAlchemy connection string (e.g. PostgreSQL, Cloud SQL)
+    # If not set, falls back to SQLite file at database_path.
+    database_url: str = Field(default="", validation_alias="DATABASE_URL")
     database_path: Path = BASE_DIR / "tryout.db"
 
     model_extraction: str = "gemini-2.5-flash"
@@ -43,7 +46,6 @@ class Settings(BaseSettings):
     github_client_secret: str = ""
     github_redirect_uri: str = ""
     repos_cache_dir: Path = BASE_DIR / "cloned_repos"
-    gcs_db_bucket: str = ""
 
     def require_project(self) -> str:
         """Return the Cloud project, raising if it is not configured."""

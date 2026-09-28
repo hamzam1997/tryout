@@ -89,6 +89,10 @@ export function getRepositoryCatalog(id) {
   return fetch(`/repositories/${id}/catalog`).then(parse);
 }
 
+export function deleteRepository(id) {
+  return fetch(`/repositories/${id}`, { method: "DELETE" }).then(parse);
+}
+
 export function onboardRepository({ sourceType, repoFullName, branch, path, forceRefresh }) {
   const payload = {
     source_type: sourceType,

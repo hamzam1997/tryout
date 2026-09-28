@@ -127,3 +127,26 @@ class RepositoriesViewTestCase(unittest.TestCase):
     def test_get_nonexistent_repository(self):
         resp = self.client.get("/repositories/9999")
         self.assertEqual(resp.status_code, 404)
+
+    def test_delete_repository(self):
+        # Create a repo
+        repo = db.create_repository(
+            Repository(
+                name="to-delete",
+                source="https://github.com/org/to-delete",
+                source_type=RepoSource.GITHUB,
+            )
+        )
+        self.assertIsNotNone(db.get_repository(repo.id))
+
+        # Delete it via API
+        resp = self.client.delete(f"/repositories/{repo.id}")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.get_json()["id"], repo.id)
+
+        # Verify it's gone
+        self.assertIsNone(db.get_repository(repo.id))
+
+    def test_delete_nonexistent_repository(self):
+        resp = self.client.delete("/repositories/9999")
+        self.assertEqual(resp.status_code, 404)

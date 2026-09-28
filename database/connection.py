@@ -40,27 +40,65 @@ def get_engine() -> Engine:
     """Return or initialize the singleton SQLAlchemy Engine."""
     global _engine
     if _engine is None:
-        db_file = database_path()
-        db_file.parent.mkdir(parents=True, exist_ok=True)
-        engine = create_engine(
-            f"sqlite:///{db_file}",
-            # Background idea extraction runs in worker threads.
-            connect_args={
-                "timeout": BUSY_TIMEOUT_MS / 1000,
-                "check_same_thread": False,
-            },
-            echo=False,
-            future=True,
-        )
+        if _db_path is not None:
+            # Explicit path set (e.g. by unit tests)
+            db_file = Path(_db_path)
+            db_file.parent.mkdir(parents=True, exist_ok=True)
+            engine = create_engine(
+                f"sqlite:///{db_file}",
+                connect_args={
+                    "timeout": BUSY_TIMEOUT_MS / 1000,
+                    "check_same_thread": False,
+                },
+                echo=False,
+                future=True,
+            )
 
-        @event.listens_for(engine, "connect")
-        def set_sqlite_pragma(dbapi_connection, connection_record):
-            cursor = dbapi_connection.cursor()
-            cursor.execute("PRAGMA foreign_keys=ON")
-            cursor.execute(f"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}")
-            cursor.close()
+            @event.listens_for(engine, "connect")
+            def set_sqlite_pragma(dbapi_connection, connection_record):
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.execute(f"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}")
+                cursor.close()
 
-        _engine = engine
+            _engine = engine
+
+        elif settings.database_url.strip():
+            # Production database connection (PostgreSQL / Cloud SQL)
+            db_url = settings.database_url.strip()
+            if db_url.startswith("postgres://"):
+                db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+            engine = create_engine(
+                db_url,
+                pool_pre_ping=True,
+                pool_size=10,
+                max_overflow=20,
+                echo=False,
+                future=True,
+            )
+            _engine = engine
+
+        else:
+            # Default local SQLite file
+            db_file = settings.database_path
+            db_file.parent.mkdir(parents=True, exist_ok=True)
+            engine = create_engine(
+                f"sqlite:///{db_file}",
+                connect_args={"timeout": BUSY_TIMEOUT_MS / 1000},
+                echo=False,
+                future=True,
+            )
+
+            @event.listens_for(engine, "connect")
+            def set_sqlite_pragma(dbapi_connection, connection_record):
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.execute(f"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}")
+                cursor.close()
+
+            _engine = engine
+
     return _engine
 
 

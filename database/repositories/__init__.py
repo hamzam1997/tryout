@@ -35,6 +35,7 @@ from database.repositories.meeting import (
 from database.repositories.repository import (
     catalog_is_current,
     create_repository,
+    delete_repository,
     get_or_create_repository,
     get_repository,
     get_repository_by_source,
@@ -48,6 +49,7 @@ __all__ = [
     # Repository
     "catalog_is_current",
     "create_repository",
+    "delete_repository",
     "get_or_create_repository",
     "get_repository",
     "get_repository_by_source",

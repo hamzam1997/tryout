@@ -55,6 +55,23 @@ def get_repository_catalog(repo_id: int):
     return jsonify(repo.catalog.model_dump(mode="json"))
 
 
+@bp.delete("/<int:repo_id>")
+def delete_repository(repo_id: int):
+    """Delete an onboarded repository."""
+    repo = db.get_repository(repo_id)
+    if not repo:
+        return jsonify({"error": f"Repository {repo_id} not found."}), 404
+
+    deleted = db.delete_repository(repo_id)
+    if not deleted:
+        return jsonify({"error": f"Failed to delete repository {repo_id}."}), 500
+
+    return (
+        jsonify({"message": f"Repository '{repo.name}' deleted successfully.", "id": repo_id}),
+        200,
+    )
+
+
 def _run_demo_onboarding(repo_id: int, force_refresh: bool) -> None:
     """Background worker for Demo repo onboarding."""
     try:

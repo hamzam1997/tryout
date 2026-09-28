@@ -153,6 +153,10 @@ export default function App() {
     });
   }
 
+  function handleRepoDeleted(repoId) {
+    setRepositories((current) => current.filter((r) => r.id !== repoId));
+  }
+
   async function handleRetryIdeas(meetingId) {
     setRetryingId(meetingId);
     setError("");
@@ -261,6 +265,7 @@ export default function App() {
             error={error}
             onRefresh={refresh}
             onOnboarded={handleRepoOnboarded}
+            onDeleted={handleRepoDeleted}
           />
         ) : view === "meetings" ? (
           <MeetingsPage
