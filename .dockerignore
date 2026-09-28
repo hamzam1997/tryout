@@ -34,6 +34,5 @@ __pycache__/
 
 # Not needed at runtime
 tests/
-demo_repo/
 *.log
 .DS_Store
