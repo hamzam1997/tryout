@@ -53,6 +53,20 @@ def _ensure_meeting_ideas_error_column(engine) -> None:
         conn.commit()
 
 
+def _ensure_repository_status_columns(engine) -> None:
+    """Add repository.catalog_status and catalog_error on existing SQLite DBs."""
+    inspector = inspect(engine)
+    if "repository" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("repository")}
+    with engine.connect() as conn:
+        if "catalog_status" not in columns:
+            conn.execute(text("ALTER TABLE repository ADD COLUMN catalog_status VARCHAR(32) DEFAULT 'ready' NOT NULL"))
+        if "catalog_error" not in columns:
+            conn.execute(text("ALTER TABLE repository ADD COLUMN catalog_error TEXT"))
+        conn.commit()
+
+
 def init_db() -> None:
     """Create tables and indexes via SQLAlchemy metadata and ensure WAL mode."""
     db_file = database_path()
@@ -72,3 +86,4 @@ def init_db() -> None:
         _recreate_idea_dependent_tables(engine)
     Base.metadata.create_all(bind=engine)
     _ensure_meeting_ideas_error_column(engine)
+    _ensure_repository_status_columns(engine)
