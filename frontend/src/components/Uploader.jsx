@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { uploadTranscript } from "../api";
+import { loadDemoMeeting, uploadTranscript } from "../api";
 
 const ACCEPTED = [".vtt", ".srt", ".txt"];
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -70,11 +70,35 @@ export default function Uploader({ onUploaded }) {
     }
   }
 
+  async function handleLoadDemo() {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await loadDemoMeeting();
+      clear();
+      onUploaded(result);
+    } catch (problem) {
+      setError(problem.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="card">
       <div className="card-head">
-        <h2>Upload a transcript</h2>
-        <span className="card-hint">{ACCEPTED.join(", ")} · max 2MB</span>
+        <div>
+          <h2>Upload a transcript</h2>
+          <span className="card-hint">{ACCEPTED.join(", ")} · max 2MB</span>
+        </div>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={handleLoadDemo}
+          disabled={busy}
+        >
+          {busy ? "Loading…" : "Load Demo Transcript (Acme Store)"}
+        </button>
       </div>
 
       <div className="card-body">

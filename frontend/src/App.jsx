@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
+import RepositoriesPage from "./pages/RepositoriesPage";
 import MeetingsPage from "./pages/MeetingsPage";
 import IdeasPage from "./pages/IdeasPage";
-import { health, listMeetings } from "./api";
+import { health, listMeetings, listRepositories } from "./api";
 import "./styles/global.css";
 
 export default function App() {
-  const [view, setView] = useState("meetings");
+  const [view, setView] = useState("repositories");
+  const [repositories, setRepositories] = useState([]);
   const [meetings, setMeetings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -16,7 +18,12 @@ export default function App() {
     setLoading(true);
     setError("");
     try {
-      setMeetings(await listMeetings());
+      const [reposData, meetingsData] = await Promise.all([
+        listRepositories(),
+        listMeetings(),
+      ]);
+      setRepositories(reposData);
+      setMeetings(meetingsData);
       setOnline(true);
     } catch (problem) {
       setError(problem.message);
@@ -32,8 +39,14 @@ export default function App() {
   }, [refresh]);
 
   function handleUploaded(result) {
-    // The response carries the finished meeting, so show it without a round trip.
     setMeetings((current) => [result.meeting, ...current]);
+  }
+
+  function handleRepoOnboarded(newRepo) {
+    setRepositories((current) => {
+      const filtered = current.filter((r) => r.id !== newRepo.id);
+      return [newRepo, ...filtered];
+    });
   }
 
   return (
@@ -41,12 +54,24 @@ export default function App() {
       <Sidebar
         view={view}
         onNavigate={setView}
-        counts={{ meetings: meetings.length, ideas: 0 }}
+        counts={{
+          repositories: repositories.length,
+          meetings: meetings.length,
+          ideas: 0,
+        }}
         online={online}
       />
 
       <main className="main">
-        {view === "meetings" ? (
+        {view === "repositories" ? (
+          <RepositoriesPage
+            repositories={repositories}
+            loading={loading}
+            error={error}
+            onRefresh={refresh}
+            onOnboarded={handleRepoOnboarded}
+          />
+        ) : view === "meetings" ? (
           <MeetingsPage
             meetings={meetings}
             loading={loading}

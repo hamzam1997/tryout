@@ -37,6 +37,13 @@ class Settings(BaseSettings):
 
     execution_timeout_seconds: int = Field(default=60, gt=0)
 
+    # Session and GitHub OAuth settings
+    secret_key: str = "tryout-dev-secret-key-change-in-prod"
+    github_client_id: str = ""
+    github_client_secret: str = ""
+    github_redirect_uri: str = ""
+    repos_cache_dir: Path = BASE_DIR / "cloned_repos"
+
     def require_project(self) -> str:
         """Return the Cloud project, raising if it is not configured."""
         if not self.google_cloud_project:
