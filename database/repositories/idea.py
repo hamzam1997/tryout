@@ -148,3 +148,13 @@ def update_idea(idea: Idea) -> Idea:
             model.approved_by = idea.approved_by
             model.approved_at = idea.approved_at
     return idea
+
+
+def delete_idea(idea_id: int) -> bool:
+    """Delete an idea and cascaded attempts. Returns False if missing."""
+    with session_scope() as session:
+        model = session.get(IdeaModel, idea_id)
+        if model is None:
+            return False
+        session.delete(model)
+        return True

@@ -5,6 +5,8 @@ import MeetingsPage from "./pages/MeetingsPage";
 import IdeasPage from "./pages/IdeasPage";
 import {
   approveIdea,
+  deleteIdea,
+  deleteMeeting,
   extractIdeas,
   health,
   listIdeas,
@@ -35,6 +37,7 @@ export default function App() {
   const [ideasError, setIdeasError] = useState("");
   const [busyId, setBusyId] = useState(null);
   const [retryingId, setRetryingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const [online, setOnline] = useState(null);
   const pollRef = useRef(null);
 
@@ -176,11 +179,11 @@ export default function App() {
     }
   }
 
-  async function handleApprove(ideaId) {
+  async function handleApprove(ideaId, approvedBy) {
     setBusyId(ideaId);
     setIdeasError("");
     try {
-      const updated = await approveIdea(ideaId);
+      const updated = await approveIdea(ideaId, approvedBy);
       setIdeas((current) =>
         current.map((idea) => (idea.id === updated.id ? { ...idea, ...updated } : idea))
       );
@@ -203,6 +206,35 @@ export default function App() {
       setIdeasError(problem.message);
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function handleDeleteMeeting(meetingId) {
+    if (!window.confirm("Delete this meeting and its ideas?")) return;
+    setDeletingId(`meeting-${meetingId}`);
+    setError("");
+    try {
+      await deleteMeeting(meetingId);
+      setMeetings((current) => current.filter((meeting) => meeting.id !== meetingId));
+      setIdeas((current) => current.filter((idea) => idea.meeting_id !== meetingId));
+    } catch (problem) {
+      setError(problem.message);
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleDeleteIdea(ideaId) {
+    if (!window.confirm("Delete this idea?")) return;
+    setDeletingId(`idea-${ideaId}`);
+    setIdeasError("");
+    try {
+      await deleteIdea(ideaId);
+      setIdeas((current) => current.filter((idea) => idea.id !== ideaId));
+    } catch (problem) {
+      setIdeasError(problem.message);
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -236,9 +268,15 @@ export default function App() {
             loading={loading}
             error={error}
             retryingId={retryingId}
+            deletingId={
+              deletingId?.startsWith("meeting-")
+                ? Number(deletingId.slice("meeting-".length))
+                : null
+            }
             onUploaded={handleUploaded}
             onRefresh={refresh}
             onRetryIdeas={handleRetryIdeas}
+            onDelete={handleDeleteMeeting}
           />
         ) : (
           <IdeasPage
@@ -246,8 +284,14 @@ export default function App() {
             loading={loading}
             error={ideasError || error}
             busyId={busyId}
+            deletingId={
+              deletingId?.startsWith("idea-")
+                ? Number(deletingId.slice("idea-".length))
+                : null
+            }
             onApprove={handleApprove}
             onReject={handleReject}
+            onDelete={handleDeleteIdea}
             onRefresh={refresh}
           />
         )}

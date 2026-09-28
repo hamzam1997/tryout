@@ -90,6 +90,15 @@ class TestIdeasApi(unittest.TestCase):
         response = self.client.get("/ideas/9999")
         self.assertEqual(response.status_code, 404)
 
+    def test_delete_idea(self):
+        response = self.client.delete(f"/ideas/{self.idea.id}")
+        self.assertEqual(response.status_code, 204)
+        self.assertIsNone(db.get_idea(self.idea.id))
+        self.assertIsNotNone(db.get_meeting(self.meeting.id))
+
+        missing = self.client.delete("/ideas/9999")
+        self.assertEqual(missing.status_code, 404)
+
 
 if __name__ == "__main__":
     unittest.main()

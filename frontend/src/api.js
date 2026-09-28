@@ -17,6 +17,13 @@ export function getMeeting(id) {
   return fetch(`/meetings/${id}`).then(parse);
 }
 
+export function deleteMeeting(id) {
+  return fetch(`/meetings/${id}`, { method: "DELETE" }).then(async (response) => {
+    if (response.status === 204) return true;
+    return parse(response);
+  });
+}
+
 export function uploadTranscript({ file, title, occurredAt }) {
   const form = new FormData();
   form.append("file", file);
@@ -60,6 +67,13 @@ export function approveIdea(id, approvedBy = "local") {
 
 export function rejectIdea(id) {
   return fetch(`/ideas/${id}/reject`, { method: "POST" }).then(parse);
+}
+
+export function deleteIdea(id) {
+  return fetch(`/ideas/${id}`, { method: "DELETE" }).then(async (response) => {
+    if (response.status === 204) return true;
+    return parse(response);
+  });
 }
 
 // Repositories API

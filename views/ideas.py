@@ -86,3 +86,11 @@ def reject_idea(idea_id: int):
 
     db.set_idea_status(idea_id, IdeaStatus.REJECTED)
     return jsonify(_serialise(db.get_idea(idea_id)))
+
+
+@bp.delete("/<int:idea_id>")
+def delete_idea(idea_id: int):
+    """Delete an idea and its cascaded attempts."""
+    if not db.delete_idea(idea_id):
+        return jsonify({"error": "idea not found"}), 404
+    return "", 204

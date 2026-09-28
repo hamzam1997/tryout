@@ -16,7 +16,7 @@ db.set_database_path(Path(_BOOTSTRAP.name) / "bootstrap.db")
 
 import app as flask_app  # noqa: E402
 from agents.note_taker import NoteTakerError  # noqa: E402
-from schemas import MeetingMinutes, MeetingSource, MeetingStatus  # noqa: E402
+from schemas import Idea, MeetingMinutes, MeetingSource, MeetingStatus  # noqa: E402
 
 VTT = """WEBVTT
 
@@ -173,6 +173,24 @@ class TestReadEndpoints(IngestionTestCase):
 
     def test_get_unknown_meeting_is_404(self):
         self.assertEqual(self.client.get("/meetings/9999").status_code, 404)
+
+    @mock.patch("agents.note_taker.generate_minutes", return_value=MINUTES)
+    def test_delete_meeting_cascades_ideas(self, _):
+        meeting_id = upload(self.client).get_json()["meeting"]["id"]
+        db.create_idea(
+            Idea(
+                meeting_id=meeting_id,
+                title="Notify delayed refunds",
+                idea_key="notify-delayed-refunds",
+            )
+        )
+        self.assertEqual(len(db.list_ideas(meeting_id=meeting_id)), 1)
+
+        response = self.client.delete(f"/meetings/{meeting_id}")
+        self.assertEqual(response.status_code, 204)
+        self.assertIsNone(db.get_meeting(meeting_id))
+        self.assertEqual(db.list_ideas(meeting_id=meeting_id), [])
+        self.assertEqual(self.client.delete("/meetings/9999").status_code, 404)
 
 
 if __name__ == "__main__":

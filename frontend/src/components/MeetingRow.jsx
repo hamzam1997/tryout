@@ -1,20 +1,12 @@
 import { useState } from "react";
+import { formatRelative, formatSource } from "../lib/format";
 
 const BADGES = {
-  PROCESSED: ["badge-ok", "Processed"],
+  PROCESSED: ["badge-ok", "Ready"],
   PROCESSING: ["badge-warn", "Processing"],
   FAILED: ["badge-err", "Failed"],
-  PENDING: ["badge-idle", "Pending"],
+  PENDING: ["badge-idle", "Queued"],
 };
-
-function formatDate(value) {
-  if (!value) return null;
-  return new Date(value).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 function speakersIn(transcript = "") {
   const found = new Set();
@@ -25,16 +17,23 @@ function speakersIn(transcript = "") {
   return [...found];
 }
 
-export default function MeetingRow({ meeting, retrying, onRetryIdeas }) {
+export default function MeetingRow({
+  meeting,
+  retrying,
+  deleting,
+  onRetryIdeas,
+  onDelete,
+}) {
   const minutesRunning =
     meeting.status === "PROCESSING" || meeting.status === "PENDING";
   const ideasFailed = meeting.ideas_status === "FAILED" || Boolean(meeting.ideas_error);
   const ideasRunning = meeting.ideas_status === "PROCESSING";
+  const pipelineRunning = minutesRunning || ideasRunning;
   const [open, setOpen] = useState(ideasFailed);
   const [showTranscript, setShowTranscript] = useState(false);
 
   const [badgeClass, badgeLabel] = BADGES[meeting.status] ?? BADGES.PENDING;
-  const when = formatDate(meeting.occurred_at ?? meeting.created_at);
+  const when = formatRelative(meeting.occurred_at ?? meeting.created_at);
   const minutes = meeting.minutes;
   const keyPoints = minutes?.key_points ?? [];
   const actions = minutes?.action_items ?? [];
@@ -42,8 +41,18 @@ export default function MeetingRow({ meeting, retrying, onRetryIdeas }) {
   const canRetryIdeas =
     meeting.status === "PROCESSED" && meeting.ideas_status !== "PROCESSING";
 
+  const statusLabel = minutesRunning
+    ? "Writing minutes"
+    : ideasRunning
+      ? "Extracting ideas"
+      : badgeLabel;
+
   return (
-    <article className={`row${open ? " is-open" : ""}`}>
+    <article
+      className={`row${open ? " is-open" : ""}${pipelineRunning ? " is-processing" : ""}`}
+    >
+      {pipelineRunning && <div className="row-progress" aria-hidden="true" />}
+
       <button
         type="button"
         className="row-header"
@@ -53,31 +62,37 @@ export default function MeetingRow({ meeting, retrying, onRetryIdeas }) {
         <span className="row-main">
           <span className="row-title">{meeting.title}</span>
           <span className="row-meta">
-            {when && <span>{when}</span>}
+            {when && (
+              <time dateTime={meeting.occurred_at ?? meeting.created_at}>{when}</time>
+            )}
             {when && <span className="sep">·</span>}
-            <span>{meeting.external_source}</span>
+            <span>{formatSource(meeting.external_source)}</span>
             {speakers.length > 0 && (
               <>
                 <span className="sep">·</span>
-                <span>{speakers.length} speakers</span>
+                <span>
+                  {speakers.length} speaker{speakers.length === 1 ? "" : "s"}
+                </span>
               </>
             )}
             {actions.length > 0 && (
               <>
                 <span className="sep">·</span>
-                <span>{actions.length} action {actions.length === 1 ? "item" : "items"}</span>
+                <span>
+                  {actions.length} action{actions.length === 1 ? "" : "s"}
+                </span>
               </>
             )}
             {minutesRunning && (
               <>
                 <span className="sep">·</span>
-                <span className="meta-warn">Writing minutes…</span>
+                <span className="meta-live">Writing minutes…</span>
               </>
             )}
             {!minutesRunning && ideasRunning && (
               <>
                 <span className="sep">·</span>
-                <span className="meta-warn">Extracting ideas…</span>
+                <span className="meta-live">Extracting ideas…</span>
               </>
             )}
             {ideasFailed && (
@@ -89,7 +104,10 @@ export default function MeetingRow({ meeting, retrying, onRetryIdeas }) {
           </span>
         </span>
 
-        <span className={`badge ${badgeClass}`}>{badgeLabel}</span>
+        <span className={`badge ${pipelineRunning ? "badge-warn" : badgeClass}`}>
+          {pipelineRunning && <span className="spinner" />}
+          {statusLabel}
+        </span>
 
         <svg className="chevron" viewBox="0 0 20 20" aria-hidden="true">
           <path d="m6 8 4 4 4-4" />
@@ -99,21 +117,27 @@ export default function MeetingRow({ meeting, retrying, onRetryIdeas }) {
       {open && (
         <div className="row-detail">
           {minutesRunning && (
-            <section className="detail">
-              <h4 className="detail-label">Minutes</h4>
+            <section className="detail status-panel">
+              <div className="status-panel-head">
+                <span className="spinner spinner-muted" />
+                <h4 className="detail-label">Generating minutes</h4>
+              </div>
               <p className="detail-note">
-                Minutes are generating in the background. Ideas will follow
-                automatically when they finish.
+                Gemini is summarizing the transcript. Catalog-grounded ideas start
+                automatically when minutes land — keep this tab open or come back later.
               </p>
             </section>
           )}
 
           {!minutesRunning && ideasRunning && (
-            <section className="detail">
-              <h4 className="detail-label">Ideas</h4>
+            <section className="detail status-panel">
+              <div className="status-panel-head">
+                <span className="spinner spinner-muted" />
+                <h4 className="detail-label">Extracting ideas</h4>
+              </div>
               <p className="detail-note">
-                Idea extraction is running in the background. This page refreshes
-                automatically when it finishes.
+                Matching meeting proposals to the repository catalog. New ideas will
+                show up in the Ideas inbox when this finishes.
               </p>
             </section>
           )}
@@ -125,18 +149,18 @@ export default function MeetingRow({ meeting, retrying, onRetryIdeas }) {
                 {meeting.ideas_error || "Idea extraction failed."}
               </div>
               <p className="detail-note">
-                Minutes were saved. Ideas can be retried without re-uploading the transcript.
+                Minutes were saved. Retry ideas without re-uploading the transcript.
               </p>
               {canRetryIdeas && (
                 <div className="idea-actions">
                   <button
                     type="button"
                     className="btn btn-primary"
-                    disabled={retrying}
+                    disabled={retrying || deleting}
                     onClick={() => onRetryIdeas?.(meeting.id)}
                   >
                     {retrying && <span className="spinner" />}
-                    {retrying ? "Queuing" : "Try again"}
+                    {retrying ? "Queuing…" : "Try again"}
                   </button>
                 </div>
               )}
@@ -147,26 +171,26 @@ export default function MeetingRow({ meeting, retrying, onRetryIdeas }) {
             <section className="detail ideas-retry">
               <h4 className="detail-label">Ideas</h4>
               <p className="detail-note">
-                Re-queue catalog-grounded idea extraction for this meeting if the inbox looks empty.
+                Re-run catalog-grounded extraction if the inbox looks empty or stale.
               </p>
               <div className="idea-actions">
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  disabled={retrying}
+                  disabled={retrying || deleting}
                   onClick={() => onRetryIdeas?.(meeting.id)}
                 >
                   {retrying && <span className="spinner" />}
-                  {retrying ? "Queuing" : "Extract ideas again"}
+                  {retrying ? "Queuing…" : "Extract ideas again"}
                 </button>
               </div>
             </section>
           )}
 
-          {!minutes && (
+          {!minutes && !minutesRunning && (
             <p className="detail-none">
               {meeting.status === "FAILED"
-                ? "Extraction failed, so there are no minutes. The transcript is still stored."
+                ? "Minutes failed, but the transcript is still stored."
                 : "No minutes yet."}
             </p>
           )}
@@ -228,6 +252,18 @@ export default function MeetingRow({ meeting, retrying, onRetryIdeas }) {
               )}
             </section>
           )}
+
+          <div className="row-footer">
+            <button
+              type="button"
+              className="btn btn-ghost btn-danger"
+              disabled={deleting || pipelineRunning}
+              onClick={() => onDelete?.(meeting.id)}
+            >
+              {deleting && <span className="spinner spinner-muted" />}
+              {deleting ? "Deleting…" : "Delete meeting"}
+            </button>
+          </div>
         </div>
       )}
     </article>

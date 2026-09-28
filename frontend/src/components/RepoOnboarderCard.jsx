@@ -155,9 +155,10 @@ export default function RepoOnboarderCard({
     <div className="card onboarding-card">
       <div className="card-head">
         <div>
-          <h2>Repository Onboarding</h2>
+          <h2>Onboard a repository</h2>
           <p className="card-hint">
-            Connect a codebase. Gemini 2.5 Flash analyzes its architecture in the background and builds a shared catalog.
+            Connect once. Gemini maps modules, routes, and owners into a catalog
+            that later ideas must ground against.
           </p>
         </div>
       </div>
@@ -326,7 +327,14 @@ export default function RepoOnboarderCard({
                 onClick={handleOnboardDemo}
                 disabled={onboarding}
               >
-                {onboarding ? "Starting…" : "Connect Demo Repo (acme-store)"}
+                {onboarding ? (
+                  <>
+                    <span className="spinner" />
+                    Starting…
+                  </>
+                ) : (
+                  "Connect Acme Store demo"
+                )}
               </button>
             </div>
           </div>
@@ -362,7 +370,7 @@ export default function RepoOnboarderCard({
                           <span className="spinner spinner-xs" /> Analyzing…
                         </span>
                       ) : isFailed ? (
-                        <span className="badge badge-error">Failed</span>
+                        <span className="badge badge-err">Failed</span>
                       ) : (
                         <button
                           type="button"

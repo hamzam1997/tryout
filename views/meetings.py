@@ -151,3 +151,11 @@ def get_meeting(meeting_id: int):
     if meeting is None:
         return jsonify({"error": "meeting not found"}), 404
     return jsonify(_serialise(meeting))
+
+
+@bp.delete("/<int:meeting_id>")
+def delete_meeting(meeting_id: int):
+    """Delete a meeting and its cascaded ideas/attempts."""
+    if not db.delete_meeting(meeting_id):
+        return jsonify({"error": "meeting not found"}), 404
+    return "", 204
