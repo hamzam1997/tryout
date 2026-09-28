@@ -1155,6 +1155,42 @@ svg { flex: none; }
 .repo-card-actions { display: flex; align-items: center; gap: var(--s-2); flex-shrink: 0; }
 .btn-danger { color: var(--error); border-color: transparent; }
 .btn-danger:hover { background: rgba(186, 26, 26, 0.08); color: var(--error); border-color: rgba(186, 26, 26, 0.2); }
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-full);
+  background: transparent;
+  cursor: pointer;
+  color: var(--on-surface-muted);
+  transition: background 150ms var(--ease), color 150ms var(--ease);
+}
+
+.icon-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.icon-btn.btn-danger { color: var(--error); }
+.icon-btn.btn-danger:hover:not(:disabled) {
+  background: var(--error-container);
+  color: var(--error);
+}
 .repo-source-sub code { font-size: var(--text-label); color: var(--on-surface-muted); word-break: break-all; }
 .repo-card-stats { font-size: var(--text-label); color: var(--on-surface-variant); }
 
