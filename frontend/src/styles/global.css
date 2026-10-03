@@ -1053,13 +1053,6 @@ svg { flex: none; }
   margin-top: var(--s-2);
 }
 
-.approver-field {
-  flex: 1 1 180px;
-  max-width: 240px;
-}
-
-.approver-field .input { height: 40px; }
-
 .btn-danger { color: var(--error); }
 .btn-danger:hover:not(:disabled) {
   background: var(--error-container);

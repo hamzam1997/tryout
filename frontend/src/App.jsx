@@ -229,11 +229,11 @@ export default function App() {
     }
   }
 
-  async function handleApprove(ideaId, approvedBy) {
+  async function handleApprove(ideaId) {
     setBusyId(ideaId);
     setIdeasError("");
     try {
-      const updated = await approveIdea(ideaId, approvedBy);
+      const updated = await approveIdea(ideaId);
       setIdeas((current) =>
         ideaFilter === "PENDING"
           ? current.filter((idea) => idea.id !== updated.id)

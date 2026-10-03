@@ -65,11 +65,9 @@ export function getIdeaCounts() {
   return fetch("/ideas/counts").then(parse);
 }
 
-export function approveIdea(id, approvedBy = "local") {
+export function approveIdea(id) {
   return fetch(`/ideas/${id}/approve`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ approved_by: approvedBy }),
   }).then(parse);
 }
 
