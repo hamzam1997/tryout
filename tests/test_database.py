@@ -22,29 +22,13 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
         self._tmp.cleanup()
 
     def test_schema_initialization_and_constraints(self):
-        """Verify singular table names, schema idempotency, and foreign key cascades."""
-        with db.connect() as conn:
-            rows = conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            ).fetchall()
-        tables = {row["name"] for row in rows}
-        expected_singular = {"repository", "meeting", "idea", "attempt", "friction_log"}
-        self.assertTrue(expected_singular <= tables, f"Expected singular tables, got: {tables}")
-
+        """Verify Firestore collections, idempotency, and cascades."""
         # Idempotency check: re-running init_db preserves existing data
         repo = db.create_repository(db.Repository(name="acme", source="https://github.com/acme/store"))
         db.init_db()
         self.assertEqual(db.get_repository(repo.id).name, "acme")
 
-        # Unique constraint on repository source
-        with self.assertRaises((sqlite3.IntegrityError, db.IntegrityError)):
-            db.create_repository(db.Repository(name="duplicate", source="https://github.com/acme/store"))
-
-        # Foreign key integrity check: cannot create orphan idea
-        with self.assertRaises((sqlite3.IntegrityError, db.IntegrityError)):
-            db.create_idea(db.Idea(meeting_id=9999, title="orphan"))
-
-        # Foreign key cascades
+        # Cascades check
         meeting = db.create_meeting(db.Meeting(title="Sync", transcript="transcript"))
         idea1 = db.create_idea(db.Idea(meeting_id=meeting.id, title="Idea 1", idea_key="fp1"))
         idea2 = db.create_idea(
@@ -54,8 +38,7 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
         db.create_friction_log(db.FrictionLog(attempt_id=attempt.id, category=db.FrictionCategory.PRODUCT_DECISION))
 
         # Deleting idea1 sets idea2.original_idea_id to NULL and cascades to attempt & friction_log
-        with db.connect() as conn:
-            conn.execute("DELETE FROM idea WHERE id = ?", (idea1.id,))
+        self.assertTrue(db.delete_idea(idea1.id))
         self.assertIsNone(db.get_attempt(attempt.id))
         self.assertEqual(len(db.list_friction_logs(attempt_id=attempt.id)), 0)
         self.assertIsNone(db.get_idea(idea2.id).original_idea_id)
@@ -248,52 +231,52 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             db.count_friction_by("attempt_id; DROP TABLE friction_log")
 
-    def test_sqlalchemy_orm_relationships(self):
-        """Verify direct SQLAlchemy 2.0 ORM models, relationships, and session usage."""
-        with db.session_scope() as session:
-            repo = db.RepositoryModel(
-                name="orm-repo", source="/tmp/orm-repo", source_type="local", created_at=FIXED_TIME
-            )
-            meeting = db.MeetingModel(
-                title="ORM Design", transcript="Discussing ORM", created_at=FIXED_TIME
-            )
-            session.add_all([repo, meeting])
-            session.flush()
+    def test_firestore_documents_and_serialization(self):
+        """Verify dedicated Firestore document models, conversion to/from domain schemas."""
+        from database.documents import (
+            RepositoryDoc,
+            MeetingDoc,
+            IdeaDoc,
+            AttemptDoc,
+            FrictionLogDoc,
+        )
 
-            idea = db.IdeaModel(
-                meeting_id=meeting.id,
-                title="SQLAlchemy models",
-                created_at=FIXED_TIME,
-            )
-            session.add(idea)
-            session.flush()
+        repo = db.create_repository(
+            db.Repository(name="fs-repo", source="/tmp/fs-repo", source_type=db.RepoSource.LOCAL)
+        )
+        meeting = db.create_meeting(
+            db.Meeting(title="Firestore Design", transcript="Discussing Firestore")
+        )
+        idea = db.create_idea(
+            db.Idea(meeting_id=meeting.id, title="Firestore models")
+        )
+        attempt = db.create_attempt(
+            db.Attempt(idea_id=idea.id, repository_id=repo.id, status=db.AttemptStatus.PLANNING)
+        )
+        flog = db.create_friction_log(
+            db.FrictionLog(attempt_id=attempt.id, category=db.FrictionCategory.PRODUCT_DECISION)
+        )
 
-            attempt = db.AttemptModel(
-                idea_id=idea.id,
-                repository_id=repo.id,
-                status="PLANNING",
-                created_at=FIXED_TIME,
-            )
-            session.add(attempt)
-            session.flush()
+        # Verify Document models convert correctly
+        m_doc = MeetingDoc.from_domain(meeting)
+        self.assertEqual(m_doc.title, "Firestore Design")
+        self.assertEqual(m_doc.to_domain().title, meeting.title)
 
-            flog = db.FrictionLogModel(
-                attempt_id=attempt.id,
-                category="PRODUCT_DECISION",
-                created_at=FIXED_TIME,
-            )
-            session.add(flog)
+        i_doc = IdeaDoc.from_domain(idea)
+        self.assertEqual(i_doc.meeting_id, meeting.id)
+        self.assertEqual(i_doc.to_domain().title, idea.title)
 
-        # In a new session, verify relationships load seamlessly
-        with db.session_scope() as session:
-            loaded_meeting = session.get(db.MeetingModel, meeting.id)
-            self.assertEqual(len(loaded_meeting.ideas), 1)
-            self.assertEqual(loaded_meeting.ideas[0].title, "SQLAlchemy models")
+        r_doc = RepositoryDoc.from_domain(repo)
+        self.assertEqual(r_doc.name, "fs-repo")
+        self.assertEqual(r_doc.to_domain().name, repo.name)
 
-            loaded_attempt = session.get(db.AttemptModel, attempt.id)
-            self.assertEqual(loaded_attempt.repository.name, "orm-repo")
-            self.assertEqual(loaded_attempt.idea.title, "SQLAlchemy models")
-            self.assertEqual(len(loaded_attempt.friction_logs), 1)
+        a_doc = AttemptDoc.from_domain(attempt)
+        self.assertEqual(a_doc.status, "PLANNING")
+        self.assertEqual(a_doc.to_domain().status, db.AttemptStatus.PLANNING)
+
+        f_doc = FrictionLogDoc.from_domain(flog)
+        self.assertEqual(f_doc.category, db.FrictionCategory.PRODUCT_DECISION.value)
+        self.assertEqual(f_doc.to_domain().category, db.FrictionCategory.PRODUCT_DECISION)
 
 
 if __name__ == "__main__":

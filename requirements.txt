@@ -4,8 +4,8 @@ google-genai==2.25.0
 pydantic==2.13.5
 pydantic-settings==2.15.0
 requests==2.34.2
-SQLAlchemy==2.0.36
-psycopg2-binary==2.9.10
+google-cloud-firestore>=2.16.0
+firebase-admin>=6.5.0
 
 # Pulled in by pydantic-settings; pinned here to keep builds reproducible.
 python-dotenv==1.2.3

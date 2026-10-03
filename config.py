@@ -28,10 +28,8 @@ class Settings(BaseSettings):
     port: int = 8080
     debug: bool = Field(default=False, validation_alias="FLASK_DEBUG")
 
-    # Database settings: standard SQLAlchemy connection string (e.g. PostgreSQL, Cloud SQL)
-    # If not set, falls back to SQLite file at database_path.
-    database_url: str = Field(default="", validation_alias="DATABASE_URL")
-    database_path: Path = BASE_DIR / "tryout.db"
+    # Database settings: Google Cloud Firestore
+    firestore_database: str = Field(default="(default)", validation_alias="FIRESTORE_DATABASE")
 
     model_extraction: str = "gemini-2.5-flash"
     model_onboarding: str = "gemini-2.5-flash"
