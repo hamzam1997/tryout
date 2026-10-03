@@ -455,6 +455,9 @@ class Attempt(BaseModel):
     idea_id: int
     repository_id: int
     repo_ref: str | None = None
+    base_branch: str | None = None
+    branch_name: str | None = None
+    pull_request_url: str | None = None
     status: AttemptStatus = AttemptStatus.QUEUED
     plan: TechnicalPlan | None = None
     diff: str | None = None

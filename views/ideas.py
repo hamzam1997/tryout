@@ -37,6 +37,9 @@ def _latest_attempt_payload(attempt) -> dict | None:
         "id": attempt.id,
         "repository_id": attempt.repository_id,
         "repo_ref": attempt.repo_ref,
+        "base_branch": attempt.base_branch,
+        "branch_name": attempt.branch_name,
+        "pull_request_url": attempt.pull_request_url,
         "status": attempt.status.value,
         "error": attempt.error,
     }

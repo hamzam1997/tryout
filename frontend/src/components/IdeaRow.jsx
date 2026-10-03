@@ -211,6 +211,16 @@ export default function IdeaRow({
             <section className="detail attempt-result">
               <h4 className="detail-label">Attempt · {latestAttempt.status}</h4>
               {latestAttempt.error && <div className="alert alert-error">{latestAttempt.error}</div>}
+              {latestAttempt.pull_request_url && (
+                <p className="detail-note">
+                  <a href={latestAttempt.pull_request_url} target="_blank" rel="noreferrer">
+                    View pull request
+                  </a>
+                </p>
+              )}
+              {latestAttempt.branch_name && !latestAttempt.pull_request_url && (
+                <p className="detail-note">Generated branch: {latestAttempt.branch_name}</p>
+              )}
               {latestAttempt.plan && (
                 <>
                   <p className="detail-body">{latestAttempt.plan.summary}</p>

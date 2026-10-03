@@ -256,6 +256,9 @@ class AttemptDoc(BaseModel):
     idea_id: int
     repository_id: int
     repo_ref: str | None = None
+    base_branch: str | None = None
+    branch_name: str | None = None
+    pull_request_url: str | None = None
     status: str = "QUEUED"
     plan: dict[str, Any] | None = None
     diff: str | None = None
@@ -287,6 +290,9 @@ class AttemptDoc(BaseModel):
             idea_id=self.idea_id,
             repository_id=self.repository_id,
             repo_ref=self.repo_ref,
+            base_branch=self.base_branch,
+            branch_name=self.branch_name,
+            pull_request_url=self.pull_request_url,
             status=schemas.AttemptStatus(self.status),
             plan=plan_obj,
             diff=self.diff,
@@ -314,6 +320,9 @@ class AttemptDoc(BaseModel):
             idea_id=attempt.idea_id,
             repository_id=attempt.repository_id,
             repo_ref=attempt.repo_ref,
+            base_branch=attempt.base_branch,
+            branch_name=attempt.branch_name,
+            pull_request_url=attempt.pull_request_url,
             status=attempt.status.value,
             plan=plan_dict,
             diff=attempt.diff,

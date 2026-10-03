@@ -12,6 +12,7 @@ import database as db
 from agents.attempt_agent import generate_plan
 from agents.coder import CodingAgent
 from agents.git_utils import fetch_github_repository
+from agents.github_pr import create_attempt_pull_request
 from agents.repo_onboarder import compute_source_ref
 from config import settings
 from logging_setup import log_event
@@ -162,6 +163,28 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
                 attempt.test_exit_code = None
             attempt.test_stderr = ""
             db.update_attempt(attempt)
+
+            if attempt.diff:
+                published = create_attempt_pull_request(
+                    root=workspace,
+                    repository_source=repo.source,
+                    token=github_token,
+                    attempt_id=attempt.id,
+                    idea_id=idea.id,
+                    idea_title=idea.title,
+                    summary=plan.summary,
+                    repo_ref=repo_ref,
+                    change_paths=[change.path for change in batch.changes],
+                )
+                if published:
+                    attempt.branch_name, attempt.base_branch, attempt.pull_request_url = published
+                    db.update_attempt(attempt)
+                else:
+                    attempt.test_stdout += (
+                        " No GitHub remote was available, so the patch is stored here "
+                        "without a hosted pull request."
+                    )
+                    db.update_attempt(attempt)
 
         db.set_attempt_status(attempt_id, AttemptStatus.READY_FOR_REVIEW)
         log_event(logger, "attempt_jobs.completed", attempt_id=attempt_id, idea_id=attempt.idea_id)
