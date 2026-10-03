@@ -51,7 +51,11 @@ def set_attempt_status(
         AttemptStatus.CODING,
         AttemptStatus.TESTING,
     )
-    is_terminal = status in (AttemptStatus.COMPLETE, AttemptStatus.FAILED)
+    is_terminal = status in (
+        AttemptStatus.READY_FOR_REVIEW,
+        AttemptStatus.COMPLETE,
+        AttemptStatus.FAILED,
+    )
 
     client = get_firestore_client()
     doc_ref = client.collection(AttemptDoc.COLLECTION).document(str(attempt_id))
