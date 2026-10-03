@@ -6,7 +6,7 @@ Reject keeps the idea for audit without queuing an attempt.
 
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, session
 
 import database as db
 from schemas import IdeaStatus
@@ -42,13 +42,10 @@ def _serialise_summary(idea) -> dict:
 
 
 def _approved_by_from_request() -> str:
-    payload = request.get_json(silent=True) or {}
-    if isinstance(payload, dict):
-        name = (payload.get("approved_by") or "").strip()
-        if name:
-            return name
-    query_name = (request.args.get("approved_by") or "").strip()
-    return query_name or _DEFAULT_APPROVER
+    user = session.get("user") or session.get("github_user")
+    if user:
+        return (user.get("name") or user.get("login") or "").strip() or _DEFAULT_APPROVER
+    return _DEFAULT_APPROVER
 
 
 @bp.get("/counts")

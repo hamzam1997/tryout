@@ -61,14 +61,15 @@ class TestIdeasApi(unittest.TestCase):
         self.assertEqual(len(approved.get_json()), 1)
 
     def test_approve_and_reject_gates(self):
+        with self.client.session_transaction() as sess:
+            sess["user"] = {"uid": "user-123", "name": "Dana"}
         approved = self.client.post(
             f"/ideas/{self.idea.id}/approve",
-            json={"approved_by": "dana"},
         )
         self.assertEqual(approved.status_code, 200)
         body = approved.get_json()
         self.assertEqual(body["status"], "IN_PROCESS")
-        self.assertEqual(body["approved_by"], "dana")
+        self.assertEqual(body["approved_by"], "Dana")
         self.assertIsNotNone(body["approved_at"])
 
         again = self.client.post(f"/ideas/{self.idea.id}/approve")

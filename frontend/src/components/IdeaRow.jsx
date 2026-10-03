@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { getIdea } from "../api";
-import { getStoredApprover, setStoredApprover } from "../lib/approver";
 import { formatDateTime, formatPriority, formatRelative } from "../lib/format";
 import DeleteIconButton from "./DeleteIconButton";
 
@@ -16,7 +15,6 @@ export default function IdeaRow({ idea, busy, deleting, onApprove, onReject, onD
   const [details, setDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [detailsError, setDetailsError] = useState("");
-  const [approver, setApprover] = useState(() => getStoredApprover() || "local");
 
   useEffect(() => {
     if (open && !details && !loadingDetails) {
@@ -39,8 +37,7 @@ export default function IdeaRow({ idea, busy, deleting, onApprove, onReject, onD
 
   function handleApprove(event) {
     event.stopPropagation();
-    const name = setStoredApprover(approver) || "local";
-    onApprove(idea.id, name);
+    onApprove(idea.id);
   }
 
   return (
@@ -179,22 +176,11 @@ export default function IdeaRow({ idea, busy, deleting, onApprove, onReject, onD
 
           {pending && (
             <div className="idea-actions-panel">
-              <div className="field approver-field">
-                <label htmlFor={`approver-${idea.id}`}>Approved by</label>
-                <input
-                  id={`approver-${idea.id}`}
-                  className="input"
-                  value={approver}
-                  placeholder="Your name"
-                  onChange={(event) => setApprover(event.target.value)}
-                  onClick={(event) => event.stopPropagation()}
-                />
-              </div>
               <div className="idea-actions">
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={busy || deleting || !approver.trim()}
+                  disabled={busy || deleting}
                   onClick={handleApprove}
                 >
                   {busy && <span className="spinner" />}
