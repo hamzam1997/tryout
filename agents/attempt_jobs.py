@@ -172,17 +172,25 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
             db.update_attempt(attempt)
 
             if attempt.diff:
-                published = create_attempt_pull_request(
-                    root=workspace,
-                    repository_source=repo.source,
-                    token=github_token,
-                    attempt_id=attempt.id,
-                    idea_id=idea.id,
-                    idea_title=idea.title,
-                    summary=plan.summary,
-                    repo_ref=repo_ref,
-                    change_paths=[change.path for change in batch.changes],
-                )
+                try:
+                    published = create_attempt_pull_request(
+                        root=workspace,
+                        repository_source=repo.source,
+                        token=github_token,
+                        attempt_id=attempt.id,
+                        idea_id=idea.id,
+                        idea_title=idea.title,
+                        summary=plan.summary,
+                        repo_ref=repo_ref,
+                        change_paths=[change.path for change in batch.changes],
+                    )
+                except Exception as exc:
+                    # A publishing problem should not erase a useful generated patch.
+                    # Keep it available for review/retry and finish the idea workflow.
+                    logger.exception("Could not publish PR for attempt %s", attempt_id)
+                    attempt.test_stderr = f"Pull request creation failed: {exc}"
+                    db.update_attempt(attempt)
+                    published = None
                 if published:
                     attempt.branch_name, attempt.base_branch, attempt.pull_request_url = published
                     db.update_attempt(attempt)
