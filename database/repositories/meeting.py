@@ -11,6 +11,11 @@ from schemas import (
 )
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 def create_meeting(meeting: Meeting) -> Meeting:
     client = get_firestore_client()
     meeting_id = meeting.id or get_next_id("meetings")
@@ -35,31 +40,39 @@ def find_meeting_by_external_id(external_id: str) -> Meeting | None:
     if not external_id:
         return None
     client = get_firestore_client()
-    docs = list(
-        client.collection(MeetingDoc.COLLECTION)
-        .where("external_id", "==", external_id)
-        .order_by("id")
-        .stream()
-    )
-    if not docs:
+    try:
+        docs = list(
+            client.collection(MeetingDoc.COLLECTION)
+            .where("external_id", "==", external_id)
+            .stream()
+        )
+        if not docs:
+            return None
+        docs.sort(key=lambda d: d.to_dict().get("id", 0))
+        return MeetingDoc.from_doc(docs[0].to_dict()).to_domain()
+    except Exception as exc:
+        logger.warning("Could not query meeting by external_id: %s", exc)
         return None
-    return MeetingDoc.from_doc(docs[0].to_dict()).to_domain()
 
 
 def find_meeting_by_transcript(transcript: str) -> Meeting | None:
     """Return the earliest meeting with an exact transcript match (legacy rows)."""
-    if not transcript:
+    if not transcript or len(transcript.encode("utf-8")) > 1400:
         return None
     client = get_firestore_client()
-    docs = list(
-        client.collection(MeetingDoc.COLLECTION)
-        .where("transcript", "==", transcript)
-        .order_by("id")
-        .stream()
-    )
-    if not docs:
+    try:
+        docs = list(
+            client.collection(MeetingDoc.COLLECTION)
+            .where("transcript", "==", transcript)
+            .stream()
+        )
+        if not docs:
+            return None
+        docs.sort(key=lambda d: d.to_dict().get("id", 0))
+        return MeetingDoc.from_doc(docs[0].to_dict()).to_domain()
+    except Exception as exc:
+        logger.warning("Could not query meeting by transcript: %s", exc)
         return None
-    return MeetingDoc.from_doc(docs[0].to_dict()).to_domain()
 
 
 def list_meetings() -> list[Meeting]:

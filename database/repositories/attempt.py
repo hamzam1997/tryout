@@ -31,12 +31,13 @@ def list_attempts(idea_id: int | None = None) -> list[Attempt]:
     if idea_id is not None:
         query = query.where("idea_id", "==", idea_id)
 
-    docs = query.order_by("id", direction="DESCENDING").stream()
+    docs = query.stream()
     attempts = []
     for d in docs:
         data = d.to_dict()
         if data:
             attempts.append(AttemptDoc.from_doc(data).to_domain())
+    attempts.sort(key=lambda x: x.id, reverse=True)
     return attempts
 
 

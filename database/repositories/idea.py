@@ -35,12 +35,13 @@ def list_ideas(
     if meeting_id is not None:
         query = query.where("meeting_id", "==", meeting_id)
 
-    docs = query.order_by("id").stream()
+    docs = query.stream()
     ideas = []
     for d in docs:
         data = d.to_dict()
         if data:
             ideas.append(IdeaDoc.from_doc(data).to_domain())
+    ideas.sort(key=lambda x: x.id)
     return ideas
 
 

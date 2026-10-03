@@ -26,12 +26,13 @@ def list_friction_logs(attempt_id: int | None = None) -> list[FrictionLog]:
     if attempt_id is not None:
         query = query.where("attempt_id", "==", attempt_id)
 
-    docs = query.order_by("id").stream()
+    docs = query.stream()
     logs = []
     for d in docs:
         data = d.to_dict()
         if data:
             logs.append(FrictionLogDoc.from_doc(data).to_domain())
+    logs.sort(key=lambda x: x.id)
     return logs
 
 
