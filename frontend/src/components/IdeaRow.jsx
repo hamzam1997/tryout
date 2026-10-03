@@ -11,6 +11,12 @@ const BADGES = {
   REJECTED: ["badge-idle", "Rejected"],
 };
 
+function formatAttemptStatus(status) {
+  if (status === "COMPLETE") return "done";
+  if (status === "READY_FOR_REVIEW") return "ready for review";
+  return String(status || "").replaceAll("_", " ").toLowerCase();
+}
+
 export default function IdeaRow({
   idea,
   repositories = [],
@@ -106,7 +112,7 @@ export default function IdeaRow({
               <>
                 <span className="sep">·</span>
                 <span>
-                  Attempt {idea.latest_attempt.status.replaceAll("_", " ").toLowerCase()}
+                  Attempt {formatAttemptStatus(idea.latest_attempt.status)}
                 </span>
               </>
             )}
@@ -227,7 +233,9 @@ export default function IdeaRow({
 
           {latestAttempt && (
             <section className="detail attempt-result">
-              <h4 className="detail-label">Attempt · {latestAttempt.status}</h4>
+              <h4 className="detail-label">
+                Attempt · {formatAttemptStatus(latestAttempt.status)}
+              </h4>
               {latestAttempt.error && <div className="alert alert-error">{latestAttempt.error}</div>}
               {["FAILED", "READY_FOR_REVIEW"].includes(latestAttempt.status) &&
                 !latestAttempt.pull_request_url && (

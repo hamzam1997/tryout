@@ -88,7 +88,7 @@ def _relevant_context(root: Path, idea, plan, catalog) -> str:
         if step.target:
             wanted.add(step.target.strip().strip("/"))
     for file_role in catalog.key_files:
-        if any(ref in file_role.path or ref in file_role.description for ref in refs):
+        if any(ref in file_role.path or ref in file_role.role for ref in refs):
             wanted.add(file_role.path.strip().strip("/"))
     for module in catalog.modules:
         if any(ref in module.path or ref in module.name for ref in refs):
@@ -193,7 +193,10 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
                     )
                     db.update_attempt(attempt)
 
-        db.set_attempt_status(attempt_id, AttemptStatus.READY_FOR_REVIEW)
+        attempt_status = (
+            AttemptStatus.COMPLETE if attempt.pull_request_url else AttemptStatus.READY_FOR_REVIEW
+        )
+        db.set_attempt_status(attempt_id, attempt_status)
         if attempt.diff:
             idea.status = IdeaStatus.DONE
             db.update_idea(idea)
