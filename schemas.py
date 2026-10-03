@@ -40,6 +40,7 @@ class IdeaStatus(str, Enum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
     IN_PROCESS = "IN_PROCESS"
+    DONE = "DONE"
     REJECTED = "REJECTED"
 
 

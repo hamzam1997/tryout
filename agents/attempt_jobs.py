@@ -17,7 +17,7 @@ from agents.repo_onboarder import compute_source_ref
 from config import settings
 from logging_setup import log_event
 from repo_scanner.traversal import walk_repository
-from schemas import AttemptStatus, RepoSource
+from schemas import AttemptStatus, IdeaStatus, RepoSource
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +194,9 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
                     db.update_attempt(attempt)
 
         db.set_attempt_status(attempt_id, AttemptStatus.READY_FOR_REVIEW)
+        if attempt.diff:
+            idea.status = IdeaStatus.DONE
+            db.update_idea(idea)
         log_event(logger, "attempt_jobs.completed", attempt_id=attempt_id, idea_id=attempt.idea_id)
     except Exception as exc:
         logger.exception("Attempt %s failed: %s", attempt_id, exc)

@@ -4,6 +4,7 @@ import LoadingRows from "../components/LoadingRows";
 const FILTERS = [
   { id: "PENDING", label: "Needs approval" },
   { id: "IN_PROCESS", label: "In process" },
+  { id: "DONE", label: "Done" },
   { id: "REJECTED", label: "Rejected" },
   { id: "ALL", label: "All" },
 ];
@@ -19,6 +20,7 @@ export default function IdeasPage({
   busyId,
   deletingId,
   onApprove,
+  onRetryAttempt,
   onReject,
   onDelete,
 }) {
@@ -75,7 +77,9 @@ export default function IdeasPage({
               ? "Inbox clear"
               : filter === "IN_PROCESS"
                 ? "No ideas in process"
-                : "No ideas in this view"}
+                : filter === "DONE"
+                  ? "No completed ideas"
+                  : "No ideas in this view"}
           </h3>
           <p>
             {filter === "PENDING"
@@ -93,6 +97,7 @@ export default function IdeasPage({
               busy={busyId === idea.id}
               deleting={deletingId === idea.id}
               onApprove={onApprove}
+              onRetryAttempt={onRetryAttempt}
               onReject={onReject}
               onDelete={onDelete}
             />
