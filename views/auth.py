@@ -127,6 +127,25 @@ def github_callback():
     session["github_token"] = access_token
     if user_data:
         session["github_user"] = user_data
+        # Generate stable UID for GitHub user and persist to Firestore
+        gh_uid = f"github:{user_data.get('login')}"
+        session["user"] = {
+            "uid": gh_uid,
+            "email": user_json.get("email") if "user_json" in locals() and user_json.get("email") else f"{user_data.get('login')}@users.noreply.github.com",
+            "name": user_data.get("name"),
+            "avatar_url": user_data.get("avatar_url"),
+        }
+        try:
+            db.upsert_user(
+                uid=gh_uid,
+                email=session["user"]["email"],
+                name=user_data.get("name"),
+                avatar_url=user_data.get("avatar_url"),
+                provider="github",
+                github_login=user_data.get("login"),
+            )
+        except Exception as db_err:
+            logger.warning("Could not persist GitHub user to Firestore: %s", db_err)
 
     session.pop("oauth_state", None)
     session.pop("oauth_redirect_uri", None)
@@ -260,21 +279,6 @@ def github_logout():
     session.pop("github_user", None)
     return jsonify({"ok": True, "authenticated": False})
 
-
-
-@bp.get("/firebase-config")
-def firebase_config():
-    """Return non-sensitive Firebase client configuration to frontend."""
-    return jsonify(
-        {
-            "apiKey": (settings.firebase_api_key or "").strip("'\" "),
-            "authDomain": (settings.firebase_auth_domain or "").strip("'\" "),
-            "projectId": (settings.firebase_project_id or settings.google_cloud_project or "").strip("'\" "),
-            "storageBucket": (settings.firebase_storage_bucket or "").strip("'\" "),
-            "messagingSenderId": (settings.firebase_messaging_sender_id or "").strip("'\" "),
-            "appId": (settings.firebase_app_id or "").strip("'\" "),
-        }
-    )
 
 
 @bp.get("/github/repos")
