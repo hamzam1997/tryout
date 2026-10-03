@@ -21,12 +21,17 @@ import "./styles/global.css";
 
 const PIPELINE_POLL_MS = 2500;
 
-function pipelineStillRunning(meetings) {
-  return meetings.some(
-    (meeting) =>
-      meeting.status === "PROCESSING" ||
-      meeting.status === "PENDING" ||
-      meeting.ideas_status === "PROCESSING"
+function pipelineStillRunning(meetings, ideas) {
+  return (
+    meetings.some(
+      (meeting) =>
+        meeting.status === "PROCESSING" ||
+        meeting.status === "PENDING" ||
+        meeting.ideas_status === "PROCESSING"
+    ) ||
+    ideas.some((idea) =>
+      ["QUEUED", "PLANNING", "CODING", "TESTING"].includes(idea.latest_attempt?.status)
+    )
   );
 }
 
@@ -136,7 +141,7 @@ export default function App() {
 
   // Poll while minutes or idea extraction is running in the background.
   useEffect(() => {
-    if (!pipelineStillRunning(meetings)) {
+    if (!pipelineStillRunning(meetings, ideas)) {
       if (pollRef.current) {
         clearInterval(pollRef.current);
         pollRef.current = null;
@@ -148,7 +153,7 @@ export default function App() {
 
     pollRef.current = setInterval(async () => {
       const nextMeetings = await refresh({ quiet: true });
-      if (nextMeetings && !pipelineStillRunning(nextMeetings)) {
+      if (nextMeetings && !pipelineStillRunning(nextMeetings, ideas)) {
         const [nextIdeas, nextCounts] = await Promise.all([
           listIdeas(ideaFilter).catch(() => null),
           getIdeaCounts().catch(() => null),
@@ -164,7 +169,7 @@ export default function App() {
         pollRef.current = null;
       }
     };
-  }, [meetings, refresh, ideaFilter]);
+  }, [meetings, ideas, refresh, ideaFilter]);
 
   function handleUploaded(result) {
     setMeetings((current) => {
@@ -229,16 +234,17 @@ export default function App() {
     }
   }
 
-  async function handleApprove(ideaId) {
+  async function handleApprove(ideaId, repositoryId) {
     setBusyId(ideaId);
     setIdeasError("");
     try {
-      const updated = await approveIdea(ideaId);
+      const updated = await approveIdea(ideaId, repositoryId);
       setIdeas((current) =>
         ideaFilter === "PENDING"
           ? current.filter((idea) => idea.id !== updated.id)
           : current.map((idea) => (idea.id === updated.id ? { ...idea, ...updated } : idea))
       );
+      setIdeaFilter("IN_PROCESS");
       getIdeaCounts().then(setIdeaCounts).catch(() => {});
     } catch (problem) {
       setIdeasError(problem.message);
@@ -353,6 +359,7 @@ export default function App() {
         ) : (
           <IdeasPage
             ideas={ideas}
+            repositories={repositories}
             counts={ideaCounts}
             filter={ideaFilter}
             onFilterChange={handleIdeaFilterChange}

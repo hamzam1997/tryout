@@ -1048,9 +1048,27 @@ svg { flex: none; }
 .idea-actions-panel {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   gap: var(--s-4);
   margin-top: var(--s-2);
+}
+
+.repo-attempt-field { min-width: 220px; flex: 1 1 220px; }
+.attempt-steps { margin: var(--s-2) 0 0 var(--s-5); color: var(--on-surface-variant); }
+.attempt-steps li + li { margin-top: var(--s-2); }
+.attempt-diff { margin-top: var(--s-3); }
+.attempt-diff summary { cursor: pointer; color: var(--primary); }
+.attempt-diff pre {
+  max-height: 420px;
+  overflow: auto;
+  margin-top: var(--s-2);
+  padding: var(--s-3);
+  border-radius: var(--r-sm);
+  background: var(--surface-dim);
+  color: var(--on-surface);
+  white-space: pre;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-label-sm);
 }
 
 .btn-danger { color: var(--error); }

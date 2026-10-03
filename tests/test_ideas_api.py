@@ -5,10 +5,11 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import database as db
 from app import app
-from schemas import Idea, IdeaStatus, Meeting, MeetingSource
+from schemas import ArchitectureCatalog, Idea, IdeaStatus, Meeting, MeetingSource, RepoSource, Repository
 
 
 class TestIdeasApi(unittest.TestCase):
@@ -39,6 +40,15 @@ class TestIdeasApi(unittest.TestCase):
                 status=IdeaStatus.PENDING,
             )
         )
+        self.repository = db.create_repository(
+            Repository(
+                name="Refunds",
+                source=self._tmp.name,
+                source_type=RepoSource.LOCAL,
+                catalog=ArchitectureCatalog(name="Refunds"),
+                catalog_status="ready",
+            )
+        )
 
     def tearDown(self):
         db.set_database_path(None)
@@ -63,14 +73,21 @@ class TestIdeasApi(unittest.TestCase):
     def test_approve_and_reject_gates(self):
         with self.client.session_transaction() as sess:
             sess["user"] = {"uid": "user-123", "name": "Dana"}
-        approved = self.client.post(
-            f"/ideas/{self.idea.id}/approve",
-        )
-        self.assertEqual(approved.status_code, 200)
+        with patch("views.ideas.queue_attempt") as queue_attempt:
+            approved = self.client.post(
+                f"/ideas/{self.idea.id}/approve",
+                json={"repository_id": self.repository.id},
+            )
+        self.assertEqual(approved.status_code, 202)
         body = approved.get_json()
         self.assertEqual(body["status"], "IN_PROCESS")
         self.assertEqual(body["approved_by"], "Dana")
         self.assertIsNotNone(body["approved_at"])
+        self.assertEqual(body["latest_attempt"]["status"], "QUEUED")
+        attempts = db.list_attempts(idea_id=self.idea.id)
+        self.assertEqual(len(attempts), 1)
+        self.assertEqual(attempts[0].repository_id, self.repository.id)
+        queue_attempt.assert_called_once()
 
         again = self.client.post(f"/ideas/{self.idea.id}/approve")
         self.assertEqual(again.status_code, 409)

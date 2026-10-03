@@ -10,6 +10,7 @@ const FILTERS = [
 
 export default function IdeasPage({
   ideas,
+  repositories = [],
   counts,
   filter = "PENDING",
   onFilterChange,
@@ -29,8 +30,8 @@ export default function IdeasPage({
           <p className="page-kicker">Step 3 · Human gate</p>
           <h1>Ideas</h1>
           <p className="page-sub">
-            Catalog-grounded proposals from meetings. Approve with your name —
-            nothing attempts until you do.
+            Catalog-grounded proposals from meetings. Approve an idea to generate a
+            repo-specific plan and code change for review.
           </p>
         </div>
       </header>
@@ -88,6 +89,7 @@ export default function IdeasPage({
             <IdeaRow
               key={idea.id}
               idea={idea}
+              repositories={repositories}
               busy={busyId === idea.id}
               deleting={deletingId === idea.id}
               onApprove={onApprove}

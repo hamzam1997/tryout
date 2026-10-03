@@ -48,6 +48,7 @@ class AttemptStatus(str, Enum):
     PLANNING = "PLANNING"
     CODING = "CODING"
     TESTING = "TESTING"
+    READY_FOR_REVIEW = "READY_FOR_REVIEW"
     COMPLETE = "COMPLETE"
     FAILED = "FAILED"
 

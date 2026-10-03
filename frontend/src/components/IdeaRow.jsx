@@ -10,14 +10,23 @@ const BADGES = {
   REJECTED: ["badge-idle", "Rejected"],
 };
 
-export default function IdeaRow({ idea, busy, deleting, onApprove, onReject, onDelete }) {
+export default function IdeaRow({
+  idea,
+  repositories = [],
+  busy,
+  deleting,
+  onApprove,
+  onReject,
+  onDelete,
+}) {
   const [open, setOpen] = useState(false);
   const [details, setDetails] = useState(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [detailsError, setDetailsError] = useState("");
+  const [repositorySelection, setRepositorySelection] = useState("");
 
   useEffect(() => {
-    if (open && !details && !loadingDetails) {
+    if (open) {
       setLoadingDetails(true);
       setDetailsError("");
       getIdea(idea.id)
@@ -25,11 +34,18 @@ export default function IdeaRow({ idea, busy, deleting, onApprove, onReject, onD
         .catch((err) => setDetailsError(err.message || "Failed to load idea details."))
         .finally(() => setLoadingDetails(false));
     }
-  }, [open, idea.id, details, loadingDetails]);
+  }, [open, idea.id, idea.latest_attempt?.status]);
 
   const displayIdea = details || idea;
   const [badgeClass, badgeLabel] = BADGES[idea.status] ?? BADGES.PENDING;
   const pending = idea.status === "PENDING";
+  const readyRepositories = repositories.filter(
+    (repository) => repository.catalog_status === "ready" && repository.catalog
+  );
+  const selectedRepositoryId = repositorySelection || (
+    readyRepositories.length === 1 ? String(readyRepositories[0].id) : ""
+  );
+  const latestAttempt = displayIdea.attempts?.[0] || idea.latest_attempt;
   const catalogRefs = displayIdea.catalog_refs ?? [];
   const priority = formatPriority(idea.priority);
   const approvedWhen = formatDateTime(displayIdea.approved_at);
@@ -37,7 +53,7 @@ export default function IdeaRow({ idea, busy, deleting, onApprove, onReject, onD
 
   function handleApprove(event) {
     event.stopPropagation();
-    onApprove(idea.id);
+    onApprove(idea.id, Number(selectedRepositoryId));
   }
 
   return (
@@ -75,6 +91,14 @@ export default function IdeaRow({ idea, busy, deleting, onApprove, onReject, onD
               <>
                 <span className="sep">·</span>
                 <span>by {idea.approved_by}</span>
+              </>
+            )}
+            {idea.latest_attempt && (
+              <>
+                <span className="sep">·</span>
+                <span>
+                  Attempt {idea.latest_attempt.status.replaceAll("_", " ").toLowerCase()}
+                </span>
               </>
             )}
             {createdWhen && pending && (
@@ -166,7 +190,9 @@ export default function IdeaRow({ idea, busy, deleting, onApprove, onReject, onD
                   <dt>Status</dt>
                   <dd>
                     {idea.status === "IN_PROCESS"
-                      ? "In process — ready for an attempt"
+                      ? latestAttempt?.status
+                        ? `Attempt ${latestAttempt.status.toLowerCase()}`
+                        : "Attempt queued"
                       : "Approved"}
                   </dd>
                 </div>
@@ -174,13 +200,77 @@ export default function IdeaRow({ idea, busy, deleting, onApprove, onReject, onD
             </section>
           )}
 
+          {latestAttempt && (
+            <section className="detail attempt-result">
+              <h4 className="detail-label">Attempt · {latestAttempt.status}</h4>
+              {latestAttempt.error && <div className="alert alert-error">{latestAttempt.error}</div>}
+              {latestAttempt.plan && (
+                <>
+                  <p className="detail-body">{latestAttempt.plan.summary}</p>
+                  {latestAttempt.plan.repo_changes?.length > 0 && (
+                    <ol className="attempt-steps">
+                      {latestAttempt.plan.repo_changes.map((step) => (
+                        <li key={`${step.order}-${step.target}`}>
+                          <strong>{step.target || step.action}</strong>
+                          {step.target && step.action ? ` — ${step.action}` : ""}
+                          {step.rationale && <span> {step.rationale}</span>}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  {latestAttempt.plan.external_requirements?.length > 0 && (
+                    <p className="detail-note">
+                      External requirements: {latestAttempt.plan.external_requirements.join(", ")}
+                    </p>
+                  )}
+                </>
+              )}
+              {latestAttempt.diff ? (
+                <details className="attempt-diff">
+                  <summary>View generated code change</summary>
+                  <pre>{latestAttempt.diff}</pre>
+                </details>
+              ) : latestAttempt.status === "READY_FOR_REVIEW" ? (
+                <p className="detail-note">No code changes were generated.</p>
+              ) : null}
+              {latestAttempt.test_stdout && (
+                <p className="detail-note">{latestAttempt.test_stdout}</p>
+              )}
+            </section>
+          )}
+
           {pending && (
             <div className="idea-actions-panel">
+              {readyRepositories.length > 1 ? (
+                <div className="field repo-attempt-field">
+                  <label htmlFor={`repo-${idea.id}`}>Attempt in repository</label>
+                  <select
+                    id={`repo-${idea.id}`}
+                    className="input"
+                    value={selectedRepositoryId}
+                    onChange={(event) => setRepositorySelection(event.target.value)}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <option value="">Choose a repository</option>
+                    {readyRepositories.map((repository) => (
+                      <option key={repository.id} value={repository.id}>{repository.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : readyRepositories.length === 1 ? (
+                <p className="detail-note">
+                  Attempt in <strong>{readyRepositories[0].name}</strong>
+                </p>
+              ) : (
+                <p className="detail-note">
+                  Onboard a repository and finish its architecture catalog before approving.
+                </p>
+              )}
               <div className="idea-actions">
                 <button
                   type="button"
                   className="btn btn-primary"
-                  disabled={busy || deleting}
+                  disabled={busy || deleting || !selectedRepositoryId}
                   onClick={handleApprove}
                 >
                   {busy && <span className="spinner" />}
