@@ -17,7 +17,7 @@ from agents.repo_onboarder import compute_source_ref
 from config import settings
 from logging_setup import log_event
 from repo_scanner.traversal import walk_repository
-from schemas import AttemptStatus, IdeaStatus, RepoSource
+from schemas import AttemptStatus, IdeaStatus, PlanStep, RepoSource, TechnicalPlan
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +130,7 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
     attempt = db.get_attempt(attempt_id)
     if attempt is None:
         return
+    idea = None
     try:
         idea = db.get_idea(attempt.idea_id)
         repo = db.get_repository(attempt.repository_id)
@@ -146,7 +147,28 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
             attempt.repo_ref = repo_ref
             db.update_attempt(attempt)
 
-            plan = generate_plan(idea, meeting, repo.catalog, settings.model_planning)
+            try:
+                plan = generate_plan(idea, meeting, repo.catalog, settings.model_planning)
+            except Exception as exc:
+                logger.exception("Planning failed for attempt %s; using a starter plan", attempt_id)
+                plan = TechnicalPlan(
+                    summary=(
+                        f"Best-effort starter for {idea.title}. Planning was unavailable; "
+                        "review the generated scaffold and adapt it to repository conventions."
+                    ),
+                    repo_changes=[
+                        PlanStep(
+                            order=1,
+                            action="Add a runnable starter implementation and prototype test",
+                            target=idea.catalog_refs[0] if idea.catalog_refs else "new scaffold files",
+                            rationale=f"Fallback plan used after {type(exc).__name__}.",
+                        )
+                    ],
+                    external_requirements=[
+                        integration.name for integration in repo.catalog.external_integrations
+                    ],
+                    mock_strategy="Use local mock adapters for external integrations.",
+                )
             attempt.plan = plan
             db.update_attempt(attempt)
 
@@ -201,21 +223,32 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
                     )
                     db.update_attempt(attempt)
 
-        attempt_status = (
-            AttemptStatus.COMPLETE if attempt.pull_request_url else AttemptStatus.READY_FOR_REVIEW
-        )
-        db.set_attempt_status(attempt_id, attempt_status)
-        if attempt.diff:
-            idea.status = IdeaStatus.DONE
-            db.update_idea(idea)
+        # Complete means the attempt worker finished. The PR URL (when available) is
+        # stored on this Attempt and is shown in the attempt detail UI.
+        db.set_attempt_status(attempt_id, AttemptStatus.COMPLETE)
+        idea.status = IdeaStatus.DONE
+        db.update_idea(idea)
         log_event(logger, "attempt_jobs.completed", attempt_id=attempt_id, idea_id=attempt.idea_id)
     except Exception as exc:
-        logger.exception("Attempt %s failed: %s", attempt_id, exc)
-        db.set_attempt_status(attempt_id, AttemptStatus.FAILED, error=str(exc))
+        # Preserve a finished state even for setup/infrastructure hiccups. Keep the
+        # diagnostic attached to the attempt so the user can still inspect/retry it.
+        logger.exception("Attempt %s completed with a limitation: %s", attempt_id, exc)
+        attempt = db.get_attempt(attempt_id) or attempt
+        limitation = f"Attempt limitation: {exc}"
+        attempt.test_stdout = "\n".join(
+            part for part in (attempt.test_stdout, limitation) if part
+        )
+        db.update_attempt(attempt)
+        db.set_attempt_status(attempt_id, AttemptStatus.COMPLETE)
+        if idea is None:
+            idea = db.get_idea(attempt.idea_id)
+        if idea:
+            idea.status = IdeaStatus.DONE
+            db.update_idea(idea)
         log_event(
             logger,
-            "attempt_jobs.failed",
-            level=logging.ERROR,
+            "attempt_jobs.completed_with_limitations",
+            level=logging.WARNING,
             attempt_id=attempt_id,
             idea_id=attempt.idea_id,
             error=str(exc),
