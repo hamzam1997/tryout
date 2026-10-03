@@ -42,8 +42,15 @@ export default function IdeaRow({
   const readyRepositories = repositories.filter(
     (repository) => repository.catalog_status === "ready" && repository.catalog
   );
+  const sourceRepository = readyRepositories.find(
+    (repository) => repository.id === idea.repository_id
+  );
   const selectedRepositoryId = repositorySelection || (
-    readyRepositories.length === 1 ? String(readyRepositories[0].id) : ""
+    sourceRepository
+      ? String(sourceRepository.id)
+      : readyRepositories.length === 1
+        ? String(readyRepositories[0].id)
+        : ""
   );
   const latestAttempt = displayIdea.attempts?.[0] || idea.latest_attempt;
   const catalogRefs = displayIdea.catalog_refs ?? [];

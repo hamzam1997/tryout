@@ -47,6 +47,7 @@ def _serialise_summary(idea, latest_attempt=None) -> dict:
     return {
         "id": idea.id,
         "meeting_id": idea.meeting_id,
+        "repository_id": idea.repository_id,
         "meeting_title": meeting.title if meeting else "",
         "title": idea.title,
         "speaker": idea.speaker,
@@ -114,7 +115,7 @@ def approve_idea_endpoint(idea_id: int):
         ), 409
 
     body = request.get_json(silent=True) or {}
-    repository_id = body.get("repository_id")
+    repository_id = body.get("repository_id", idea.repository_id)
     if not isinstance(repository_id, int):
         return jsonify({"error": "Choose a repository before approving this idea."}), 400
     repository = db.get_repository(repository_id)

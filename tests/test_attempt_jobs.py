@@ -67,11 +67,17 @@ class TestAttemptJobs(unittest.TestCase):
             repo_changes=[PlanStep(order=1, action="Update the message", target="app.py")],
         )
         changes = FileChangeBatch(
-            changes=[FileChange(path="app.py", content="MESSAGE = 'after'\n")]
+            changes=[
+                FileChange(path="app.py", content="MESSAGE = 'after'\n"),
+                FileChange(
+                    path="test_prototype.py",
+                    content="from app import MESSAGE\n\ndef test_message():\n    assert MESSAGE == 'after'\n",
+                ),
+            ]
         )
         with (
             patch("agents.attempt_jobs.generate_plan", return_value=plan),
-            patch("agents.attempt_jobs.generate_changes", return_value=changes),
+            patch("agents.coder.generate_changes", return_value=changes),
         ):
             execute_attempt(self.attempt.id)
 
