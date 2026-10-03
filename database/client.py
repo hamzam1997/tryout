@@ -165,6 +165,72 @@ def reset_in_memory_firestore() -> None:
     _mock_client.clear()
 
 
+class _GCloudCredentials:
+    """Wrapper that provides an active OAuth2 token from the gcloud CLI when ADC lacks Firestore permissions."""
+    def __init__(self):
+        self.token = None
+
+    def refresh(self, request):
+        import subprocess
+        try:
+            self.token = subprocess.check_output(
+                ["gcloud", "auth", "print-access-token"],
+                stderr=subprocess.DEVNULL
+            ).decode().strip()
+        except Exception as exc:
+            logger.warning("Failed to refresh token from gcloud CLI: %s", exc)
+
+    def apply(self, headers):
+        if not self.token:
+            self.refresh(None)
+        headers["authorization"] = f"Bearer {self.token}"
+
+    def before_request(self, request, method, url, headers):
+        self.apply(headers)
+
+
+def _get_live_credentials(project: str | None = None):
+    """Obtain credentials for Firestore, preferring ADC and falling back to gcloud user credentials."""
+    import google.auth
+    from google.auth.transport.requests import Request
+    from google.cloud import firestore
+
+    try:
+        creds, _ = google.auth.default()
+        creds.refresh(Request())
+        # Smoke test ADC against Firestore to verify it has permissions
+        test_client = firestore.Client(project=project, credentials=creds)
+        list(test_client.collection("repositories").limit(1).get())
+        return creds
+    except Exception as exc:
+        logger.info("ADC credentials did not have Firestore permission (%s); trying gcloud CLI credentials...", exc)
+
+    try:
+        from google.auth.credentials import Credentials
+
+        class GCloudUserCredentials(Credentials):
+            def __init__(self):
+                super().__init__()
+                self.token = None
+
+            def refresh(self, request):
+                import subprocess
+                self.token = subprocess.check_output(
+                    ["gcloud", "auth", "print-access-token"],
+                    stderr=subprocess.DEVNULL
+                ).decode().strip()
+
+        creds = GCloudUserCredentials()
+        creds.refresh(None)
+        test_client = firestore.Client(project=project, credentials=creds)
+        list(test_client.collection("repositories").limit(1).get())
+        logger.info("Using active gcloud CLI account credentials for Firestore.")
+        return creds
+    except Exception as exc:
+        logger.warning("Could not obtain gcloud CLI credentials: %s", exc)
+        return None
+
+
 def get_firestore_client():
     """Return the Google Cloud Firestore client strictly."""
     global _firestore_client, _use_memory_fallback
@@ -192,12 +258,17 @@ def get_firestore_client():
             else None
         )
 
+        creds = _get_live_credentials(project=project)
+
+        kwargs = {}
+        if project:
+            kwargs["project"] = project
         if database:
-            client = firestore.Client(project=project, database=database)
-        elif project:
-            client = firestore.Client(project=project)
-        else:
-            client = firestore.Client()
+            kwargs["database"] = database
+        if creds:
+            kwargs["credentials"] = creds
+
+        client = firestore.Client(**kwargs)
 
         logger.info("Initialized Google Cloud Firestore client for project %s", client.project)
         _firestore_client = client

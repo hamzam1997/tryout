@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Sidebar from "./components/Sidebar";
+import LandingPage from "./components/LandingPage";
 import RepositoriesPage from "./pages/RepositoriesPage";
 import MeetingsPage from "./pages/MeetingsPage";
 import IdeasPage from "./pages/IdeasPage";
+import { onAuthChanged, checkSessionExpired } from "./lib/firebase";
 import {
   approveIdea,
   deleteIdea,
@@ -29,6 +31,8 @@ function pipelineStillRunning(meetings) {
 }
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authChecking, setAuthChecking] = useState(true);
   const [view, setView] = useState("repositories");
   const [repositories, setRepositories] = useState([]);
   const [meetings, setMeetings] = useState([]);
@@ -43,6 +47,15 @@ export default function App() {
   const [deletingId, setDeletingId] = useState(null);
   const [online, setOnline] = useState(null);
   const pollRef = useRef(null);
+
+  // Monitor auth state changes and session expiration
+  useEffect(() => {
+    const unsubscribe = onAuthChanged((user) => {
+      setCurrentUser(user);
+      setAuthChecking(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const refresh = useCallback(async ({ quiet = false } = {}) => {
     if (!quiet) {
@@ -281,6 +294,21 @@ export default function App() {
     } finally {
       setDeletingId(null);
     }
+  }
+
+  if (authChecking) {
+    return (
+      <div className="landing-wrap">
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", color: "var(--on-surface-variant)" }}>
+          <div className="spinner" style={{ width: "32px", height: "32px", borderWidth: "3px" }} />
+          <span>Loading workspace...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return <LandingPage onLoginSuccess={(user) => { setCurrentUser(user); refresh(); }} />;
   }
 
   return (
