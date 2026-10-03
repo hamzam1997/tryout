@@ -27,19 +27,26 @@ const NAV = [
   { id: "ideas", label: "Ideas" },
 ];
 
-export default function Sidebar({ view, onNavigate, counts, online }) {
-  const [currentUser, setCurrentUser] = useState(null);
+export default function Sidebar({ view, onNavigate, counts, online, user, onLogout }) {
+  const [currentUser, setCurrentUser] = useState(user || null);
 
   useEffect(() => {
-    const unsubscribe = onAuthChanged((user) => {
+    if (user !== undefined) {
       setCurrentUser(user);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthChanged((authUser) => {
+      setCurrentUser(authUser);
     });
     return () => unsubscribe();
   }, []);
 
   async function handleGoogleLogin() {
     try {
-      await loginWithGoogle();
+      const loggedUser = await loginWithGoogle();
+      setCurrentUser(loggedUser);
     } catch (err) {
       console.warn("Google sign-in cancelled or failed:", err);
     }
@@ -49,6 +56,7 @@ export default function Sidebar({ view, onNavigate, counts, online }) {
     try {
       await logoutUser();
       setCurrentUser(null);
+      if (onLogout) onLogout();
     } catch (err) {
       console.warn("Logout failed:", err);
     }
