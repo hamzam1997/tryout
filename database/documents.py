@@ -381,3 +381,54 @@ class FrictionLogDoc(BaseModel):
             readiness_checklist=checklist_dicts,
             created_at=created,
         )
+
+
+class UserDoc(BaseModel):
+    """Document stored in Firestore `/users/{uid}`."""
+
+    COLLECTION: ClassVar[str] = "users"
+
+    uid: str
+    email: str | None = None
+    name: str | None = None
+    avatar_url: str | None = None
+    provider: str | None = None
+    github_login: str | None = None
+    created_at: str = Field(default_factory=lambda: utc_now().isoformat())
+    last_login_at: str = Field(default_factory=lambda: utc_now().isoformat())
+
+    def to_doc(self) -> dict[str, Any]:
+        return self.model_dump(mode="json")
+
+    @classmethod
+    def from_doc(cls, data: dict[str, Any]) -> UserDoc:
+        return cls.model_validate(data)
+
+    def to_domain(self) -> schemas.User:
+        created = datetime.fromisoformat(self.created_at) if self.created_at else None
+        last_login = datetime.fromisoformat(self.last_login_at) if self.last_login_at else None
+        return schemas.User(
+            uid=self.uid,
+            email=self.email,
+            name=self.name,
+            avatar_url=self.avatar_url,
+            provider=self.provider,
+            github_login=self.github_login,
+            created_at=created,
+            last_login_at=last_login,
+        )
+
+    @classmethod
+    def from_domain(cls, user: schemas.User) -> UserDoc:
+        created = user.created_at.isoformat() if user.created_at else utc_now().isoformat()
+        last_login = user.last_login_at.isoformat() if user.last_login_at else utc_now().isoformat()
+        return cls(
+            uid=user.uid,
+            email=user.email,
+            name=user.name,
+            avatar_url=user.avatar_url,
+            provider=user.provider,
+            github_login=user.github_login,
+            created_at=created,
+            last_login_at=last_login,
+        )

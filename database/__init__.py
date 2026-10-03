@@ -14,6 +14,7 @@ from database.documents import (
     IdeaDoc,
     MeetingDoc,
     RepositoryDoc,
+    UserDoc,
     utc_now,
 )
 from database.repositories import (
@@ -38,11 +39,13 @@ from database.repositories import (
     get_or_create_repository,
     get_repository,
     get_repository_by_source,
+    get_user,
     list_attempts,
     list_friction_logs,
     list_ideas,
     list_meetings,
     list_repositories,
+    list_users,
     save_catalog,
     set_attempt_status,
     set_idea_status,
@@ -54,6 +57,7 @@ from database.repositories import (
     update_idea,
     update_meeting,
     update_repository,
+    upsert_user,
 )
 from schemas import (
     ArchitectureCatalog,
@@ -120,6 +124,7 @@ __all__ = [
     "IdeaDoc",
     "AttemptDoc",
     "FrictionLogDoc",
+    "UserDoc",
     # Domain schemas
     "ArchitectureCatalog",
     "Attempt",
@@ -137,6 +142,7 @@ __all__ = [
     "RepoSource",
     "Repository",
     "TechnicalPlan",
+    "User",
     # Repositories
     "approve_idea",
     "catalog_is_current",
@@ -159,11 +165,13 @@ __all__ = [
     "get_or_create_repository",
     "get_repository",
     "get_repository_by_source",
+    "get_user",
     "list_attempts",
     "list_friction_logs",
     "list_ideas",
     "list_meetings",
     "list_repositories",
+    "list_users",
     "save_catalog",
     "set_attempt_status",
     "set_idea_status",
@@ -175,4 +183,5 @@ __all__ = [
     "update_idea",
     "update_meeting",
     "update_repository",
+    "upsert_user",
 ]
