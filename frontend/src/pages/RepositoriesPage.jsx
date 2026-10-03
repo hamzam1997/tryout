@@ -1,6 +1,7 @@
 import { useState } from "react";
 import ArchitectureCatalogDrawer from "../components/ArchitectureCatalogDrawer";
 import RepoOnboarderCard from "../components/RepoOnboarderCard";
+import { getRepositoryCatalog } from "../api";
 
 export default function RepositoriesPage({
   repositories,
@@ -10,13 +11,24 @@ export default function RepositoriesPage({
   onDeleted,
 }) {
   const [selectedRepo, setSelectedRepo] = useState(null);
+  const [loadingCatalogId, setLoadingCatalogId] = useState(null);
+  const [catalogError, setCatalogError] = useState("");
   const readyCount = repositories.filter((repo) => repo.catalog_status === "ready").length;
   const analyzingCount = repositories.filter(
     (repo) => repo.catalog_status === "onboarding"
   ).length;
 
-  function handleViewCatalog(repo) {
-    setSelectedRepo(repo);
+  async function handleViewCatalog(repo) {
+    setLoadingCatalogId(repo.id);
+    setCatalogError("");
+    try {
+      const fullCatalog = await getRepositoryCatalog(repo.id);
+      setSelectedRepo({ ...repo, catalog: fullCatalog });
+    } catch (err) {
+      setCatalogError(`Failed to load catalog: ${err.message}`);
+    } finally {
+      setLoadingCatalogId(null);
+    }
   }
 
   function handleCloseDrawer() {
@@ -61,6 +73,7 @@ export default function RepositoriesPage({
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
+      {catalogError && <div className="alert alert-error">{catalogError}</div>}
 
       {loading && repositories.length === 0 ? (
         <p className="detail-note">Loading repositories…</p>
@@ -71,6 +84,7 @@ export default function RepositoriesPage({
         onOnboarded={onOnboarded}
         onDeleted={onDeleted}
         onViewCatalog={handleViewCatalog}
+        loadingCatalogId={loadingCatalogId}
       />
 
       {selectedRepo && (

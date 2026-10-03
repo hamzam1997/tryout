@@ -99,6 +99,32 @@ class TestIdeasApi(unittest.TestCase):
         missing = self.client.delete("/ideas/9999")
         self.assertEqual(missing.status_code, 404)
 
+    def test_get_idea_detail_vs_summary(self):
+        # Summary from list_ideas does not include heavy fields
+        list_resp = self.client.get("/ideas")
+        self.assertEqual(list_resp.status_code, 200)
+        summary = list_resp.get_json()[0]
+        self.assertNotIn("description", summary)
+        self.assertNotIn("attempt_hypothesis", summary)
+        self.assertNotIn("quote", summary)
+
+        # GET /ideas/<id> returns all details
+        detail_resp = self.client.get(f"/ideas/{self.idea.id}")
+        self.assertEqual(detail_resp.status_code, 200)
+        detail = detail_resp.get_json()
+        self.assertEqual(detail["id"], self.idea.id)
+        self.assertEqual(detail["description"], self.idea.description)
+        self.assertEqual(detail["attempt_hypothesis"], self.idea.attempt_hypothesis)
+        self.assertEqual(detail["quote"], self.idea.quote)
+
+    def test_get_idea_counts(self):
+        resp = self.client.get("/ideas/counts")
+        self.assertEqual(resp.status_code, 200)
+        counts = resp.get_json()
+        self.assertEqual(counts["PENDING"], 1)
+        self.assertEqual(counts["IN_PROCESS"], 0)
+        self.assertEqual(counts["ALL"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

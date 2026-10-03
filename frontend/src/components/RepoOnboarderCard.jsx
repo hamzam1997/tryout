@@ -13,6 +13,7 @@ export default function RepoOnboarderCard({
   repositories,
   onOnboarded,
   onViewCatalog,
+  loadingCatalogId,
   onDeleted,
 }) {
   const [tab, setTab] = useState("github"); // "github" | "demo"
@@ -439,8 +440,15 @@ export default function RepoOnboarderCard({
                           type="button"
                           className="btn btn-ghost btn-sm repo-catalog-link"
                           onClick={() => onViewCatalog(repo)}
+                          disabled={loadingCatalogId === repo.id}
                         >
-                          View Catalog →
+                          {loadingCatalogId === repo.id ? (
+                            <>
+                              <span className="spinner spinner-xs" /> Loading catalog…
+                            </>
+                          ) : (
+                            "View Catalog →"
+                          )}
                         </button>
                       </div>
                     )}

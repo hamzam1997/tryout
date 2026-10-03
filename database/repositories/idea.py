@@ -2,7 +2,7 @@
 
 import json
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from database.connection import session_scope, utc_now
 from database.models import Idea as IdeaModel
@@ -89,6 +89,17 @@ def list_ideas(
         stmt = stmt.order_by(IdeaModel.id)
         models = session.scalars(stmt).all()
         return [orm_to_idea(m) for m in models]
+
+
+def get_idea_counts() -> dict[str, int]:
+    with session_scope() as session:
+        counts = {status.value: 0 for status in IdeaStatus}
+        stmt = select(IdeaModel.status, func.count(IdeaModel.id)).group_by(IdeaModel.status)
+        for status_val, count in session.execute(stmt):
+            if status_val in counts:
+                counts[status_val] = count
+        counts["ALL"] = sum(counts.values())
+        return counts
 
 
 def find_idea_by_key(idea_key: str) -> Idea | None:

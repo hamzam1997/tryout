@@ -28,11 +28,26 @@ def _serialise_repo(repo: Repository, include_catalog: bool = True) -> dict:
     return data
 
 
+def _serialise_repo_summary(repo: Repository) -> dict:
+    """Return repository with lightweight catalog summary for list views."""
+    data = repo.model_dump(mode="json")
+    if repo.catalog:
+        data["catalog"] = {
+            "name": repo.catalog.name,
+            "language": repo.catalog.language,
+            "framework": repo.catalog.framework,
+            "modules": [{"name": m.name} for m in repo.catalog.modules],
+            "api_routes": [{"path": r.path} for r in repo.catalog.api_routes],
+            "internal_models": [{"name": m.name} for m in repo.catalog.internal_models],
+        }
+    return data
+
+
 @bp.get("")
 def list_repositories():
     """List all onboarded repositories."""
     repos = db.list_repositories()
-    return jsonify([_serialise_repo(r, include_catalog=True) for r in repos])
+    return jsonify([_serialise_repo_summary(r) for r in repos])
 
 
 @bp.get("/<int:repo_id>")

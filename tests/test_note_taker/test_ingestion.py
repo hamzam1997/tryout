@@ -167,9 +167,13 @@ class TestReadEndpoints(IngestionTestCase):
 
         listed = self.client.get("/meetings").get_json()
         self.assertEqual(len(listed), 1)
+        self.assertNotIn("transcript", listed[0])
+        self.assertIn("speakers", listed[0])
 
         fetched = self.client.get(f"/meetings/{meeting_id}").get_json()
         self.assertEqual(fetched["id"], meeting_id)
+        self.assertIn("transcript", fetched)
+        self.assertIsNotNone(fetched.get("minutes"))
 
     def test_get_unknown_meeting_is_404(self):
         self.assertEqual(self.client.get("/meetings/9999").status_code, 404)

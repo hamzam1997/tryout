@@ -24,6 +24,23 @@ def _serialise(idea) -> dict:
     return payload
 
 
+def _serialise_summary(idea) -> dict:
+    meeting = db.get_meeting(idea.meeting_id)
+    return {
+        "id": idea.id,
+        "meeting_id": idea.meeting_id,
+        "meeting_title": meeting.title if meeting else "",
+        "title": idea.title,
+        "speaker": idea.speaker,
+        "priority": idea.priority,
+        "status": idea.status.value,
+        "approved_by": idea.approved_by,
+        "created_at": idea.created_at.isoformat() if idea.created_at else None,
+        "original_idea_id": idea.original_idea_id,
+        "catalog_refs": idea.catalog_refs or [],
+    }
+
+
 def _approved_by_from_request() -> str:
     payload = request.get_json(silent=True) or {}
     if isinstance(payload, dict):
@@ -34,11 +51,17 @@ def _approved_by_from_request() -> str:
     return query_name or _DEFAULT_APPROVER
 
 
+@bp.get("/counts")
+def get_idea_counts():
+    """Return status counts across all ideas."""
+    return jsonify(db.get_idea_counts())
+
+
 @bp.get("")
 def list_ideas():
     status_param = (request.args.get("status") or "").strip().upper()
     status = None
-    if status_param:
+    if status_param and status_param != "ALL":
         if status_param not in _VALID_STATUSES:
             return jsonify(
                 {"error": f"status must be one of {sorted(_VALID_STATUSES)}"}
@@ -47,7 +70,7 @@ def list_ideas():
 
     meeting_id = request.args.get("meeting_id", type=int)
     ideas = db.list_ideas(status=status, meeting_id=meeting_id)
-    return jsonify([_serialise(idea) for idea in ideas])
+    return jsonify([_serialise_summary(idea) for idea in ideas])
 
 
 @bp.get("/<int:idea_id>")
