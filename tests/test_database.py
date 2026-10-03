@@ -278,6 +278,46 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
         self.assertEqual(f_doc.category, db.FrictionCategory.PRODUCT_DECISION.value)
         self.assertEqual(f_doc.to_domain().category, db.FrictionCategory.PRODUCT_DECISION)
 
+    def test_user_persistence(self):
+        """Verify User document modeling and Firestore repository upsert/get/list."""
+        from database.documents import UserDoc
+
+        user = db.upsert_user(
+            uid="usr-12345",
+            email="developer@example.com",
+            name="Alice Dev",
+            avatar_url="https://avatar.url/alice.png",
+            provider="github",
+            github_login="alicedev",
+        )
+        self.assertEqual(user.uid, "usr-12345")
+        self.assertEqual(user.email, "developer@example.com")
+        self.assertEqual(user.github_login, "alicedev")
+
+        # Fetch
+        fetched = db.get_user("usr-12345")
+        self.assertIsNotNone(fetched)
+        self.assertEqual(fetched.name, "Alice Dev")
+
+        # Update last login and avatar
+        updated = db.upsert_user(
+            uid="usr-12345",
+            avatar_url="https://avatar.url/alice-new.png",
+        )
+        self.assertEqual(updated.avatar_url, "https://avatar.url/alice-new.png")
+        self.assertEqual(updated.email, "developer@example.com")  # Preserved
+
+        # List
+        users = db.list_users()
+        self.assertEqual(len(users), 1)
+        self.assertEqual(users[0].uid, "usr-12345")
+
+        # Document conversion check
+        doc = UserDoc.from_domain(user)
+        self.assertEqual(doc.uid, "usr-12345")
+        self.assertEqual(doc.to_domain().email, "developer@example.com")
+
 
 if __name__ == "__main__":
     unittest.main()
+

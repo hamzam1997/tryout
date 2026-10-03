@@ -475,3 +475,14 @@ class FrictionLog(BaseModel):
     required_action: str = ""
     readiness_checklist: list[ReadinessItem] = Field(default_factory=list)
     created_at: datetime | None = None
+
+
+class User(BaseModel):
+    uid: str
+    email: str | None = None
+    name: str | None = None
+    avatar_url: str | None = None
+    provider: str | None = None
+    github_login: str | None = None
+    created_at: datetime | None = None
+    last_login_at: datetime | None = None

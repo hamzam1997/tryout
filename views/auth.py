@@ -9,6 +9,7 @@ from urllib.parse import urlencode
 import requests
 from flask import Blueprint, jsonify, redirect, request, session
 
+import database as db
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -161,7 +162,28 @@ def firebase_sync():
     if firebase_user:
         session["user"] = firebase_user
 
-    user_info = session.get("github_user") or session.get("user")
+    # Upsert user record into Firestore /users collection
+    uid = firebase_user.get("uid")
+    saved_user = None
+    if uid:
+        try:
+            gh_user = session.get("github_user") or {}
+            saved_user = db.upsert_user(
+                uid=uid,
+                email=firebase_user.get("email"),
+                name=firebase_user.get("name") or gh_user.get("name"),
+                avatar_url=firebase_user.get("avatar_url") or gh_user.get("avatar_url"),
+                provider="github" if github_token else "google",
+                github_login=gh_user.get("login"),
+            )
+        except Exception as exc:
+            logger.warning("Could not persist user %s to Firestore: %s", uid, exc)
+
+    user_info = (
+        saved_user.model_dump(mode="json")
+        if saved_user
+        else (session.get("github_user") or session.get("user"))
+    )
     return jsonify(
         {
             "ok": True,
@@ -169,6 +191,24 @@ def firebase_sync():
             "user": user_info,
         }
     )
+
+
+@bp.get("/me")
+def get_current_user():
+    """Retrieve the currently authenticated user's profile from Firestore."""
+    user_sess = session.get("user") or {}
+    uid = user_sess.get("uid")
+    if not uid:
+        gh_user = session.get("github_user")
+        if gh_user:
+            return jsonify({"authenticated": True, "user": gh_user})
+        return jsonify({"authenticated": False, "user": None}), 401
+
+    user = db.get_user(uid)
+    if not user:
+        return jsonify({"authenticated": True, "user": user_sess})
+
+    return jsonify({"authenticated": True, "user": user.model_dump(mode="json")})
 
 
 @bp.get("/github/status")

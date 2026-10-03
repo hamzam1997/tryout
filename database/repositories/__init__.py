@@ -12,6 +12,11 @@ from database.repositories.friction import (
     create_friction_log,
     list_friction_logs,
 )
+from database.repositories.user import (
+    get_user,
+    list_users,
+    upsert_user,
+)
 from database.repositories.idea import (
     approve_idea,
     create_idea,
@@ -91,4 +96,8 @@ __all__ = [
     "count_friction_by",
     "create_friction_log",
     "list_friction_logs",
+    # User
+    "upsert_user",
+    "get_user",
+    "list_users",
 ]
