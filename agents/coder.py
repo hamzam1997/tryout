@@ -66,7 +66,10 @@ class CodingAgent:
             ):
                 raise ValueError(f"Generated changes cannot modify credential files: {change.path}")
 
-            target = root.joinpath(*relative.parts).resolve()
+            candidate = root.joinpath(*relative.parts)
+            if any(path.is_symlink() for path in (candidate, *candidate.parents) if path != root.parent):
+                raise ValueError(f"Generated changes cannot follow repository symlinks: {change.path}")
+            target = candidate.resolve()
             if not target.is_relative_to(root):
                 raise ValueError(f"Generated file escaped repository: {change.path}")
             before = target.read_text(encoding="utf-8").splitlines(keepends=True) if target.exists() else []
