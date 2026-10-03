@@ -8,6 +8,7 @@ import {
   deleteIdea,
   deleteMeeting,
   extractIdeas,
+  getIdeaCounts,
   health,
   listIdeas,
   listMeetings,
@@ -32,6 +33,8 @@ export default function App() {
   const [repositories, setRepositories] = useState([]);
   const [meetings, setMeetings] = useState([]);
   const [ideas, setIdeas] = useState([]);
+  const [ideaFilter, setIdeaFilter] = useState("PENDING");
+  const [ideaCounts, setIdeaCounts] = useState({ PENDING: 0, IN_PROCESS: 0, REJECTED: 0, ALL: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [ideasError, setIdeasError] = useState("");
@@ -48,10 +51,11 @@ export default function App() {
       setIdeasError("");
     }
 
-    const [reposResult, meetingsResult, ideasResult] = await Promise.allSettled([
+    const [reposResult, meetingsResult, ideasResult, countsResult] = await Promise.allSettled([
       listRepositories(),
       listMeetings(),
-      listIdeas(),
+      listIdeas(ideaFilter),
+      getIdeaCounts(),
     ]);
 
     if (reposResult.status === "fulfilled") {
@@ -89,6 +93,10 @@ export default function App() {
       }
     }
 
+    if (countsResult.status === "fulfilled") {
+      setIdeaCounts(countsResult.value);
+    }
+
     const anySuccess = [reposResult, meetingsResult, ideasResult].some(
       (result) => result.status === "fulfilled"
     );
@@ -104,7 +112,7 @@ export default function App() {
 
     if (!quiet) setLoading(false);
     return meetingsData;
-  }, [view]);
+  }, [view, ideaFilter]);
 
   useEffect(() => {
     refresh();
@@ -128,8 +136,12 @@ export default function App() {
     pollRef.current = setInterval(async () => {
       const nextMeetings = await refresh({ quiet: true });
       if (nextMeetings && !pipelineStillRunning(nextMeetings)) {
-        const nextIdeas = await listIdeas().catch(() => null);
+        const [nextIdeas, nextCounts] = await Promise.all([
+          listIdeas(ideaFilter).catch(() => null),
+          getIdeaCounts().catch(() => null),
+        ]);
         if (nextIdeas) setIdeas(nextIdeas);
+        if (nextCounts) setIdeaCounts(nextCounts);
       }
     }, PIPELINE_POLL_MS);
 
@@ -139,7 +151,7 @@ export default function App() {
         pollRef.current = null;
       }
     };
-  }, [meetings, refresh]);
+  }, [meetings, refresh, ideaFilter]);
 
   function handleUploaded(result) {
     setMeetings((current) => {
@@ -186,14 +198,35 @@ export default function App() {
     }
   }
 
+  async function handleIdeaFilterChange(newFilter) {
+    setIdeaFilter(newFilter);
+    setLoading(true);
+    setIdeasError("");
+    try {
+      const [filteredIdeas, counts] = await Promise.all([
+        listIdeas(newFilter),
+        getIdeaCounts().catch(() => null),
+      ]);
+      setIdeas(filteredIdeas);
+      if (counts) setIdeaCounts(counts);
+    } catch (err) {
+      setIdeasError(err.message || "Failed to load ideas");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleApprove(ideaId, approvedBy) {
     setBusyId(ideaId);
     setIdeasError("");
     try {
       const updated = await approveIdea(ideaId, approvedBy);
       setIdeas((current) =>
-        current.map((idea) => (idea.id === updated.id ? { ...idea, ...updated } : idea))
+        ideaFilter === "PENDING"
+          ? current.filter((idea) => idea.id !== updated.id)
+          : current.map((idea) => (idea.id === updated.id ? { ...idea, ...updated } : idea))
       );
+      getIdeaCounts().then(setIdeaCounts).catch(() => {});
     } catch (problem) {
       setIdeasError(problem.message);
     } finally {
@@ -207,8 +240,11 @@ export default function App() {
     try {
       const updated = await rejectIdea(ideaId);
       setIdeas((current) =>
-        current.map((idea) => (idea.id === updated.id ? { ...idea, ...updated } : idea))
+        ideaFilter === "PENDING"
+          ? current.filter((idea) => idea.id !== updated.id)
+          : current.map((idea) => (idea.id === updated.id ? { ...idea, ...updated } : idea))
       );
+      getIdeaCounts().then(setIdeaCounts).catch(() => {});
     } catch (problem) {
       setIdeasError(problem.message);
     } finally {
@@ -224,6 +260,7 @@ export default function App() {
       await deleteMeeting(meetingId);
       setMeetings((current) => current.filter((meeting) => meeting.id !== meetingId));
       setIdeas((current) => current.filter((idea) => idea.meeting_id !== meetingId));
+      getIdeaCounts().then(setIdeaCounts).catch(() => {});
     } catch (problem) {
       setError(problem.message);
     } finally {
@@ -238,14 +275,13 @@ export default function App() {
     try {
       await deleteIdea(ideaId);
       setIdeas((current) => current.filter((idea) => idea.id !== ideaId));
+      getIdeaCounts().then(setIdeaCounts).catch(() => {});
     } catch (problem) {
       setIdeasError(problem.message);
     } finally {
       setDeletingId(null);
     }
   }
-
-  const pendingIdeas = ideas.filter((idea) => idea.status === "PENDING").length;
 
   return (
     <div className="shell">
@@ -255,7 +291,7 @@ export default function App() {
         counts={{
           repositories: repositories.length,
           meetings: meetings.length,
-          ideas: pendingIdeas,
+          ideas: ideaCounts.PENDING,
         }}
         online={online}
       />
@@ -287,6 +323,9 @@ export default function App() {
         ) : (
           <IdeasPage
             ideas={ideas}
+            counts={ideaCounts}
+            filter={ideaFilter}
+            onFilterChange={handleIdeaFilterChange}
             loading={loading}
             error={ideasError || error}
             busyId={busyId}

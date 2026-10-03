@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getIdea } from "../api";
 import { getStoredApprover, setStoredApprover } from "../lib/approver";
 import { formatDateTime, formatPriority, formatRelative } from "../lib/format";
 import DeleteIconButton from "./DeleteIconButton";
@@ -11,13 +12,29 @@ const BADGES = {
 };
 
 export default function IdeaRow({ idea, busy, deleting, onApprove, onReject, onDelete }) {
-  const [open, setOpen] = useState(idea.status === "PENDING");
+  const [open, setOpen] = useState(false);
+  const [details, setDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [detailsError, setDetailsError] = useState("");
   const [approver, setApprover] = useState(() => getStoredApprover() || "local");
+
+  useEffect(() => {
+    if (open && !details && !loadingDetails) {
+      setLoadingDetails(true);
+      setDetailsError("");
+      getIdea(idea.id)
+        .then((data) => setDetails(data))
+        .catch((err) => setDetailsError(err.message || "Failed to load idea details."))
+        .finally(() => setLoadingDetails(false));
+    }
+  }, [open, idea.id, details, loadingDetails]);
+
+  const displayIdea = details || idea;
   const [badgeClass, badgeLabel] = BADGES[idea.status] ?? BADGES.PENDING;
   const pending = idea.status === "PENDING";
-  const catalogRefs = idea.catalog_refs ?? [];
+  const catalogRefs = displayIdea.catalog_refs ?? [];
   const priority = formatPriority(idea.priority);
-  const approvedWhen = formatDateTime(idea.approved_at);
+  const approvedWhen = formatDateTime(displayIdea.approved_at);
   const createdWhen = formatRelative(idea.created_at);
 
   function handleApprove(event) {
@@ -79,17 +96,28 @@ export default function IdeaRow({ idea, busy, deleting, onApprove, onReject, onD
 
       {open && (
         <div className="row-detail">
-          {idea.description && (
-            <section className="detail">
-              <h4 className="detail-label">Summary</h4>
-              <p className="detail-body">{idea.description}</p>
+          {loadingDetails && !details && (
+            <section className="detail status-panel">
+              <div className="status-panel-head">
+                <span className="spinner spinner-muted" />
+                <h4 className="detail-label">Loading idea details…</h4>
+              </div>
             </section>
           )}
 
-          {idea.attempt_hypothesis && (
+          {detailsError && <div className="alert alert-error">{detailsError}</div>}
+
+          {displayIdea.description && (
+            <section className="detail">
+              <h4 className="detail-label">Summary</h4>
+              <p className="detail-body">{displayIdea.description}</p>
+            </section>
+          )}
+
+          {displayIdea.attempt_hypothesis && (
             <section className="detail">
               <h4 className="detail-label">Attempt plan</h4>
-              <p className="detail-body">{idea.attempt_hypothesis}</p>
+              <p className="detail-body">{displayIdea.attempt_hypothesis}</p>
               <p className="detail-note">
                 Catalog-grounded sketch from extraction. A full technical plan is
                 produced only after approval.
@@ -111,14 +139,14 @@ export default function IdeaRow({ idea, busy, deleting, onApprove, onReject, onD
             </section>
           )}
 
-          {idea.quote && (
+          {displayIdea.quote && (
             <section className="detail">
               <h4 className="detail-label">From the meeting</h4>
               <blockquote className="idea-quote">
-                “{idea.quote}”
-                {(idea.speaker || idea.cue_time) && (
+                “{displayIdea.quote}”
+                {(displayIdea.speaker || displayIdea.cue_time) && (
                   <footer>
-                    {[idea.speaker, idea.cue_time].filter(Boolean).join(" · ")}
+                    {[displayIdea.speaker, displayIdea.cue_time].filter(Boolean).join(" · ")}
                   </footer>
                 )}
               </blockquote>

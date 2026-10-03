@@ -83,6 +83,11 @@ class RepositoriesViewTestCase(unittest.TestCase):
         self.assertEqual(repos[0]["name"], "acme_store")
         self.assertEqual(repos[0]["catalog_status"], "ready")
         self.assertIsNotNone(repos[0]["catalog"])
+        self.assertNotIn("external_integrations", repos[0]["catalog"])
+
+        cat_resp = self.client.get(f"/repositories/{repos[0]['id']}/catalog")
+        self.assertEqual(cat_resp.status_code, 200)
+        self.assertIn("external_integrations", cat_resp.get_json())
 
     @mock.patch("views.repositories.threading.Thread")
     @mock.patch("agents.git_utils.fetch_github_repository")

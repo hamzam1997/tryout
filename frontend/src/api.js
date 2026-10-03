@@ -53,8 +53,16 @@ export function loadDemoMeeting() {
 
 // Ideas API
 export function listIdeas(status) {
-  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  const query = status && status !== "ALL" ? `?status=${encodeURIComponent(status)}` : "";
   return fetch(`/ideas${query}`).then(parse);
+}
+
+export function getIdea(id) {
+  return fetch(`/ideas/${id}`).then(parse);
+}
+
+export function getIdeaCounts() {
+  return fetch("/ideas/counts").then(parse);
 }
 
 export function approveIdea(id, approvedBy = "local") {

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getMeeting } from "../api";
 import { formatRelative, formatSource } from "../lib/format";
 import DeleteIconButton from "./DeleteIconButton";
 
@@ -32,13 +33,31 @@ export default function MeetingRow({
   const pipelineRunning = minutesRunning || ideasRunning;
   const [open, setOpen] = useState(ideasFailed);
   const [showTranscript, setShowTranscript] = useState(false);
+  const [details, setDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [detailsError, setDetailsError] = useState("");
 
+  useEffect(() => {
+    if (open && !details && !loadingDetails) {
+      setLoadingDetails(true);
+      setDetailsError("");
+      getMeeting(meeting.id)
+        .then((data) => setDetails(data))
+        .catch((err) => setDetailsError(err.message || "Failed to load meeting details."))
+        .finally(() => setLoadingDetails(false));
+    }
+  }, [open, meeting.id, details, loadingDetails]);
+
+  const displayMeeting = details || meeting;
   const [badgeClass, badgeLabel] = BADGES[meeting.status] ?? BADGES.PENDING;
   const when = formatRelative(meeting.occurred_at ?? meeting.created_at);
-  const minutes = meeting.minutes;
+  const minutes = displayMeeting.minutes;
   const keyPoints = minutes?.key_points ?? [];
   const actions = minutes?.action_items ?? [];
-  const speakers = speakersIn(meeting.transcript);
+  const actionCount = actions.length || meeting.action_count || 0;
+  const speakers = details?.transcript
+    ? speakersIn(details.transcript)
+    : (meeting.speakers ?? speakersIn(meeting.transcript));
   const canRetryIdeas =
     meeting.status === "PROCESSED" && meeting.ideas_status !== "PROCESSING";
 
@@ -82,11 +101,11 @@ export default function MeetingRow({
                 </span>
               </>
             )}
-            {actions.length > 0 && (
+            {actionCount > 0 && (
               <>
                 <span className="sep">·</span>
                 <span>
-                  {actions.length} action{actions.length === 1 ? "" : "s"}
+                  {actionCount} action{actionCount === 1 ? "" : "s"}
                 </span>
               </>
             )}
@@ -106,6 +125,16 @@ export default function MeetingRow({
 
       {open && (
         <div className="row-detail">
+          {loadingDetails && !details && (
+            <section className="detail status-panel">
+              <div className="status-panel-head">
+                <span className="spinner spinner-muted" />
+                <h4 className="detail-label">Loading meeting details…</h4>
+              </div>
+            </section>
+          )}
+
+          {detailsError && <div className="alert alert-error">{detailsError}</div>}
           {ideasFailed && (
             <section className="detail ideas-failure">
               <h4 className="detail-label">Idea extraction failed</h4>
@@ -199,7 +228,7 @@ export default function MeetingRow({
             </section>
           )}
 
-          {meeting.transcript && (
+          {displayMeeting.transcript && (
             <section className="detail">
               <button
                 type="button"
@@ -208,11 +237,11 @@ export default function MeetingRow({
               >
                 {showTranscript ? "Hide" : "Show"} transcript
                 <span className="detail-count">
-                  {meeting.transcript.split("\n").length} lines
+                  {displayMeeting.transcript.split("\n").length} lines
                 </span>
               </button>
               {showTranscript && (
-                <pre className="transcript">{meeting.transcript}</pre>
+                <pre className="transcript">{displayMeeting.transcript}</pre>
               )}
             </section>
           )}

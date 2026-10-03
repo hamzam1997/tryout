@@ -1,4 +1,3 @@
-import { useMemo, useState } from "react";
 import IdeaRow from "../components/IdeaRow";
 import LoadingRows from "../components/LoadingRows";
 
@@ -11,6 +10,9 @@ const FILTERS = [
 
 export default function IdeasPage({
   ideas,
+  counts,
+  filter = "PENDING",
+  onFilterChange,
   loading,
   error,
   busyId,
@@ -19,15 +21,6 @@ export default function IdeasPage({
   onReject,
   onDelete,
 }) {
-  const [filter, setFilter] = useState("PENDING");
-
-  const visible = useMemo(() => {
-    if (filter === "ALL") return ideas;
-    return ideas.filter((idea) => idea.status === filter);
-  }, [ideas, filter]);
-
-  const pendingCount = ideas.filter((idea) => idea.status === "PENDING").length;
-  const inProcessCount = ideas.filter((idea) => idea.status === "IN_PROCESS").length;
 
   return (
     <div className="container">
@@ -45,13 +38,11 @@ export default function IdeasPage({
       <div className="filter-bar" role="tablist" aria-label="Idea status">
         {FILTERS.map((item) => {
           const count =
-            item.id === "PENDING"
-              ? pendingCount
-              : item.id === "IN_PROCESS"
-                ? inProcessCount
-                : item.id === "ALL"
-                  ? ideas.length
-                  : null;
+            counts && counts[item.id] !== undefined
+              ? counts[item.id]
+              : item.id === "ALL"
+                ? counts?.ALL ?? ideas.length
+                : null;
           return (
             <button
               key={item.id}
@@ -59,7 +50,7 @@ export default function IdeasPage({
               role="tab"
               aria-selected={filter === item.id}
               className={`filter-chip${filter === item.id ? " is-active" : ""}`}
-              onClick={() => setFilter(item.id)}
+              onClick={() => onFilterChange?.(item.id)}
             >
               {item.label}
               {count > 0 && <span className="filter-count">{count}</span>}
@@ -72,7 +63,7 @@ export default function IdeasPage({
 
       {loading && ideas.length === 0 ? (
         <LoadingRows label="Loading ideas…" />
-      ) : visible.length === 0 ? (
+      ) : ideas.length === 0 ? (
         <div className="empty">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M12 3.25a5.75 5.75 0 0 0-3.25 10.5v2.5h6.5v-2.5A5.75 5.75 0 0 0 12 3.25Z" />
@@ -93,7 +84,7 @@ export default function IdeasPage({
         </div>
       ) : (
         <div className="rows">
-          {visible.map((idea) => (
+          {ideas.map((idea) => (
             <IdeaRow
               key={idea.id}
               idea={idea}

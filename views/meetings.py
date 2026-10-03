@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import re
 
 from flask import Blueprint, jsonify, request
 
@@ -20,6 +21,21 @@ ALLOWED_SUFFIXES = (".vtt", ".srt", ".txt")
 MAX_TRANSCRIPT_BYTES = 2 * 1024 * 1024
 
 
+def _extract_speakers(transcript: str | None) -> list[str]:
+    if not transcript:
+        return []
+    found = []
+    seen = set()
+    for line in transcript.split("\n"):
+        match = re.match(r"^(?:\[[\d:]+\]\s*)?([^:]{1,40}):\s", line)
+        if match:
+            speaker = match.group(1).strip()
+            if speaker not in seen:
+                seen.add(speaker)
+                found.append(speaker)
+    return found
+
+
 def _parse_occurred_at(value: str | None) -> datetime | None:
     if not value:
         return None
@@ -31,6 +47,46 @@ def _parse_occurred_at(value: str | None) -> datetime | None:
 
 def _serialise(meeting) -> dict:
     return meeting.model_dump(mode="json")
+
+
+def _serialise_summary(meeting) -> dict:
+    """Return lightweight metadata needed for meeting list views."""
+    actions_count = (
+        len(meeting.minutes.action_items)
+        if meeting.minutes and meeting.minutes.action_items
+        else 0
+    )
+    key_points_count = (
+        len(meeting.minutes.key_points)
+        if meeting.minutes and meeting.minutes.key_points
+        else 0
+    )
+    return {
+        "id": meeting.id,
+        "title": meeting.title,
+        "occurred_at": meeting.occurred_at.isoformat() if meeting.occurred_at else None,
+        "created_at": meeting.created_at.isoformat() if meeting.created_at else None,
+        "external_source": (
+            meeting.external_source.value
+            if hasattr(meeting.external_source, "value")
+            else str(meeting.external_source)
+        ),
+        "status": (
+            meeting.status.value
+            if hasattr(meeting.status, "value")
+            else str(meeting.status)
+        ),
+        "ideas_status": (
+            meeting.ideas_status.value
+            if hasattr(meeting.ideas_status, "value")
+            else str(meeting.ideas_status)
+        ),
+        "ideas_error": meeting.ideas_error,
+        "speakers": _extract_speakers(meeting.transcript),
+        "action_count": actions_count,
+        "key_point_count": key_points_count,
+        "has_minutes": meeting.minutes is not None,
+    }
 
 
 def _meeting_payload(meeting, parsed, *, queued: bool, duplicate: bool = False) -> dict:
@@ -159,7 +215,7 @@ def retry_extract_ideas(meeting_id: int):
 
 @bp.get("")
 def list_meetings():
-    return jsonify([_serialise(m) for m in db.list_meetings()])
+    return jsonify([_serialise_summary(m) for m in db.list_meetings()])
 
 
 @bp.get("/<int:meeting_id>")
