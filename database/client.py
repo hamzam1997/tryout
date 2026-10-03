@@ -166,7 +166,7 @@ def reset_in_memory_firestore() -> None:
 
 
 def get_firestore_client():
-    """Return the Firestore client, using in-memory store if offline/unconfigured."""
+    """Return the Google Cloud Firestore client strictly."""
     global _firestore_client, _use_memory_fallback
 
     if _use_memory_fallback:
@@ -179,40 +179,29 @@ def get_firestore_client():
         if _firestore_client is not None:
             return _firestore_client
 
-        try:
-            from google.cloud import firestore
+        from google.cloud import firestore
 
-            project = (
-                settings.google_cloud_project
-                or os.environ.get("GOOGLE_CLOUD_PROJECT")
-                or None
-            )
-            database = (
-                settings.firestore_database
-                if settings.firestore_database != "(default)"
-                else None
-            )
+        project = (
+            settings.google_cloud_project
+            or os.environ.get("GOOGLE_CLOUD_PROJECT")
+            or None
+        )
+        database = (
+            settings.firestore_database
+            if settings.firestore_database != "(default)"
+            else None
+        )
 
-            if database:
-                client = firestore.Client(project=project, database=database)
-            elif project:
-                client = firestore.Client(project=project)
-            else:
-                client = firestore.Client()
+        if database:
+            client = firestore.Client(project=project, database=database)
+        elif project:
+            client = firestore.Client(project=project)
+        else:
+            client = firestore.Client()
 
-            # Probe connectivity to ensure Firestore API is enabled in this project
-            client.collection("counters").document("probe").get(timeout=3)
-            logger.info("Initialized and verified Google Cloud Firestore client for project %s", client.project)
-            _firestore_client = client
-            return _firestore_client
-        except Exception as exc:
-            logger.warning(
-                "Google Cloud Firestore is disabled or unreachable (%s). "
-                "Falling back to in-memory storage so all endpoints continue working locally.",
-                exc,
-            )
-            _use_memory_fallback = True
-            return _mock_client
+        logger.info("Initialized Google Cloud Firestore client for project %s", client.project)
+        _firestore_client = client
+        return _firestore_client
 
 
 def get_next_id(entity_name: str) -> int:
