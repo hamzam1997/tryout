@@ -227,12 +227,23 @@ def github_status():
     )
 
 
+@bp.post("/logout")
+def logout():
+    """Clear all authenticated session data (Firebase user + GitHub token)."""
+    session.pop("user", None)
+    session.pop("github_token", None)
+    session.pop("github_user", None)
+    session.clear()
+    return jsonify({"ok": True, "authenticated": False})
+
+
 @bp.post("/github/logout")
 def github_logout():
     """Clear the GitHub session."""
     session.pop("github_token", None)
     session.pop("github_user", None)
     return jsonify({"ok": True, "authenticated": False})
+
 
 
 @bp.get("/github/repos")

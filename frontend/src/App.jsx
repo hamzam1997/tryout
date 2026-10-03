@@ -322,6 +322,8 @@ export default function App() {
           ideas: ideaCounts.PENDING,
         }}
         online={online}
+        user={currentUser}
+        onLogout={() => setCurrentUser(null)}
       />
 
       <main className="main">
