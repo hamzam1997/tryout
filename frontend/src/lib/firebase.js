@@ -10,16 +10,14 @@ import {
 
 // Vite client env variables or fallback configuration
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDummyKeyForDevelopment12345",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCAst4nJNYaxCp_h5-C0D0e2QSh6mDi6y0",
   authDomain:
-    import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ||
-    `${import.meta.env.VITE_FIREBASE_PROJECT_ID || "tryout-ai"}.firebaseapp.com`,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "tryout-ai",
+    import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "project-d8ffc1c1-61f2-4aef-9ab.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "project-d8ffc1c1-61f2-4aef-9ab",
   storageBucket:
-    import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ||
-    `${import.meta.env.VITE_FIREBASE_PROJECT_ID || "tryout-ai"}.appspot.com`,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "1234567890",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:1234567890:web:abcdef123456",
+    import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "project-d8ffc1c1-61f2-4aef-9ab.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "228085742413",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:228085742413:web:80180bf01b38db40acd504",
 };
 
 const app = initializeApp(firebaseConfig);
