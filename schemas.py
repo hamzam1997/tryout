@@ -432,6 +432,7 @@ class ExtractedIdeaBatch(BaseModel):
 class Idea(BaseModel):
     id: int | None = None
     meeting_id: int
+    repository_id: int | None = None
     title: str
     description: str = ""
     quote: str = ""

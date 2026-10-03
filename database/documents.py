@@ -171,6 +171,7 @@ class IdeaDoc(BaseModel):
 
     id: int
     meeting_id: int
+    repository_id: int | None = None
     title: str
     description: str = ""
     quote: str = ""
@@ -204,6 +205,7 @@ class IdeaDoc(BaseModel):
         return schemas.Idea(
             id=self.id,
             meeting_id=self.meeting_id,
+            repository_id=self.repository_id,
             title=self.title,
             description=self.description,
             quote=self.quote,
@@ -227,6 +229,7 @@ class IdeaDoc(BaseModel):
         return cls(
             id=idea.id or 0,
             meeting_id=idea.meeting_id,
+            repository_id=idea.repository_id,
             title=idea.title,
             description=idea.description,
             quote=idea.quote,

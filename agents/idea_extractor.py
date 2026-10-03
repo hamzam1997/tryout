@@ -155,13 +155,16 @@ def generate_ideas(
     return batch
 
 
-def _candidate_to_idea(candidate: ExtractedIdeaCandidate, meeting_id: int) -> Idea:
+def _candidate_to_idea(
+    candidate: ExtractedIdeaCandidate, meeting_id: int, repository_id: int | None = None
+) -> Idea:
     idea_key = normalize_idea_key(candidate.idea_key)
     if not idea_key and candidate.title.strip():
         idea_key = normalize_idea_key(candidate.title)
 
     return Idea(
         meeting_id=meeting_id,
+        repository_id=repository_id,
         title=candidate.title.strip() or idea_key or "Untitled idea",
         description=candidate.description.strip(),
         quote=candidate.quote.strip(),
@@ -187,7 +190,11 @@ def extract_ideas(
     repo_target = repository if repository is not None else DEFAULT_REPOSITORY_PATH
     onboarder = RepoOnboarder()
     try:
-        catalog = onboarder.onboard(repo_target)
+        onboarded = onboarder.onboard(repo_target, return_repo=True)
+        if isinstance(onboarded, tuple):
+            repository_record, catalog = onboarded
+        else:  # Keep injected/custom onboarders that only return the catalog usable.
+            repository_record, catalog = None, onboarded
     except Exception as exc:
         log_event(
             logger,
@@ -220,7 +227,9 @@ def extract_ideas(
             )
             continue
 
-        draft = _candidate_to_idea(candidate, meeting_id)
+        draft = _candidate_to_idea(
+            candidate, meeting_id, repository_record.id if repository_record else None
+        )
         if draft.idea_key:
             if draft.idea_key in seen_keys:
                 log_event(

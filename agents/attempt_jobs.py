@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-import difflib
 import logging
 import shutil
 import tempfile
 import threading
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 import database as db
-from agents.attempt_agent import generate_changes, generate_plan
+from agents.attempt_agent import generate_plan
+from agents.coder import CodingAgent
 from agents.git_utils import fetch_github_repository
 from agents.repo_onboarder import compute_source_ref
 from config import settings
@@ -118,42 +118,6 @@ def _relevant_context(root: Path, idea, plan, catalog) -> str:
     return "".join(parts)
 
 
-def _apply_changes(root: Path, changes) -> str:
-    diffs: list[str] = []
-    total_bytes = 0
-    for change in changes:
-        relative = PurePosixPath(change.path)
-        if relative.is_absolute() or not relative.parts or ".." in relative.parts:
-            raise ValueError(f"Unsafe generated file path: {change.path}")
-        if any(part.startswith(".") for part in relative.parts):
-            raise ValueError(f"Generated changes cannot modify hidden files: {change.path}")
-        if _is_sensitive_filename(relative.name):
-            raise ValueError(f"Generated changes cannot modify credential files: {change.path}")
-
-        target = root.joinpath(*relative.parts).resolve()
-        if not target.is_relative_to(root.resolve()):
-            raise ValueError(f"Generated file escaped repository: {change.path}")
-        before = target.read_text(encoding="utf-8").splitlines(keepends=True) if target.exists() else []
-        after = change.content.splitlines(keepends=True)
-        content_bytes = len(change.content.encode("utf-8"))
-        total_bytes += content_bytes
-        if content_bytes > 200_000 or total_bytes > 500_000:
-            raise ValueError(f"Generated file is too large: {change.path}")
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(change.content, encoding="utf-8")
-        diffs.extend(
-            difflib.unified_diff(
-                before,
-                after,
-                fromfile=f"a/{relative.as_posix()}",
-                tofile=f"b/{relative.as_posix()}",
-            )
-        )
-        if sum(len(part.encode("utf-8")) for part in diffs) > 500_000:
-            raise ValueError("Generated patch is too large to store safely.")
-    return "".join(diffs)
-
-
 def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
     attempt = db.get_attempt(attempt_id)
     if attempt is None:
@@ -181,14 +145,13 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
             db.set_attempt_status(attempt_id, AttemptStatus.CODING)
             attempt = db.get_attempt(attempt_id) or attempt
             context = _relevant_context(workspace, idea, plan, repo.catalog)
-            batch = generate_changes(
-                idea,
-                plan,
-                repo.catalog,
-                context,
-                settings.model_coding,
+            batch, attempt.diff = CodingAgent(settings.model_coding).generate_and_apply(
+                root=workspace,
+                idea=idea,
+                plan=plan,
+                catalog=repo.catalog,
+                source_context=context,
             )
-            attempt.diff = _apply_changes(workspace, batch.changes)
             if not batch.changes:
                 attempt.test_stdout = "No code changes were generated; review the plan and blockers."
                 attempt.test_exit_code = None
