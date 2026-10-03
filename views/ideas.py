@@ -157,7 +157,7 @@ def retry_attempt_endpoint(idea_id: int):
     idea = db.get_idea(idea_id)
     if idea is None:
         return jsonify({"error": "idea not found"}), 404
-    if idea.status != IdeaStatus.IN_PROCESS:
+    if idea.status not in (IdeaStatus.IN_PROCESS, IdeaStatus.DONE):
         return jsonify({"error": "only approved ideas can retry an attempt"}), 409
 
     attempts = db.list_attempts(idea_id=idea_id)
@@ -181,6 +181,9 @@ def retry_attempt_endpoint(idea_id: int):
             status=AttemptStatus.QUEUED,
         )
     )
+    if idea.status == IdeaStatus.DONE:
+        idea.status = IdeaStatus.IN_PROCESS
+        db.update_idea(idea)
     try:
         queue_attempt(attempt.id, session.get("github_token"))
     except Exception as exc:

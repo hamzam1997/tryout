@@ -7,6 +7,7 @@ const BADGES = {
   PENDING: ["badge-warn", "Needs approval"],
   APPROVED: ["badge-ok", "Approved"],
   IN_PROCESS: ["badge-ok", "In process"],
+  DONE: ["badge-ok", "Done"],
   REJECTED: ["badge-idle", "Rejected"],
 };
 
@@ -109,6 +110,20 @@ export default function IdeaRow({
                 </span>
               </>
             )}
+            {idea.latest_attempt?.pull_request_url && (
+              <>
+                <span className="sep">·</span>
+                <a
+                  className="idea-pr-link"
+                  href={idea.latest_attempt.pull_request_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  View PR
+                </a>
+              </>
+            )}
             {createdWhen && pending && (
               <>
                 <span className="sep">·</span>
@@ -182,7 +197,7 @@ export default function IdeaRow({
             </section>
           )}
 
-          {(idea.status === "IN_PROCESS" || idea.status === "APPROVED") && (
+          {["IN_PROCESS", "APPROVED", "DONE"].includes(idea.status) && (
             <section className="detail approval-panel">
               <h4 className="detail-label">Approval</h4>
               <dl className="meta-grid">
@@ -201,6 +216,8 @@ export default function IdeaRow({
                       ? latestAttempt?.status
                         ? `Attempt ${latestAttempt.status.toLowerCase()}`
                         : "Attempt queued"
+                    : idea.status === "DONE"
+                      ? "Done"
                       : "Approved"}
                   </dd>
                 </div>

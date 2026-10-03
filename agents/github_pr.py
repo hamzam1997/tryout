@@ -136,12 +136,15 @@ def create_attempt_pull_request(
         "A prototype test suite is included, with mocks for required external services. "
         "Generated code was not executed by the attempt worker."
     )
+    pr_title = " ".join(idea_title.split()) or f"Tryout attempt #{attempt_id}"
+    if not pr_title.upper().startswith("[TRYOUT]"):
+        pr_title = f"[TRYOUT] {pr_title}"
     pr = _github_request(
         "POST",
         f"{GITHUB_API}/repos/{owner}/{name}/pulls",
         token,
         json={
-            "title": " ".join(idea_title.split())[:256] or f"Tryout attempt #{attempt_id}",
+            "title": pr_title[:256],
             "head": branch,
             "base": base_branch,
             "body": body,

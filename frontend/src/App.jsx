@@ -44,7 +44,7 @@ export default function App() {
   const [meetings, setMeetings] = useState([]);
   const [ideas, setIdeas] = useState([]);
   const [ideaFilter, setIdeaFilter] = useState("PENDING");
-  const [ideaCounts, setIdeaCounts] = useState({ PENDING: 0, IN_PROCESS: 0, REJECTED: 0, ALL: 0 });
+  const [ideaCounts, setIdeaCounts] = useState({ PENDING: 0, IN_PROCESS: 0, DONE: 0, REJECTED: 0, ALL: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [ideasError, setIdeasError] = useState("");
