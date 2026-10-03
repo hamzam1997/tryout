@@ -71,6 +71,13 @@ def _copy_source(repo, github_token: str | None, destination: Path) -> tuple[Pat
         symlinks=True,
         dirs_exist_ok=True,
     )
+    # Keep Git metadata in the isolated copy so generated changes can be
+    # committed to a branch and pushed as a pull request. The scanner and
+    # model-context builder skip hidden paths, so `.git` is never sent to the LLM.
+    source_git = source_path / ".git"
+    destination_git = destination / ".git"
+    if source_git.is_dir() and not destination_git.exists():
+        shutil.copytree(source_git, destination_git, symlinks=True)
     return destination, commit_sha
 
 
