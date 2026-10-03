@@ -200,12 +200,15 @@ def get_firestore_client():
             else:
                 client = firestore.Client()
 
-            logger.info("Initialized Google Cloud Firestore client for project %s", client.project)
+            # Probe connectivity to ensure Firestore API is enabled in this project
+            client.collection("counters").document("probe").get(timeout=3)
+            logger.info("Initialized and verified Google Cloud Firestore client for project %s", client.project)
             _firestore_client = client
             return _firestore_client
         except Exception as exc:
             logger.warning(
-                "Could not connect to Google Cloud Firestore (%s). Falling back to in-memory Firestore.",
+                "Google Cloud Firestore is disabled or unreachable (%s). "
+                "Falling back to in-memory storage so all endpoints continue working locally.",
                 exc,
             )
             _use_memory_fallback = True
