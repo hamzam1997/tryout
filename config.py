@@ -38,6 +38,14 @@ class Settings(BaseSettings):
 
     execution_timeout_seconds: int = Field(default=60, gt=0)
 
+    # Firebase settings: loaded from environment / Secret Manager
+    firebase_api_key: str = Field(default="AIzaSyCAst4nJNYaxCp_h5-C0D0e2QSh6mDi6y0", validation_alias="FIREBASE_API_KEY")
+    firebase_auth_domain: str = Field(default="project-d8ffc1c1-61f2-4aef-9ab.firebaseapp.com", validation_alias="FIREBASE_AUTH_DOMAIN")
+    firebase_project_id: str = Field(default="project-d8ffc1c1-61f2-4aef-9ab", validation_alias="FIREBASE_PROJECT_ID")
+    firebase_storage_bucket: str = Field(default="project-d8ffc1c1-61f2-4aef-9ab.firebasestorage.app", validation_alias="FIREBASE_STORAGE_BUCKET")
+    firebase_messaging_sender_id: str = Field(default="228085742413", validation_alias="FIREBASE_MESSAGING_SENDER_ID")
+    firebase_app_id: str = Field(default="1:228085742413:web:80180bf01b38db40acd504", validation_alias="FIREBASE_APP_ID")
+
     # Session and GitHub OAuth settings
     secret_key: str = "tryout-dev-secret-key-change-in-prod"
     github_client_id: str = ""
