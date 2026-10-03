@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app";
 import {
   getAuth,
   GoogleAuthProvider,
@@ -6,37 +6,95 @@ import {
   signInWithPopup,
   signOut,
   onAuthStateChanged,
+  setPersistence,
+  browserSessionPersistence,
 } from "firebase/auth";
 
-// Vite client env variables or fallback configuration
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyCAst4nJNYaxCp_h5-C0D0e2QSh6mDi6y0",
-  authDomain:
-    import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "project-d8ffc1c1-61f2-4aef-9ab.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "project-d8ffc1c1-61f2-4aef-9ab",
-  storageBucket:
-    import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "project-d8ffc1c1-61f2-4aef-9ab.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "228085742413",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:228085742413:web:80180bf01b38db40acd504",
-};
+let authInstance = null;
+let googleProviderInstance = null;
+let githubProviderInstance = null;
+let initPromise = null;
 
-const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000; // 2 hours
+const SESSION_TIMESTAMP_KEY = "tryout_session_login_time";
 
-// Google Provider
-export const googleProvider = new GoogleAuthProvider();
+/**
+ * Fetch Firebase client configuration dynamically from server runtime.
+ * Never hardcodes keys, project IDs, or secrets in client source code.
+ */
+async function fetchServerConfig() {
+  const resp = await fetch("/api/auth/firebase-config");
+  if (!resp.ok) {
+    throw new Error(`Failed to load Firebase configuration (${resp.status})`);
+  }
+  return resp.json();
+}
 
-// GitHub Provider with repository access scopes
-export const githubProvider = new GithubAuthProvider();
-githubProvider.addScope("repo");
-githubProvider.addScope("read:user");
+/**
+ * Initialize Firebase dynamically from backend configuration.
+ */
+export async function getFirebaseAuth() {
+  if (authInstance) {
+    return {
+      auth: authInstance,
+      googleProvider: googleProviderInstance,
+      githubProvider: githubProviderInstance,
+    };
+  }
+
+  if (initPromise) {
+    return initPromise;
+  }
+
+  initPromise = (async () => {
+    const config = await fetchServerConfig();
+    const apps = getApps();
+    const app = apps.length > 0 ? apps[0] : initializeApp(config);
+    authInstance = getAuth(app);
+
+    // Set session persistence to browser session only (closes on tab/window close)
+    await setPersistence(authInstance, browserSessionPersistence).catch(() => {});
+
+    googleProviderInstance = new GoogleAuthProvider();
+    githubProviderInstance = new GithubAuthProvider();
+    githubProviderInstance.addScope("repo");
+    githubProviderInstance.addScope("read:user");
+
+    return {
+      auth: authInstance,
+      googleProvider: googleProviderInstance,
+      githubProvider: githubProviderInstance,
+    };
+  })();
+
+  return initPromise;
+}
+
+/**
+ * Check if the current session has exceeded its maximum duration.
+ */
+export function checkSessionExpired() {
+  const loginTime = sessionStorage.getItem(SESSION_TIMESTAMP_KEY);
+  if (!loginTime) return false;
+  const elapsed = Date.now() - parseInt(loginTime, 10);
+  return elapsed > SESSION_EXPIRY_MS;
+}
+
+/**
+ * Stamp current login time.
+ */
+function stampSessionTime() {
+  sessionStorage.setItem(SESSION_TIMESTAMP_KEY, Date.now().toString());
+}
 
 /**
  * Sign in using Google OAuth via Firebase.
  */
 export async function loginWithGoogle() {
+  const { auth, googleProvider } = await getFirebaseAuth();
   const result = await signInWithPopup(auth, googleProvider);
   const user = result.user;
+  stampSessionTime();
 
   // Sync session with Flask backend
   await fetch("/api/auth/firebase-sync", {
@@ -57,14 +115,15 @@ export async function loginWithGoogle() {
 
 /**
  * Sign in using GitHub OAuth via Firebase.
- * Automatically obtains the GitHub OAuth Access Token so repository onboarding
- * works immediately without separate OAuth authorization.
+ * Automatically extracts the GitHub OAuth token with 'repo' scope.
  */
 export async function loginWithGitHub() {
+  const { auth, githubProvider } = await getFirebaseAuth();
   const result = await signInWithPopup(auth, githubProvider);
   const credential = GithubAuthProvider.credentialFromResult(result);
   const githubToken = credential?.accessToken;
   const user = result.user;
+  stampSessionTime();
 
   // Sync GitHub token with Flask backend
   const syncResp = await fetch("/api/auth/firebase-sync", {
@@ -89,13 +148,35 @@ export async function loginWithGitHub() {
  * Log out from Firebase and clear the Flask session.
  */
 export async function logoutUser() {
-  await signOut(auth).catch(() => {});
+  sessionStorage.removeItem(SESSION_TIMESTAMP_KEY);
+  try {
+    const { auth } = await getFirebaseAuth();
+    await signOut(auth).catch(() => {});
+  } catch {}
   await fetch("/api/auth/github/logout", { method: "POST" }).catch(() => {});
 }
 
 /**
- * Subscribe to auth state changes.
+ * Subscribe to auth state changes with automatic session expiry enforcement.
  */
 export function onAuthChanged(callback) {
-  return onAuthStateChanged(auth, callback);
+  let unsubscribeAuth = null;
+  getFirebaseAuth()
+    .then(({ auth }) => {
+      unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+        if (user && checkSessionExpired()) {
+          logoutUser().then(() => callback(null));
+          return;
+        }
+        callback(user);
+      });
+    })
+    .catch((err) => {
+      console.warn("Firebase Auth initialization error:", err);
+      callback(null);
+    });
+
+  return () => {
+    if (unsubscribeAuth) unsubscribeAuth();
+  };
 }

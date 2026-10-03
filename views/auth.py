@@ -133,6 +133,22 @@ def github_callback():
     return redirect("/?auth_success=1")
 
 
+@bp.get("/firebase-config")
+def firebase_config():
+    """Return public Firebase client configuration from server settings or Secret Manager."""
+    project_id = settings.firebase_project_id or settings.google_cloud_project
+    return jsonify(
+        {
+            "apiKey": settings.firebase_api_key,
+            "authDomain": settings.firebase_auth_domain or (f"{project_id}.firebaseapp.com" if project_id else ""),
+            "projectId": project_id,
+            "storageBucket": settings.firebase_storage_bucket or (f"{project_id}.firebasestorage.app" if project_id else ""),
+            "messagingSenderId": settings.firebase_messaging_sender_id,
+            "appId": settings.firebase_app_id,
+        }
+    )
+
+
 @bp.post("/firebase-sync")
 def firebase_sync():
     """Sync Firebase authenticated user and optional GitHub access token."""
