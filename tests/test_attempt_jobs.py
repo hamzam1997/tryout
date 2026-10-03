@@ -15,6 +15,8 @@ from schemas import (
     Attempt,
     AttemptStatus,
     Idea,
+    IdeaStatus,
+    FileRole,
     Meeting,
     PlanStep,
     RepoSource,
@@ -49,7 +51,11 @@ class TestAttemptJobs(unittest.TestCase):
                 name="Demo",
                 source=str(self.repo_path),
                 source_type=RepoSource.LOCAL,
-                catalog=ArchitectureCatalog(name="Demo", test_command="touch should-not-run"),
+                catalog=ArchitectureCatalog(
+                    name="Demo",
+                    test_command="touch should-not-run",
+                    key_files=[FileRole(path="app.py", role="Greeting constant")],
+                ),
                 catalog_status="ready",
             )
         )
@@ -78,11 +84,20 @@ class TestAttemptJobs(unittest.TestCase):
         with (
             patch("agents.attempt_jobs.generate_plan", return_value=plan),
             patch("agents.coder.generate_changes", return_value=changes),
+            patch(
+                "agents.attempt_jobs.create_attempt_pull_request",
+                return_value=(
+                    "tryout/idea-1-attempt-1",
+                    "main",
+                    "https://github.com/org/repo/pull/1",
+                ),
+            ),
         ):
             execute_attempt(self.attempt.id)
 
         result = db.get_attempt(self.attempt.id)
-        self.assertEqual(result.status, AttemptStatus.READY_FOR_REVIEW)
+        self.assertEqual(result.status, AttemptStatus.COMPLETE)
+        self.assertEqual(result.pull_request_url, "https://github.com/org/repo/pull/1")
         self.assertEqual(result.plan.summary, plan.summary)
         self.assertIn("MESSAGE = 'after'", result.diff)
         self.assertIn("Tests were not run", result.test_stdout)
@@ -91,6 +106,7 @@ class TestAttemptJobs(unittest.TestCase):
         self.assertEqual(
             (self.repo_path / "app.py").read_text(encoding="utf-8"), "MESSAGE = 'before'\n"
         )
+        self.assertEqual(db.get_idea(self.idea.id).status, IdeaStatus.DONE)
 
 
 if __name__ == "__main__":
