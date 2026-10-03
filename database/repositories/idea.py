@@ -1,171 +1,141 @@
-"""Idea persistence layer using SQLAlchemy."""
+"""Idea persistence layer using Cloud Firestore."""
 
-import json
+from __future__ import annotations
 
-from sqlalchemy import func, select
-
-from database.connection import session_scope, utc_now
-from database.models import Idea as IdeaModel
+from database.client import get_firestore_client, get_next_id
+from database.documents import AttemptDoc, FrictionLogDoc, IdeaDoc, utc_now
 from schemas import Idea, IdeaStatus
 
 
-def _load_catalog_refs(raw: str | None) -> list[str]:
-    if not raw:
-        return []
-    try:
-        value = json.loads(raw)
-    except json.JSONDecodeError:
-        return []
-    if not isinstance(value, list):
-        return []
-    return [str(item) for item in value]
-
-
-def _dump_catalog_refs(refs: list[str] | None) -> str:
-    return json.dumps(list(refs or []))
-
-
-def orm_to_idea(orm: IdeaModel) -> Idea:
-    return Idea(
-        id=orm.id,
-        meeting_id=orm.meeting_id,
-        title=orm.title,
-        description=orm.description,
-        quote=orm.quote,
-        speaker=orm.speaker,
-        cue_time=orm.cue_time,
-        priority=orm.priority,
-        attempt_hypothesis=orm.attempt_hypothesis,
-        catalog_refs=_load_catalog_refs(orm.catalog_refs_json),
-        idea_key=orm.idea_key,
-        original_idea_id=orm.original_idea_id,
-        status=IdeaStatus(orm.status),
-        approved_by=orm.approved_by,
-        approved_at=orm.approved_at,
-        created_at=orm.created_at,
-    )
-
-
 def create_idea(idea: Idea) -> Idea:
-    created_at = idea.created_at or utc_now()
-    with session_scope() as session:
-        model = IdeaModel(
-            meeting_id=idea.meeting_id,
-            title=idea.title,
-            description=idea.description,
-            quote=idea.quote,
-            speaker=idea.speaker,
-            cue_time=idea.cue_time,
-            priority=idea.priority,
-            attempt_hypothesis=idea.attempt_hypothesis,
-            catalog_refs_json=_dump_catalog_refs(idea.catalog_refs),
-            idea_key=idea.idea_key,
-            original_idea_id=idea.original_idea_id,
-            status=idea.status.value,
-            approved_by=idea.approved_by,
-            approved_at=idea.approved_at,
-            created_at=created_at,
-        )
-        session.add(model)
-        session.flush()
-        return orm_to_idea(model)
+    client = get_firestore_client()
+    idea_id = idea.id or get_next_id("ideas")
+    idea.id = idea_id
+
+    doc = IdeaDoc.from_domain(idea)
+    client.collection(IdeaDoc.COLLECTION).document(str(idea_id)).set(doc.to_doc())
+    return idea
 
 
 def get_idea(idea_id: int) -> Idea | None:
-    with session_scope() as session:
-        model = session.get(IdeaModel, idea_id)
-        return orm_to_idea(model) if model else None
+    client = get_firestore_client()
+    doc_ref = client.collection(IdeaDoc.COLLECTION).document(str(idea_id)).get()
+    if not doc_ref.exists:
+        return None
+    return IdeaDoc.from_doc(doc_ref.to_dict()).to_domain()
 
 
 def list_ideas(
     status: IdeaStatus | None = None, meeting_id: int | None = None
 ) -> list[Idea]:
-    with session_scope() as session:
-        stmt = select(IdeaModel)
-        if status is not None:
-            stmt = stmt.where(IdeaModel.status == status.value)
-        if meeting_id is not None:
-            stmt = stmt.where(IdeaModel.meeting_id == meeting_id)
-        stmt = stmt.order_by(IdeaModel.id)
-        models = session.scalars(stmt).all()
-        return [orm_to_idea(m) for m in models]
+    client = get_firestore_client()
+    query = client.collection(IdeaDoc.COLLECTION)
+    if status is not None:
+        query = query.where("status", "==", status.value)
+    if meeting_id is not None:
+        query = query.where("meeting_id", "==", meeting_id)
+
+    docs = query.order_by("id").stream()
+    ideas = []
+    for d in docs:
+        data = d.to_dict()
+        if data:
+            ideas.append(IdeaDoc.from_doc(data).to_domain())
+    return ideas
 
 
 def get_idea_counts() -> dict[str, int]:
-    with session_scope() as session:
-        counts = {status.value: 0 for status in IdeaStatus}
-        stmt = select(IdeaModel.status, func.count(IdeaModel.id)).group_by(IdeaModel.status)
-        for status_val, count in session.execute(stmt):
-            if status_val in counts:
-                counts[status_val] = count
-        counts["ALL"] = sum(counts.values())
-        return counts
+    client = get_firestore_client()
+    counts = {s.value: 0 for s in IdeaStatus}
+    docs = client.collection(IdeaDoc.COLLECTION).stream()
+    for d in docs:
+        data = d.to_dict() or {}
+        st = data.get("status")
+        if st in counts:
+            counts[st] += 1
+    counts["ALL"] = sum(counts.values())
+    return counts
 
 
-def find_idea_by_key(idea_key: str) -> Idea | None:
-    """Return the earliest idea with this idea_key, for cross-meeting dedup."""
-    if not idea_key:
+def set_idea_status(
+    idea_id: int,
+    status: IdeaStatus,
+    approved_by: str | None = None,
+) -> Idea | None:
+    client = get_firestore_client()
+    doc_ref = client.collection(IdeaDoc.COLLECTION).document(str(idea_id))
+    snap = doc_ref.get()
+    if not snap.exists:
         return None
-    with session_scope() as session:
-        stmt = (
-            select(IdeaModel)
-            .where(IdeaModel.idea_key == idea_key)
-            .order_by(IdeaModel.id)
-            .limit(1)
-        )
-        model = session.scalars(stmt).first()
-        return orm_to_idea(model) if model else None
 
-
-def set_idea_status(idea_id: int, status: IdeaStatus) -> None:
-    with session_scope() as session:
-        model = session.get(IdeaModel, idea_id)
-        if model:
-            model.status = status.value
+    now = utc_now().isoformat()
+    payload = {
+        "status": status.value,
+        "approved_by": approved_by,
+        "approved_at": now if status in (IdeaStatus.APPROVED, IdeaStatus.IN_PROCESS) else None,
+    }
+    doc_ref.set(payload, merge=True)
+    updated = doc_ref.get().to_dict()
+    return IdeaDoc.from_doc(updated).to_domain()
 
 
 def approve_idea(idea_id: int, approved_by: str) -> Idea | None:
-    """Approve an idea and move it to IN_PROCESS as work starts."""
-    reviewer = (approved_by or "").strip()
-    if not reviewer:
-        raise ValueError("approved_by is required")
+    return set_idea_status(idea_id, IdeaStatus.IN_PROCESS, approved_by=approved_by)
 
-    with session_scope() as session:
-        model = session.get(IdeaModel, idea_id)
-        if model is None:
-            return None
-        model.status = IdeaStatus.IN_PROCESS.value
-        model.approved_by = reviewer
-        model.approved_at = utc_now()
-        session.flush()
-        return orm_to_idea(model)
+
+def reject_idea(idea_id: int) -> Idea | None:
+    return set_idea_status(idea_id, IdeaStatus.REJECTED)
+
+
+def find_idea_by_key(idea_key: str, meeting_id: int | None = None) -> Idea | None:
+    if not idea_key:
+        return None
+    client = get_firestore_client()
+    query = client.collection(IdeaDoc.COLLECTION).where("idea_key", "==", idea_key)
+    if meeting_id is not None:
+        query = query.where("meeting_id", "==", meeting_id)
+    docs = list(query.stream())
+    if not docs:
+        return None
+    return IdeaDoc.from_doc(docs[0].to_dict()).to_domain()
 
 
 def update_idea(idea: Idea) -> Idea:
-    with session_scope() as session:
-        model = session.get(IdeaModel, idea.id)
-        if model:
-            model.title = idea.title
-            model.description = idea.description
-            model.quote = idea.quote
-            model.speaker = idea.speaker
-            model.cue_time = idea.cue_time
-            model.priority = idea.priority
-            model.attempt_hypothesis = idea.attempt_hypothesis
-            model.catalog_refs_json = _dump_catalog_refs(idea.catalog_refs)
-            model.idea_key = idea.idea_key
-            model.original_idea_id = idea.original_idea_id
-            model.status = idea.status.value
-            model.approved_by = idea.approved_by
-            model.approved_at = idea.approved_at
+    if not idea.id:
+        return create_idea(idea)
+    client = get_firestore_client()
+    doc = IdeaDoc.from_domain(idea)
+    client.collection(IdeaDoc.COLLECTION).document(str(idea.id)).set(doc.to_doc(), merge=True)
     return idea
 
 
 def delete_idea(idea_id: int) -> bool:
-    """Delete an idea and cascaded attempts. Returns False if missing."""
-    with session_scope() as session:
-        model = session.get(IdeaModel, idea_id)
-        if model is None:
-            return False
-        session.delete(model)
-        return True
+    """Delete idea and cascade delete related attempts and friction logs."""
+    client = get_firestore_client()
+    doc_ref = client.collection(IdeaDoc.COLLECTION).document(str(idea_id))
+    if not doc_ref.get().exists:
+        return False
+
+    # Cascading attempt & friction log cleanup
+    attempts = list(
+        client.collection(AttemptDoc.COLLECTION).where("idea_id", "==", idea_id).stream()
+    )
+    for att in attempts:
+        att_id = int(att.id)
+        # Delete friction logs
+        flogs = list(
+            client.collection(FrictionLogDoc.COLLECTION).where("attempt_id", "==", att_id).stream()
+        )
+        for flog in flogs:
+            client.collection(FrictionLogDoc.COLLECTION).document(flog.id).delete()
+        client.collection(AttemptDoc.COLLECTION).document(att.id).delete()
+
+    # Nullify original_idea_id references
+    child_ideas = list(
+        client.collection(IdeaDoc.COLLECTION).where("original_idea_id", "==", idea_id).stream()
+    )
+    for c in child_ideas:
+        client.collection(IdeaDoc.COLLECTION).document(c.id).set({"original_idea_id": None}, merge=True)
+
+    doc_ref.delete()
+    return True

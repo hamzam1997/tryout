@@ -1,24 +1,20 @@
-"""Database package: connection helpers, ORM models, and repository CRUD."""
+"""Database package using Google Cloud Firestore."""
 
-from sqlalchemy.exc import IntegrityError
+from __future__ import annotations
 
-from database.connection import (
-    BUSY_TIMEOUT_MS,
-    connect,
-    database_path,
-    get_engine,
-    get_session_factory,
-    session_scope,
-    set_database_path,
-    utc_now,
+import logging
+from database.client import (
+    force_in_memory_firestore,
+    get_firestore_client,
+    reset_in_memory_firestore,
 )
-from database.models import (
-    Attempt as AttemptModel,
-    Base,
-    FrictionLog as FrictionLogModel,
-    Idea as IdeaModel,
-    Meeting as MeetingModel,
-    Repository as RepositoryModel,
+from database.documents import (
+    AttemptDoc,
+    FrictionLogDoc,
+    IdeaDoc,
+    MeetingDoc,
+    RepositoryDoc,
+    utc_now,
 )
 from database.repositories import (
     approve_idea,
@@ -59,7 +55,6 @@ from database.repositories import (
     update_meeting,
     update_repository,
 )
-from database.schema import init_db
 from schemas import (
     ArchitectureCatalog,
     Attempt,
@@ -85,54 +80,69 @@ from schemas import (
     TechnicalPlan,
 )
 
+logger = logging.getLogger(__name__)
+
+
+class IntegrityError(Exception):
+    """Integrity violation error (e.g. duplicate key or missing foreign entity)."""
+    pass
+
+
+def init_db() -> None:
+    """Initialize database connection. Verifies Firestore connectivity."""
+    try:
+        client = get_firestore_client()
+        logger.info("Firestore database initialized successfully.")
+    except Exception as exc:
+        logger.warning("Firestore client initialization deferred: %s", exc)
+
+
+def set_database_path(path=None) -> None:
+    """Test compatibility hook for isolation in tests."""
+    reset_in_memory_firestore()
+    if path is not None:
+        force_in_memory_firestore(True)
+    else:
+        force_in_memory_firestore(False)
+
+
 __all__ = [
-    # Connection & session
-    "BUSY_TIMEOUT_MS",
-    "IntegrityError",
-    "connect",
-    "database_path",
-    "get_engine",
-    "get_session_factory",
     "init_db",
-    "session_scope",
     "set_database_path",
+    "get_firestore_client",
+    "force_in_memory_firestore",
+    "reset_in_memory_firestore",
     "utc_now",
-    # ORM models
-    "Base",
-    "RepositoryModel",
-    "MeetingModel",
-    "IdeaModel",
-    "AttemptModel",
-    "FrictionLogModel",
-    # Domain DTOs & enums
-    "RepoSource",
-    "MeetingSource",
-    "MeetingStatus",
-    "IdeasExtractStatus",
-    "IdeaStatus",
+    "IntegrityError",
+    # Document models
+    "RepositoryDoc",
+    "MeetingDoc",
+    "IdeaDoc",
+    "AttemptDoc",
+    "FrictionLogDoc",
+    # Domain schemas
+    "ArchitectureCatalog",
+    "Attempt",
     "AttemptStatus",
     "FrictionCategory",
-    "ArchitectureCatalog",
-    "FileRole",
-    "IntegrationEntry",
-    "ModelEntry",
-    "ModuleDescription",
-    "RouteEntry",
-    "MeetingMinutes",
-    "PlanStep",
-    "TechnicalPlan",
-    "ReadinessItem",
-    "Repository",
-    "Meeting",
-    "Idea",
-    "Attempt",
     "FrictionLog",
+    "Idea",
+    "IdeasExtractStatus",
+    "IdeaStatus",
+    "Meeting",
+    "MeetingMinutes",
+    "MeetingSource",
+    "MeetingStatus",
+    "ReadinessItem",
+    "RepoSource",
+    "Repository",
+    "TechnicalPlan",
     # Repositories
+    "approve_idea",
     "catalog_is_current",
     "count_friction_by",
     "create_attempt",
     "create_friction_log",
-    "approve_idea",
     "create_idea",
     "create_meeting",
     "create_repository",

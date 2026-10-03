@@ -1,3 +1,6 @@
+import { useEffect, useState } from "react";
+import { loginWithGoogle, logoutUser, onAuthChanged } from "../lib/firebase";
+
 const ICONS = {
   repositories: (
     <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -25,6 +28,32 @@ const NAV = [
 ];
 
 export default function Sidebar({ view, onNavigate, counts, online }) {
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = onAuthChanged((user) => {
+      setCurrentUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  async function handleGoogleLogin() {
+    try {
+      await loginWithGoogle();
+    } catch (err) {
+      console.warn("Google sign-in cancelled or failed:", err);
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      await logoutUser();
+      setCurrentUser(null);
+    } catch (err) {
+      console.warn("Logout failed:", err);
+    }
+  }
+
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -55,6 +84,38 @@ export default function Sidebar({ view, onNavigate, counts, online }) {
           </button>
         ))}
       </nav>
+
+      <div className="sidebar-auth">
+        {currentUser ? (
+          <div className="sidebar-user">
+            {currentUser.photoURL ? (
+              <img src={currentUser.photoURL} alt="" className="avatar" />
+            ) : (
+              <div className="avatar avatar-fallback">
+                {(currentUser.displayName || currentUser.email || "U")[0].toUpperCase()}
+              </div>
+            )}
+            <div className="user-details">
+              <span className="user-name" title={currentUser.displayName || currentUser.email}>
+                {currentUser.displayName || currentUser.email}
+              </span>
+              <button type="button" className="btn-signout" onClick={handleLogout}>
+                Sign out
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" className="btn-google-signin" onClick={handleGoogleLogin}>
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+              <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3h3.86c2.26-2.09 3.68-5.17 3.68-9.09z"/>
+              <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.37 24 12 24z"/>
+              <path fill="#FBBC05" d="M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.98-3.09z"/>
+              <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.37 0 3.26 2.7 1.29 6.62l3.98 3.09c.95-2.85 3.6-4.96 6.73-4.96z"/>
+            </svg>
+            Sign in with Google
+          </button>
+        )}
+      </div>
 
       <div className="sidebar-foot">
         <span

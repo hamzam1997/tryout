@@ -1,71 +1,50 @@
-"""Repository persistence layer for codebase repositories using SQLAlchemy."""
+"""Repository persistence layer using Cloud Firestore."""
 
-from sqlalchemy import select
+from __future__ import annotations
 
-from database.connection import (
-    dump_model,
-    load_model,
-    session_scope,
-    utc_now,
-)
-from database.models import Repository as RepositoryModel
-from schemas import ArchitectureCatalog, RepoSource, Repository
-
-
-def orm_to_repository(orm: RepositoryModel) -> Repository:
-    return Repository(
-        id=orm.id,
-        name=orm.name,
-        source=orm.source,
-        source_type=RepoSource(orm.source_type),
-        source_ref=orm.source_ref,
-        catalog=load_model(ArchitectureCatalog, orm.catalog_json),
-        catalog_status=getattr(orm, "catalog_status", "ready"),
-        catalog_error=getattr(orm, "catalog_error", None),
-        catalog_generated_at=orm.catalog_generated_at,
-        created_at=orm.created_at,
-    )
+from database.client import get_firestore_client, get_next_id
+from database.documents import RepositoryDoc, utc_now
+from schemas import ArchitectureCatalog, Repository
 
 
 def create_repository(repo: Repository) -> Repository:
-    created_at = repo.created_at or utc_now()
-    with session_scope() as session:
-        model = RepositoryModel(
-            name=repo.name,
-            source=repo.source,
-            source_type=repo.source_type.value,
-            source_ref=repo.source_ref,
-            catalog_json=dump_model(repo.catalog),
-            catalog_status=repo.catalog_status,
-            catalog_error=repo.catalog_error,
-            catalog_generated_at=repo.catalog_generated_at,
-            created_at=created_at,
-        )
-        session.add(model)
-        session.flush()
-        saved = orm_to_repository(model)
+    client = get_firestore_client()
+    repo_id = repo.id or get_next_id("repositories")
+    repo.id = repo_id
 
-    return saved
+    doc = RepositoryDoc.from_domain(repo)
+    client.collection(RepositoryDoc.COLLECTION).document(str(repo_id)).set(doc.to_doc())
+    return repo
 
 
 def get_repository(repo_id: int) -> Repository | None:
-    with session_scope() as session:
-        model = session.get(RepositoryModel, repo_id)
-        return orm_to_repository(model) if model else None
+    client = get_firestore_client()
+    doc_ref = client.collection(RepositoryDoc.COLLECTION).document(str(repo_id)).get()
+    if not doc_ref.exists:
+        return None
+    doc = RepositoryDoc.from_doc(doc_ref.to_dict())
+    return doc.to_domain()
 
 
 def get_repository_by_source(source: str) -> Repository | None:
-    with session_scope() as session:
-        stmt = select(RepositoryModel).where(RepositoryModel.source == source)
-        model = session.scalars(stmt).first()
-        return orm_to_repository(model) if model else None
+    client = get_firestore_client()
+    query = client.collection(RepositoryDoc.COLLECTION).where("source", "==", source)
+    docs = list(query.stream())
+    if not docs:
+        return None
+    doc = RepositoryDoc.from_doc(docs[0].to_dict())
+    return doc.to_domain()
 
 
 def list_repositories() -> list[Repository]:
-    with session_scope() as session:
-        stmt = select(RepositoryModel).order_by(RepositoryModel.id)
-        models = session.scalars(stmt).all()
-        return [orm_to_repository(m) for m in models]
+    client = get_firestore_client()
+    docs = client.collection(RepositoryDoc.COLLECTION).order_by("id").stream()
+    result = []
+    for d in docs:
+        data = d.to_dict()
+        if data:
+            result.append(RepositoryDoc.from_doc(data).to_domain())
+    return result
 
 
 def get_or_create_repository(repo: Repository) -> Repository:
@@ -74,15 +53,11 @@ def get_or_create_repository(repo: Repository) -> Repository:
 
 
 def update_repository(repo: Repository) -> Repository:
-    with session_scope() as session:
-        model = session.get(RepositoryModel, repo.id)
-        if model:
-            model.name = repo.name
-            model.source = repo.source
-            model.source_type = repo.source_type.value
-            model.source_ref = repo.source_ref
-            model.catalog_json = dump_model(repo.catalog)
-            model.catalog_generated_at = repo.catalog_generated_at
+    if not repo.id:
+        return create_repository(repo)
+    client = get_firestore_client()
+    doc = RepositoryDoc.from_domain(repo)
+    client.collection(RepositoryDoc.COLLECTION).document(str(repo.id)).set(doc.to_doc(), merge=True)
     return repo
 
 
@@ -90,42 +65,45 @@ def save_catalog(
     repo_id: int, catalog: ArchitectureCatalog, source_ref: str | None = None
 ) -> None:
     """Cache a generated catalog against the repo state it was built from."""
-    with session_scope() as session:
-        model = session.get(RepositoryModel, repo_id)
-        if model:
-            model.catalog_json = catalog.model_dump_json()
-            model.catalog_generated_at = utc_now()
-            model.catalog_status = "ready"
-            model.catalog_error = None
-            model.source_ref = source_ref
+    client = get_firestore_client()
+    now_str = utc_now().isoformat()
+    client.collection(RepositoryDoc.COLLECTION).document(str(repo_id)).set(
+        {
+            "catalog": catalog.model_dump(mode="json"),
+            "catalog_generated_at": now_str,
+            "catalog_status": "ready",
+            "catalog_error": None,
+            "source_ref": source_ref,
+        },
+        merge=True,
+    )
+
+
+def catalog_is_current(repo_or_id: int | Repository, current_commit: str) -> bool:
+    """True if the cached catalog was built from current_commit."""
+    if isinstance(repo_or_id, Repository):
+        repo = repo_or_id
+    else:
+        repo = get_repository(repo_or_id)
+    if not repo or not repo.catalog:
+        return False
+    return repo.source_ref == current_commit
 
 
 def set_repository_status(
     repo_id: int, status: str, error: str | None = None
 ) -> None:
-    """Update onboarding catalog status ('onboarding', 'ready', 'failed')."""
-    with session_scope() as session:
-        model = session.get(RepositoryModel, repo_id)
-        if model:
-            model.catalog_status = status
-            model.catalog_error = error
-
-
-def catalog_is_current(repo: Repository, source_ref: str | None) -> bool:
-    """True when a cached catalog exists and the repo has not moved since."""
-    return (
-        repo.catalog is not None
-        and repo.source_ref is not None
-        and repo.source_ref == source_ref
-    )
+    """Update catalog onboarding status and optional error message."""
+    client = get_firestore_client()
+    payload = {"catalog_status": status, "catalog_error": error}
+    client.collection(RepositoryDoc.COLLECTION).document(str(repo_id)).set(payload, merge=True)
 
 
 def delete_repository(repo_id: int) -> bool:
-    """Delete a repository and its cascades. Returns True if found and deleted."""
-    with session_scope() as session:
-        model = session.get(RepositoryModel, repo_id)
-        if not model:
-            return False
-        session.delete(model)
-
+    """Delete a repository document from Firestore."""
+    client = get_firestore_client()
+    doc_ref = client.collection(RepositoryDoc.COLLECTION).document(str(repo_id))
+    if not doc_ref.get().exists:
+        return False
+    doc_ref.delete()
     return True

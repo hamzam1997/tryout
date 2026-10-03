@@ -133,16 +133,54 @@ def github_callback():
     return redirect("/?auth_success=1")
 
 
+@bp.post("/firebase-sync")
+def firebase_sync():
+    """Sync Firebase authenticated user and optional GitHub access token."""
+    body = request.get_json(silent=True) or {}
+    github_token = body.get("github_token")
+    firebase_user = body.get("user") or {}
+
+    if github_token:
+        session["github_token"] = github_token
+        try:
+            user_resp = requests.get(
+                "https://api.github.com/user",
+                headers={"Authorization": f"Bearer {github_token}", "User-Agent": "tryout-app"},
+                timeout=10,
+            )
+            if user_resp.status_code == 200:
+                user_json = user_resp.json()
+                session["github_user"] = {
+                    "login": user_json.get("login"),
+                    "avatar_url": user_json.get("avatar_url"),
+                    "name": user_json.get("name") or user_json.get("login"),
+                }
+        except Exception as exc:
+            logger.warning("Could not fetch user profile from GitHub in firebase-sync: %s", exc)
+
+    if firebase_user:
+        session["user"] = firebase_user
+
+    user_info = session.get("github_user") or session.get("user")
+    return jsonify(
+        {
+            "ok": True,
+            "authenticated": bool(session.get("github_token")),
+            "user": user_info,
+        }
+    )
+
+
 @bp.get("/github/status")
 def github_status():
     """Return the current GitHub authentication state."""
     has_creds = bool(settings.github_client_id and settings.github_client_secret)
     token = session.get("github_token")
-    user = session.get("github_user")
+    user = session.get("github_user") or session.get("user")
 
     return jsonify(
         {
-            "configured": has_creds,
+            "configured": has_creds or bool(token),
             "authenticated": bool(token),
             "user": user if token else None,
         }

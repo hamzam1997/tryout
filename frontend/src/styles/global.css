@@ -194,6 +194,74 @@ svg { flex: none; }
   color: var(--on-surface-muted);
 }
 
+.sidebar-auth {
+  padding: var(--s-3) var(--s-4);
+  border-top: 1px solid var(--outline-variant);
+}
+
+.sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.sidebar-user .avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+}
+
+.sidebar-user .user-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sidebar-user .user-name {
+  font-size: var(--text-caption);
+  font-weight: 500;
+  color: var(--on-surface);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.btn-signout {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  color: var(--on-surface-muted);
+  cursor: pointer;
+  text-align: left;
+}
+
+.btn-signout:hover {
+  color: var(--warn);
+}
+
+.btn-google-signin {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  width: 100%;
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--text-caption);
+  font-weight: 500;
+  background: var(--surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--r-md);
+  color: var(--on-surface);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.btn-google-signin:hover {
+  background: var(--surface-container);
+  border-color: var(--outline);
+}
+
 .dot { width: 8px; height: 8px; border-radius: var(--r-full); background: var(--outline-variant); }
 .dot.is-up { background: var(--ok); }
 .dot.is-down { background: var(--error); }
