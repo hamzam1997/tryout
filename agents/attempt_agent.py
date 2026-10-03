@@ -84,8 +84,11 @@ def generate_changes(
                 "(for example mock_twilio_client.py) and make the prototype tests use "
                 "the mock rather than contacting a real service. "
                 "Do not include secrets, credentials, generated artifacts, or files "
-                "outside the repository. If the plan is blocked or there is not enough "
-                "context to make a safe change, return an empty changes list."
+                "outside the repository. If details are missing, still return the best "
+                "safe starter implementation you can: use clearly named TODOs for "
+                "unknown repository-specific behavior, provide mocks for unavailable "
+                "services, and include a prototype test. Never return an empty changes "
+                "list solely because an external service, detail, or owner is unavailable."
             ),
             response_mime_type="application/json",
             response_schema=FileChangeBatch,
