@@ -19,6 +19,7 @@ export default function IdeasPage({
   busyId,
   deletingId,
   onApprove,
+  onRetryAttempt,
   onReject,
   onDelete,
 }) {
@@ -93,6 +94,7 @@ export default function IdeasPage({
               busy={busyId === idea.id}
               deleting={deletingId === idea.id}
               onApprove={onApprove}
+              onRetryAttempt={onRetryAttempt}
               onReject={onReject}
               onDelete={onDelete}
             />

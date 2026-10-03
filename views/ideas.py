@@ -151,6 +151,46 @@ def approve_idea_endpoint(idea_id: int):
     return jsonify(response), 202
 
 
+@bp.post("/<int:idea_id>/attempts/retry")
+def retry_attempt_endpoint(idea_id: int):
+    """Start a fresh attempt after a previous generation or PR failed."""
+    idea = db.get_idea(idea_id)
+    if idea is None:
+        return jsonify({"error": "idea not found"}), 404
+    if idea.status != IdeaStatus.IN_PROCESS:
+        return jsonify({"error": "only approved ideas can retry an attempt"}), 409
+
+    attempts = db.list_attempts(idea_id=idea_id)
+    latest = attempts[0] if attempts else None
+    if latest is None:
+        return jsonify({"error": "there is no previous attempt to retry"}), 409
+    if latest.status not in (AttemptStatus.FAILED, AttemptStatus.READY_FOR_REVIEW):
+        return jsonify({"error": "the latest attempt is still running"}), 409
+    if latest.pull_request_url:
+        return jsonify({"error": "the latest attempt already has a pull request"}), 409
+
+    repository = db.get_repository(latest.repository_id)
+    if repository is None or repository.catalog_status != "ready" or repository.catalog is None:
+        return jsonify({"error": "the attempt repository needs a ready architecture catalog"}), 409
+
+    attempt = db.create_attempt(
+        Attempt(
+            idea_id=idea_id,
+            repository_id=repository.id,
+            repo_ref=repository.source_ref,
+            status=AttemptStatus.QUEUED,
+        )
+    )
+    try:
+        queue_attempt(attempt.id, session.get("github_token"))
+    except Exception as exc:
+        db.set_attempt_status(attempt.id, AttemptStatus.FAILED, error=str(exc))
+
+    response = _serialise(db.get_idea(idea_id))
+    response["latest_attempt"] = _serialise_attempt(db.get_attempt(attempt.id) or attempt)
+    return jsonify(response), 202
+
+
 @bp.post("/<int:idea_id>/reject")
 def reject_idea(idea_id: int):
     idea = db.get_idea(idea_id)

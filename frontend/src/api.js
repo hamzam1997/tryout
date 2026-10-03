@@ -73,6 +73,10 @@ export function approveIdea(id, repositoryId) {
   }).then(parse);
 }
 
+export function retryIdeaAttempt(id) {
+  return fetch(`/ideas/${id}/attempts/retry`, { method: "POST" }).then(parse);
+}
+
 export function rejectIdea(id) {
   return fetch(`/ideas/${id}/reject`, { method: "POST" }).then(parse);
 }

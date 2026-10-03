@@ -16,6 +16,7 @@ import {
   listMeetings,
   listRepositories,
   rejectIdea,
+  retryIdeaAttempt,
 } from "./api";
 import "./styles/global.css";
 
@@ -253,6 +254,21 @@ export default function App() {
     }
   }
 
+  async function handleRetryAttempt(ideaId) {
+    setBusyId(ideaId);
+    setIdeasError("");
+    try {
+      const updated = await retryIdeaAttempt(ideaId);
+      setIdeas((current) =>
+        current.map((idea) => (idea.id === updated.id ? { ...idea, ...updated } : idea))
+      );
+    } catch (problem) {
+      setIdeasError(problem.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function handleReject(ideaId) {
     setBusyId(ideaId);
     setIdeasError("");
@@ -372,6 +388,7 @@ export default function App() {
                 : null
             }
             onApprove={handleApprove}
+            onRetryAttempt={handleRetryAttempt}
             onReject={handleReject}
             onDelete={handleDeleteIdea}
           />
