@@ -151,6 +151,16 @@ class AttemptHarness:
             return run_tests(self.workspace, args["command"])
         return f"Unknown tool {name}"
 
+    def _staged_diff(self) -> str:
+        """Stage every change (incl. new files) and return the staged diff."""
+        git = lambda *a: subprocess.run(["git", *a], cwd=self.workspace, capture_output=True, text=True).stdout
+        git("add", "-A")
+        # The workspace copy skips .env/secret files; their absence must not ship as deletions.
+        deleted = [p for p in git("diff", "--staged", "--name-only", "--diff-filter=D", "-z").split("\0") if p]
+        if deleted:
+            git("reset", "-q", "--", *deleted)
+        return git("diff", "--staged")
+
     def run(self) -> HarnessResult:
         system_instruction = (
             "You are an autonomous senior SWE working inside a repository workspace.\n"
@@ -210,14 +220,12 @@ class AttemptHarness:
                 if call.name == "complete_attempt":
                     completed = True
                     args = call.args or {}
-                    subprocess.run(["git", "add", "-A"], cwd=self.workspace)
-                    diff_cmd = subprocess.run(["git", "diff", "--staged"], cwd=self.workspace, capture_output=True, text=True)
                     result = HarnessResult(
                         success=True,
                         summary=args.get("summary", "Done"),
                         pr_title=args.get("pr_title", self.idea.title),
                         testing_notes=args.get("testing_notes", ""),
-                        diff=diff_cmd.stdout
+                        diff=self._staged_diff()
                     )
                     break
                 
@@ -231,9 +239,6 @@ class AttemptHarness:
                 )
 
             if completed and result:
-                # Compute diff
-                diff_cmd = subprocess.run(["git", "diff"], cwd=self.workspace, capture_output=True, text=True)
-                result.diff = diff_cmd.stdout
                 self._log_step("complete", "Attempt implementation finished.")
                 return result
 
@@ -245,11 +250,10 @@ class AttemptHarness:
 
         self._log_step("timeout", "Reached max steps without completing attempt", status="failed")
         # Fallback completion
-        diff_cmd = subprocess.run(["git", "diff"], cwd=self.workspace, capture_output=True, text=True)
         return HarnessResult(
             success=False,
             summary="Timed out after maximum iterations. Incomplete.",
             pr_title=self.idea.title,
             testing_notes="",
-            diff=diff_cmd.stdout
+            diff=self._staged_diff()
         )
