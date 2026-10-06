@@ -266,6 +266,7 @@ class AttemptDoc(BaseModel):
     test_stdout: str | None = None
     test_stderr: str | None = None
     error: str | None = None
+    events: list[dict] = Field(default_factory=list)
     started_at: str | None = None
     finished_at: str | None = None
     created_at: str = Field(default_factory=lambda: utc_now().isoformat())
@@ -285,6 +286,7 @@ class AttemptDoc(BaseModel):
         f_at = datetime.fromisoformat(self.finished_at) if self.finished_at else None
         created = datetime.fromisoformat(self.created_at) if self.created_at else None
 
+
         return schemas.Attempt(
             id=self.id,
             idea_id=self.idea_id,
@@ -294,12 +296,13 @@ class AttemptDoc(BaseModel):
             branch_name=self.branch_name,
             pull_request_url=self.pull_request_url,
             status=schemas.AttemptStatus(self.status),
-            plan=plan_obj,
+            plan=schemas.TechnicalPlan.model_validate(self.plan) if self.plan else None,
             diff=self.diff,
             test_exit_code=self.test_exit_code,
             test_stdout=self.test_stdout,
             test_stderr=self.test_stderr,
             error=self.error,
+            events=[schemas.AttemptStep.model_validate(e) for e in self.events] if self.events else [],
             started_at=s_at,
             finished_at=f_at,
             created_at=created,
@@ -315,6 +318,7 @@ class AttemptDoc(BaseModel):
             if attempt.created_at
             else utc_now().isoformat()
         )
+
         return cls(
             id=attempt.id or 0,
             idea_id=attempt.idea_id,
@@ -324,12 +328,13 @@ class AttemptDoc(BaseModel):
             branch_name=attempt.branch_name,
             pull_request_url=attempt.pull_request_url,
             status=attempt.status.value,
-            plan=plan_dict,
+            plan=attempt.plan.model_dump(mode="json") if attempt.plan else None,
             diff=attempt.diff,
             test_exit_code=attempt.test_exit_code,
             test_stdout=attempt.test_stdout,
             test_stderr=attempt.test_stderr,
             error=attempt.error,
+            events=[e.model_dump(mode="json") for e in attempt.events] if attempt.events else [],
             started_at=s_at,
             finished_at=f_at,
             created_at=created,
