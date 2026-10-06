@@ -20,12 +20,24 @@ from schemas import (
     ExtractedIdeaCandidate,
     Idea,
     IdeaStatus,
+    RepoSource,
     Repository,
 )
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_REPOSITORY_PATH = BASE_DIR / "demo_repo" / "acme_store"
+
+
+def _default_repository() -> str | Path:
+    """Newest onboarded GitHub repo (so ideas can ship as PRs), else the demo repo."""
+    # ponytail: meetings have no repo picker; add one when users onboard several repos.
+    # Re-cataloguing here runs tokenless, so this only works for public repos.
+    github = [
+        r for r in db.list_repositories()
+        if r.source_type == RepoSource.GITHUB and r.catalog is not None
+    ]
+    return max(github, key=lambda r: r.id).source if github else DEFAULT_REPOSITORY_PATH
 
 SYSTEM_INSTRUCTION = """\
 You are an idea extractor for engineering and operations meetings.
@@ -187,7 +199,7 @@ def extract_ideas(
     if meeting is None:
         raise IdeaExtractorError(f"no meeting with id {meeting_id}")
 
-    repo_target = repository if repository is not None else DEFAULT_REPOSITORY_PATH
+    repo_target = repository if repository is not None else _default_repository()
     onboarder = RepoOnboarder()
     try:
         onboarded = onboarder.onboard(repo_target, return_repo=True)
