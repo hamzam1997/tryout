@@ -150,7 +150,7 @@ class AttemptHarness:
         contents = [
             types.Content(
                 role="user",
-                parts=[types.Part.from_text(
+                parts=[types.Part.from_text(text=
                     f"Approved Idea: {self.idea.title}\n{self.idea.description}\n"
                     f"Quote: {self.idea.quote}\n"
                     f"Catalog overview:\n{self.catalog.to_markdown()}"
@@ -186,7 +186,7 @@ class AttemptHarness:
                 # Prompt the model to use tools or finish
                 contents.append(types.Content(
                     role="user",
-                    parts=[types.Part.from_text("You must either use a tool or call complete_attempt to finish.")]
+                    parts=[types.Part.from_text(text="You must either use a tool or call complete_attempt to finish.")]
                 ))
                 continue
 
