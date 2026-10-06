@@ -451,6 +451,12 @@ class Idea(BaseModel):
     created_at: datetime | None = None
 
 
+class AttemptStep(BaseModel):
+    timestamp: datetime
+    action: str
+    detail: str = ""
+    status: str = "completed"
+
 class Attempt(BaseModel):
     id: int | None = None
     idea_id: int
@@ -466,6 +472,7 @@ class Attempt(BaseModel):
     test_stdout: str | None = None
     test_stderr: str | None = None
     error: str | None = None
+    events: list[AttemptStep] = Field(default_factory=list)
     started_at: datetime | None = None
     finished_at: datetime | None = None
     created_at: datetime | None = None

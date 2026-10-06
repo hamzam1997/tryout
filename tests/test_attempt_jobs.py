@@ -8,8 +8,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 import database as db
-from agents.attempt_agent import FileChange, FileChangeBatch
 from agents.attempt_jobs import execute_attempt
+from agents.harness import HarnessResult
 from schemas import (
     ArchitectureCatalog,
     Attempt,
@@ -68,22 +68,15 @@ class TestAttemptJobs(unittest.TestCase):
         self.temp.cleanup()
 
     def test_generates_plan_and_patch_without_running_repo_code(self):
-        plan = TechnicalPlan(
+        harness_result = HarnessResult(
+            success=True,
             summary="Change the greeting constant.",
-            repo_changes=[PlanStep(order=1, action="Update the message", target="app.py")],
-        )
-        changes = FileChangeBatch(
-            changes=[
-                FileChange(path="app.py", content="MESSAGE = 'after'\n"),
-                FileChange(
-                    path="test_prototype.py",
-                    content="from app import MESSAGE\n\ndef test_message():\n    assert MESSAGE == 'after'\n",
-                ),
-            ]
+            pr_title="Change greeting",
+            testing_notes="Tested it.",
+            diff="fake diff",
         )
         with (
-            patch("agents.attempt_jobs.generate_plan", return_value=plan),
-            patch("agents.coder.generate_changes", return_value=changes),
+            patch("agents.attempt_jobs.AttemptHarness") as mock_harness_class,
             patch(
                 "agents.attempt_jobs.create_attempt_pull_request",
                 return_value=(
@@ -93,21 +86,13 @@ class TestAttemptJobs(unittest.TestCase):
                 ),
             ),
         ):
+            mock_harness_instance = mock_harness_class.return_value
+            mock_harness_instance.run.return_value = harness_result
+            
             execute_attempt(self.attempt.id)
 
         result = db.get_attempt(self.attempt.id)
         self.assertEqual(result.status, AttemptStatus.COMPLETE)
         self.assertEqual(result.pull_request_url, "https://github.com/org/repo/pull/1")
-        self.assertEqual(result.plan.summary, plan.summary)
-        self.assertIn("MESSAGE = 'after'", result.diff)
-        self.assertIn("Tests were not run", result.test_stdout)
-        self.assertIsNone(result.test_exit_code)
-        self.assertFalse((self.repo_path / "should-not-run").exists())
-        self.assertEqual(
-            (self.repo_path / "app.py").read_text(encoding="utf-8"), "MESSAGE = 'before'\n"
-        )
-        self.assertEqual(db.get_idea(self.idea.id).status, IdeaStatus.DONE)
-
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

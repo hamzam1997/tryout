@@ -9,14 +9,13 @@ import threading
 from pathlib import Path
 
 import database as db
-from agents.attempt_agent import generate_plan
-from agents.coder import CodingAgent
+
+from agents.harness import AttemptHarness
 from agents.git_utils import fetch_github_repository
 from agents.github_pr import create_attempt_pull_request
 from agents.repo_onboarder import compute_source_ref
 from config import settings
 from logging_setup import log_event
-from repo_scanner.traversal import walk_repository
 from schemas import AttemptStatus, IdeaStatus, PlanStep, RepoSource, TechnicalPlan
 
 logger = logging.getLogger(__name__)
@@ -134,9 +133,8 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
     try:
         idea = db.get_idea(attempt.idea_id)
         repo = db.get_repository(attempt.repository_id)
-        meeting = db.get_meeting(idea.meeting_id) if idea else None
-        if not idea or not repo or not meeting or not repo.catalog:
-            raise RuntimeError("Attempt is missing its idea, repository catalog, or meeting context.")
+        if not idea or not repo or not repo.catalog:
+            raise RuntimeError("Attempt is missing its idea or repository catalog.")
 
         db.set_attempt_status(attempt_id, AttemptStatus.PLANNING)
         attempt = db.get_attempt(attempt_id) or attempt
@@ -147,68 +145,43 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
             attempt.repo_ref = repo_ref
             db.update_attempt(attempt)
 
-            try:
-                plan = generate_plan(idea, meeting, repo.catalog, settings.model_planning)
-            except Exception as exc:
-                logger.exception("Planning failed for attempt %s; using a starter plan", attempt_id)
-                plan = TechnicalPlan(
-                    summary=(
-                        f"Best-effort starter for {idea.title}. Planning was unavailable; "
-                        "review the generated scaffold and adapt it to repository conventions."
-                    ),
-                    repo_changes=[
-                        PlanStep(
-                            order=1,
-                            action="Add a runnable starter implementation and prototype test",
-                            target=idea.catalog_refs[0] if idea.catalog_refs else "new scaffold files",
-                            rationale=f"Fallback plan used after {type(exc).__name__}.",
-                        )
-                    ],
-                    external_requirements=[
-                        integration.name for integration in repo.catalog.external_integrations
-                    ],
-                    mock_strategy="Use local mock adapters for external integrations.",
-                )
-            attempt.plan = plan
-            db.update_attempt(attempt)
-
             db.set_attempt_status(attempt_id, AttemptStatus.CODING)
             attempt = db.get_attempt(attempt_id) or attempt
-            context = _relevant_context(workspace, idea, plan, repo.catalog)
-            batch, attempt.diff = CodingAgent(settings.model_coding).generate_and_apply(
-                root=workspace,
-                idea=idea,
-                plan=plan,
+            
+            harness = AttemptHarness(
+                workspace=workspace,
                 catalog=repo.catalog,
-                source_context=context,
+                idea=idea,
+                attempt=attempt
             )
-            if not batch.changes:
-                attempt.test_stdout = "No code changes were generated; review the plan and blockers."
-                attempt.test_exit_code = None
-            else:
-                attempt.test_stdout = (
-                    "Tests were not run: this deployment does not have an isolated code-execution sandbox."
-                )
-                attempt.test_exit_code = None
-            attempt.test_stderr = ""
+            harness_result = harness.run()
+            
+            attempt = db.get_attempt(attempt_id) or attempt
+            attempt.diff = harness_result.diff
+            attempt.test_stdout = harness_result.testing_notes
+            attempt.test_exit_code = 0 if harness_result.success else 1
+            attempt.test_stderr = "" if harness_result.success else "Harness run failed or timed out."
             db.update_attempt(attempt)
 
             if attempt.diff:
                 try:
+                    # Parse modified files from git diff
+                    import subprocess
+                    diff_output = subprocess.run(["git", "diff", "--name-only"], cwd=workspace, capture_output=True, text=True).stdout.strip()
+                    change_paths = [p for p in diff_output.splitlines() if p]
+                    
                     published = create_attempt_pull_request(
                         root=workspace,
                         repository_source=repo.source,
                         token=github_token,
                         attempt_id=attempt.id,
                         idea_id=idea.id,
-                        idea_title=idea.title,
-                        summary=plan.summary,
+                        idea_title=harness_result.pr_title,
+                        summary=harness_result.summary,
                         repo_ref=repo_ref,
-                        change_paths=[change.path for change in batch.changes],
+                        change_paths=change_paths,
                     )
                 except Exception as exc:
-                    # A publishing problem should not erase a useful generated patch.
-                    # Keep it available for review/retry and finish the idea workflow.
                     logger.exception("Could not publish PR for attempt %s", attempt_id)
                     attempt.test_stderr = f"Pull request creation failed: {exc}"
                     db.update_attempt(attempt)
@@ -223,15 +196,11 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
                     )
                     db.update_attempt(attempt)
 
-        # Complete means the attempt worker finished. The PR URL (when available) is
-        # stored on this Attempt and is shown in the attempt detail UI.
         db.set_attempt_status(attempt_id, AttemptStatus.COMPLETE)
         idea.status = IdeaStatus.DONE
         db.update_idea(idea)
         log_event(logger, "attempt_jobs.completed", attempt_id=attempt_id, idea_id=attempt.idea_id)
     except Exception as exc:
-        # Preserve a finished state even for setup/infrastructure hiccups. Keep the
-        # diagnostic attached to the attempt so the user can still inspect/retry it.
         logger.exception("Attempt %s completed with a limitation: %s", attempt_id, exc)
         attempt = db.get_attempt(attempt_id) or attempt
         limitation = f"Attempt limitation: {exc}"
