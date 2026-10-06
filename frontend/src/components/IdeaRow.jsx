@@ -283,6 +283,23 @@ export default function IdeaRow({
                   )}
                 </>
               )}
+
+              {latestAttempt.events && latestAttempt.events.length > 0 && (
+                <div className="attempt-events">
+                  <h4 className="detail-subhead">Agent Harness Logs</h4>
+                  <ul className="attempt-steps">
+                    {latestAttempt.events.map((event, idx) => (
+                      <li key={idx}>
+                        <span className="timestamp">{new Date(event.timestamp).toLocaleTimeString()}</span>
+                        {" - "}
+                        <strong>{event.action}</strong>
+                        {event.detail && <span>: {event.detail}</span>}
+                        {event.status === "failed" && <span style={{color: "red"}}> (Failed)</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {latestAttempt.diff ? (
                 <details className="attempt-diff">
                   <summary>View generated code change</summary>

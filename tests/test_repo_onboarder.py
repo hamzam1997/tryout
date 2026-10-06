@@ -178,7 +178,7 @@ class TestRepoOnboarder(unittest.TestCase):
         # Verify Gemini client called with correct arguments
         mock_client.models.generate_content.assert_called_once()
         call_kwargs = mock_client.models.generate_content.call_args.kwargs
-        self.assertEqual(call_kwargs["model"], "gemini-2.5-flash")
+        self.assertEqual(call_kwargs["model"], "gemini-3.5-flash")
         self.assertIn("Context of acme store", call_kwargs["contents"])
         self.assertEqual(call_kwargs["config"].system_instruction, REPO_ONBOARDER_SYSTEM_INSTRUCTION)
         self.assertEqual(call_kwargs["config"].response_mime_type, "application/json")
