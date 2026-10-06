@@ -124,7 +124,18 @@ class AttemptHarness:
         logger.info(f"Harness Step [{action}]: {detail}")
 
     def _execute_tool(self, name: str, args: dict[str, Any]) -> str:
-        self._log_step(name, f"Executing {name} with args {list(args.keys())}")
+        if name == "search_code":
+            detail = f"Searching for '{args.get('query')}'"
+        elif name in ("view_file", "edit_file", "create_file"):
+            detail = f"{name} on {args.get('path')}"
+        elif name == "list_directory":
+            detail = f"Listing directory {args.get('path', '.')}"
+        elif name == "run_tests":
+            detail = f"Running tests: {args.get('command')}"
+        else:
+            detail = f"Executing {name}"
+            
+        self._log_step(name, detail)
         if name == "search_code":
             return search_code(self.workspace, args["query"])
         elif name == "list_directory":
