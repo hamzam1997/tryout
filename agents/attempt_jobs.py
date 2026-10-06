@@ -167,7 +167,7 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
                 try:
                     # Parse modified files from git diff
                     import subprocess
-                    diff_output = subprocess.run(["git", "diff", "--name-only"], cwd=workspace, capture_output=True, text=True).stdout.strip()
+                    diff_output = subprocess.run(["git", "diff", "--staged", "--name-only"], cwd=workspace, capture_output=True, text=True).stdout.strip()
                     change_paths = [p for p in diff_output.splitlines() if p]
                     
                     published = create_attempt_pull_request(

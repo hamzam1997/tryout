@@ -210,11 +210,14 @@ class AttemptHarness:
                 if call.name == "complete_attempt":
                     completed = True
                     args = call.args or {}
+                    subprocess.run(["git", "add", "-A"], cwd=self.workspace)
+                    diff_cmd = subprocess.run(["git", "diff", "--staged"], cwd=self.workspace, capture_output=True, text=True)
                     result = HarnessResult(
                         success=True,
                         summary=args.get("summary", "Done"),
                         pr_title=args.get("pr_title", self.idea.title),
-                        testing_notes=args.get("testing_notes", "")
+                        testing_notes=args.get("testing_notes", ""),
+                        diff=diff_cmd.stdout
                     )
                     break
                 
