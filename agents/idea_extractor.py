@@ -11,7 +11,7 @@ from google.genai import types
 
 import database as db
 from agents.repo_onboarder import RepoOnboarder
-from config import BASE_DIR, settings
+from config import settings
 from llm import get_client
 from logging_setup import log_event
 from schemas import (
@@ -26,11 +26,11 @@ from schemas import (
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_REPOSITORY_PATH = BASE_DIR / "demo_repo" / "acme_store"
+DEFAULT_REPOSITORY_PATH = "https://github.com/hamzam1997/acme-store"
 
 
 def _default_repositories() -> list[str | Path]:
-    """Every onboarded repo with a catalog; the demo repo if none exist yet."""
+    """Every onboarded repo with a catalog; the GitHub demo repo if none exist yet."""
     # ponytail: one extraction call per repo; add a meeting→repo picker when repo count grows.
     # GitHub re-cataloguing here runs tokenless, so only public repos work.
     targets: list[str | Path] = []

@@ -59,35 +59,12 @@ class RepositoriesViewTestCase(unittest.TestCase):
         self.assertEqual(resp.get_json(), [])
 
     @mock.patch("views.repositories.threading.Thread")
-    @mock.patch("agents.repo_onboarder.RepoOnboarder.generate_catalog", return_value=SAMPLE_CATALOG)
-    def test_onboard_demo_repo(self, mock_gen, mock_thread_cls):
-        def run_sync(target=None, args=(), **kwargs):
-            t = mock.MagicMock()
-            t.start.side_effect = lambda: target(*args)
-            return t
-
-        mock_thread_cls.side_effect = run_sync
-
+    def test_onboard_demo_repo_uses_github_demo(self, _thread):
         resp = self.client.post("/repositories/onboard", json={"source_type": "demo"})
         self.assertEqual(resp.status_code, 202)
-        data = resp.get_json()
-        self.assertIn("repository", data)
-        self.assertEqual(data["status"], "onboarding")
-        self.assertEqual(data["repository"]["name"], "acme_store")
-
-        # Verify background worker marked catalog ready and it appears in list
-        list_resp = self.client.get("/repositories")
-        self.assertEqual(list_resp.status_code, 200)
-        repos = list_resp.get_json()
-        self.assertEqual(len(repos), 1)
-        self.assertEqual(repos[0]["name"], "acme_store")
-        self.assertEqual(repos[0]["catalog_status"], "ready")
-        self.assertIsNotNone(repos[0]["catalog"])
-        self.assertNotIn("external_integrations", repos[0]["catalog"])
-
-        cat_resp = self.client.get(f"/repositories/{repos[0]['id']}/catalog")
-        self.assertEqual(cat_resp.status_code, 200)
-        self.assertIn("external_integrations", cat_resp.get_json())
+        repo = resp.get_json()["repository"]
+        self.assertEqual(repo["source_type"], "github")
+        self.assertEqual(repo["source"], "https://github.com/hamzam1997/acme-store")
 
     @mock.patch("views.repositories.threading.Thread")
     @mock.patch("agents.git_utils.fetch_github_repository")

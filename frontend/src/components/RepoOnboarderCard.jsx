@@ -360,7 +360,7 @@ export default function RepoOnboarderCard({
                 </p>
                 <div className="specs-preview">
                   <span>Stack: <strong>Python / Flask</strong></span>
-                  <span>Path: <code>demo_repo/acme_store</code></span>
+                  <span>Repo: <a href="https://github.com/hamzam1997/acme-store" target="_blank" rel="noreferrer"><code>hamzam1997/acme-store</code></a></span>
                   <span>Contains: Models, Routes, CODEOWNERS</span>
                 </div>
               </div>
