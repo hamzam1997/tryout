@@ -29,15 +29,17 @@ logger = logging.getLogger(__name__)
 DEFAULT_REPOSITORY_PATH = BASE_DIR / "demo_repo" / "acme_store"
 
 
-def _default_repository() -> str | Path:
-    """Newest onboarded GitHub repo (so ideas can ship as PRs), else the demo repo."""
-    # ponytail: meetings have no repo picker; add one when users onboard several repos.
-    # Re-cataloguing here runs tokenless, so this only works for public repos.
-    github = [
-        r for r in db.list_repositories()
-        if r.source_type == RepoSource.GITHUB and r.catalog is not None
-    ]
-    return max(github, key=lambda r: r.id).source if github else DEFAULT_REPOSITORY_PATH
+def _default_repositories() -> list[str | Path]:
+    """Every onboarded repo with a catalog; the demo repo if none exist yet."""
+    # ponytail: one extraction call per repo; add a meeting→repo picker when repo count grows.
+    # GitHub re-cataloguing here runs tokenless, so only public repos work.
+    targets: list[str | Path] = []
+    for r in db.list_repositories():
+        if r.catalog is None:
+            continue
+        targets.append(r.source if r.source_type == RepoSource.GITHUB else Path(r.source))
+    return targets or [DEFAULT_REPOSITORY_PATH]
+
 
 SYSTEM_INSTRUCTION = """\
 You are an idea extractor for engineering and operations meetings.
@@ -199,7 +201,29 @@ def extract_ideas(
     if meeting is None:
         raise IdeaExtractorError(f"no meeting with id {meeting_id}")
 
-    repo_target = repository if repository is not None else _default_repository()
+    targets = [repository] if repository is not None else _default_repositories()
+    stored: list[Idea] = []
+    seen_keys: set[str] = set()
+    failures: list[str] = []
+    for target in targets:
+        try:
+            stored += _extract_for_repository(meeting, target, seen_keys)
+        except IdeaExtractorError as exc:
+            failures.append(str(exc))
+    if failures and len(failures) == len(targets):
+        raise IdeaExtractorError("; ".join(failures))
+
+    log_event(
+        logger,
+        "idea_extractor.stored",
+        meeting_id=meeting_id,
+        idea_count=len(stored),
+    )
+    return stored
+
+
+def _extract_for_repository(meeting, repo_target, seen_keys: set[str]) -> list[Idea]:
+    meeting_id = meeting.id
     onboarder = RepoOnboarder()
     try:
         onboarded = onboarder.onboard(repo_target, return_repo=True)
@@ -213,6 +237,7 @@ def extract_ideas(
             "idea_extractor.onboard_failed",
             level=logging.ERROR,
             meeting_id=meeting_id,
+            repository=str(repo_target),
             error=str(exc),
         )
         raise IdeaExtractorError(f"repository onboarding failed: {exc}") from exc
@@ -228,7 +253,6 @@ def extract_ideas(
     )
 
     stored: list[Idea] = []
-    seen_keys: set[str] = set()
     for candidate in batch.ideas:
         if not candidate.catalog_refs:
             log_event(
@@ -266,11 +290,4 @@ def extract_ideas(
 
         idea = db.create_idea(draft)
         stored.append(idea)
-
-    log_event(
-        logger,
-        "idea_extractor.stored",
-        meeting_id=meeting_id,
-        idea_count=len(stored),
-    )
     return stored

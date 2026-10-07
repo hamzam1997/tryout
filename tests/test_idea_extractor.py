@@ -141,6 +141,18 @@ class TestIdeaExtractor(unittest.TestCase):
         self.assertEqual(ideas, [])
         self.assertEqual(len(db.list_ideas(meeting_id=self.meeting.id)), 0)
 
+    @patch("agents.idea_extractor._default_repositories", return_value=["broken", "demo"])
+    @patch("agents.idea_extractor.RepoOnboarder")
+    @patch("agents.idea_extractor.get_client")
+    def test_each_repo_extracted_and_one_failure_tolerated(
+        self, mock_get_client, mock_onboarder_cls, _targets
+    ):
+        mock_onboarder_cls.return_value.onboard.side_effect = [ValueError("scan failed"), self.catalog]
+        mock_get_client.return_value = self._mock_generate_client()
+
+        ideas = extract_ideas(self.meeting.id)
+        self.assertEqual(len(ideas), 1)
+
     @patch("agents.idea_extractor.RepoOnboarder")
     def test_onboard_failure_raises_without_rows(self, mock_onboarder_cls):
         mock_onboarder_cls.return_value.onboard.side_effect = ValueError("scan failed")
