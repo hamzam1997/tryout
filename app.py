@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 from flask import Flask, jsonify, send_from_directory
@@ -5,6 +6,7 @@ from flask import Flask, jsonify, send_from_directory
 from config import settings
 from database import init_db
 from logging_setup import configure_logging
+from seed_history import seed_friction_history
 from views.auth import bp as auth_bp
 from views.ideas import bp as ideas_bp
 from views.meetings import bp as meetings_bp
@@ -19,6 +21,13 @@ configure_logging()
 app = Flask(__name__, static_folder=None)
 app.secret_key = settings.secret_key
 init_db()
+
+try:
+    # ponytail: tests import this module too; keep them off the live database
+    if "unittest" not in sys.modules:
+        seed_friction_history()
+except Exception:  # seeding must never stop the app from booting
+    app.logger.exception("history seeding failed")
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(meetings_bp)
