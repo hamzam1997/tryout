@@ -6,6 +6,7 @@ import logging
 import shutil
 import tempfile
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
 
 import database as db
@@ -17,7 +18,7 @@ from agents.github_pr import create_attempt_pull_request
 from agents.repo_onboarder import compute_source_ref
 from config import settings
 from logging_setup import log_event
-from schemas import AttemptStatus, IdeaStatus, PlanStep, RepoSource, TechnicalPlan
+from schemas import AttemptStatus, AttemptStep, IdeaStatus, PlanStep, RepoSource, TechnicalPlan
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +172,12 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
                     harness_result.testing_notes, settings.model_planning,
                 )
                 readiness_md = readiness_markdown(friction)
+                attempt.events.append(AttemptStep(
+                    timestamp=datetime.now(timezone.utc),
+                    action="friction",
+                    detail=f"{len(friction)} blocker(s) recorded",
+                ))
+                db.update_attempt(attempt)
                 try:
                     # Parse modified files from git diff
                     import subprocess
