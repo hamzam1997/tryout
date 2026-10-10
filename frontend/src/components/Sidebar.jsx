@@ -19,12 +19,18 @@ const ICONS = {
       <path d="M6.5 13.25h3" />
     </svg>
   ),
+  bottlenecks: (
+    <svg viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M2.5 13.25h11M4.5 13.25V8M8 13.25V3.5M11.5 13.25v-3.5" />
+    </svg>
+  ),
 };
 
 const NAV = [
   { id: "repositories", label: "Repositories" },
   { id: "meetings", label: "Meetings" },
   { id: "ideas", label: "Ideas" },
+  { id: "bottlenecks", label: "Bottleneck map" },
 ];
 
 export default function Sidebar({ view, onNavigate, counts, online, user, onLogout }) {

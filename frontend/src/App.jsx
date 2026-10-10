@@ -4,6 +4,7 @@ import LandingPage from "./components/LandingPage";
 import RepositoriesPage from "./pages/RepositoriesPage";
 import MeetingsPage from "./pages/MeetingsPage";
 import IdeasPage from "./pages/IdeasPage";
+import BottlenecksPage from "./pages/BottlenecksPage";
 import { onAuthChanged, checkSessionExpired } from "./lib/firebase";
 import {
   approveIdea,
@@ -372,6 +373,8 @@ export default function App() {
             onRetryIdeas={handleRetryIdeas}
             onDelete={handleDeleteMeeting}
           />
+        ) : view === "bottlenecks" ? (
+          <BottlenecksPage />
         ) : (
           <IdeasPage
             ideas={ideas}
