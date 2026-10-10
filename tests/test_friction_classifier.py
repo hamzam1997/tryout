@@ -8,7 +8,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 import database as db
-from agents.friction_classifier import FrictionItem, readiness_markdown, record_friction
+from agents import friction_classifier
+from agents.friction_classifier import FrictionItem, _diff_for_prompt, readiness_markdown, record_friction
 from schemas import ArchitectureCatalog, Attempt, FrictionCategory, Idea, Meeting, ReadinessItem, Repository
 
 
@@ -48,6 +49,14 @@ class TestFrictionClassifier(unittest.TestCase):
         self.assertEqual(len(logs), 1)
         md = readiness_markdown(stored)
         self.assertIn("- [ ] Grant NOTIFY_API_KEY — @team-comms", md)
+
+    def test_long_diff_lists_files_and_notes_truncation(self):
+        diff = "diff --git a/a.py b/a.py\n" + "x" * 50 + "\ndiff --git a/b.py b/b.py\n+y"
+        with patch.object(friction_classifier, "_MAX_DIFF_CHARS", 30):
+            out = _diff_for_prompt(diff)
+        self.assertIn("- a.py", out)
+        self.assertIn("- b.py", out)  # listed even though the diff body is cut
+        self.assertIn("[truncated,", out)
 
     def test_model_failure_is_swallowed(self):
         with patch("agents.friction_classifier.classify_friction", side_effect=RuntimeError("boom")):

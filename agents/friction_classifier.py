@@ -25,7 +25,8 @@ from schemas import (
 
 logger = logging.getLogger(__name__)
 
-_MAX_DIFF_CHARS = 60_000
+# ~100k tokens: far below the model's context, so real attempt diffs fit whole.
+_MAX_DIFF_CHARS = 400_000
 
 _SYSTEM = (
     "You analyse a finished prototype attempt and list every blocker that stops the idea "
@@ -58,6 +59,15 @@ class FrictionBatch(BaseModel):
     items: list[FrictionItem] = Field(default_factory=list)
 
 
+def _diff_for_prompt(diff: str) -> str:
+    """Changed-file list first, so every file is known even if the diff is cut."""
+    files = [l.split(" b/", 1)[-1] for l in diff.splitlines() if l.startswith("diff --git")]
+    text = diff[:_MAX_DIFF_CHARS]
+    if len(diff) > _MAX_DIFF_CHARS:
+        text += f"\n[truncated, {len(diff) - _MAX_DIFF_CHARS} more chars]"
+    return "Changed files:\n" + "\n".join(f"- {f}" for f in files) + f"\n\nDiff:\n{text}"
+
+
 def classify_friction(
     idea: Idea,
     catalog: ArchitectureCatalog,
@@ -66,6 +76,9 @@ def classify_friction(
     events: list,
     model: str,
 ) -> list[FrictionItem]:
+    # Cap prompt size: keep only the last 40 steps. The harness runs at most 25 model
+    # turns, but a turn can issue several tool calls, so a run can log more than 40
+    # events; any older ones are dropped (the diff and notes still cover that work).
     steps = "\n".join(f"- {e.action}: {e.detail}" for e in events[-40:])
     response = get_client().models.generate_content(
         model=model,
@@ -73,7 +86,7 @@ def classify_friction(
             f"Idea: {idea.title}\n{idea.description}\nMeeting quote: {idea.quote}\n\n"
             f"Repository catalog (integrations, owners):\n{catalog.to_markdown()}\n\n"
             f"Agent steps:\n{steps}\n\nTesting notes:\n{testing_notes}\n\n"
-            f"Diff:\n{diff[:_MAX_DIFF_CHARS]}"
+            f"{_diff_for_prompt(diff)}"
         ),
         config=types.GenerateContentConfig(
             system_instruction=_SYSTEM,

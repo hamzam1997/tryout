@@ -141,7 +141,7 @@ class TestIdeaExtractor(unittest.TestCase):
         self.assertEqual(ideas, [])
         self.assertEqual(len(db.list_ideas(meeting_id=self.meeting.id)), 0)
 
-    @patch("agents.idea_extractor._default_repositories", return_value=["broken", "demo"])
+    @patch("agents.idea_extractor._repos_with_catalog", return_value=["broken", "demo"])
     @patch("agents.idea_extractor.RepoOnboarder")
     @patch("agents.idea_extractor.get_client")
     def test_each_repo_extracted_and_one_failure_tolerated(
@@ -152,6 +152,22 @@ class TestIdeaExtractor(unittest.TestCase):
 
         ideas = extract_ideas(self.meeting.id)
         self.assertEqual(len(ideas), 1)
+
+    @patch("agents.idea_extractor.RepoOnboarder")
+    @patch("agents.idea_extractor.get_client")
+    def test_saved_repository_catalog_is_used_without_onboarding(
+        self, mock_get_client, mock_onboarder_cls
+    ):
+        saved = db.create_repository(
+            db.Repository(name="acme", source="https://github.com/org/private", catalog=self.catalog)
+        )
+        mock_get_client.return_value = self._mock_generate_client()
+
+        ideas = extract_ideas(self.meeting.id)
+
+        mock_onboarder_cls.return_value.onboard.assert_not_called()
+        self.assertEqual(len(ideas), 1)
+        self.assertEqual(db.get_idea(ideas[0].id).repository_id, saved.id)
 
     @patch("agents.idea_extractor.RepoOnboarder")
     def test_onboard_failure_raises_without_rows(self, mock_onboarder_cls):

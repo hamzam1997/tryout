@@ -1,4 +1,3 @@
-import sys
 from pathlib import Path
 
 from flask import Flask, jsonify, send_from_directory
@@ -23,8 +22,7 @@ app.secret_key = settings.secret_key
 init_db()
 
 try:
-    # ponytail: tests import this module too; keep them off the live database
-    if "unittest" not in sys.modules:
+    if settings.seed_demo_data:  # off by default; set SEED_DEMO_DATA=1 on the demo deploy only
         seed_friction_history()
 except Exception:  # seeding must never stop the app from booting
     app.logger.exception("history seeding failed")

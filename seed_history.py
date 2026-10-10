@@ -76,3 +76,8 @@ def seed_friction_history() -> bool:
                 readiness_checklist=[R(task=t, owner=o) for t, o in tasks],
             ))
     return True
+
+
+if __name__ == "__main__":  # python seed_history.py
+    db.init_db()
+    print("seeded" if seed_friction_history() else "already seeded")

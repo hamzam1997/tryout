@@ -20,7 +20,6 @@ from schemas import (
     ExtractedIdeaCandidate,
     Idea,
     IdeaStatus,
-    RepoSource,
     Repository,
 )
 
@@ -29,16 +28,12 @@ logger = logging.getLogger(__name__)
 DEFAULT_REPOSITORY_PATH = "https://github.com/hamzam1997/acme-store"
 
 
-def _default_repositories() -> list[str | Path]:
-    """Every onboarded repo with a catalog; the GitHub demo repo if none exist yet."""
+def _repos_with_catalog() -> list[Repository | str | Path]:
+    """Every saved repo that has a catalog; the GitHub demo repo if none exist yet."""
     # ponytail: one extraction call per repo; add a meeting→repo picker when repo count grows.
-    # GitHub re-cataloguing here runs tokenless, so only public repos work.
-    targets: list[str | Path] = []
-    for r in db.list_repositories():
-        if r.catalog is None:
-            continue
-        targets.append(r.source if r.source_type == RepoSource.GITHUB else Path(r.source))
-    return targets or [DEFAULT_REPOSITORY_PATH]
+    # Saved repos are used as-is (no re-onboarding); only the demo fallback is onboarded,
+    # tokenless, so it must be public.
+    return [r for r in db.list_repositories() if r.catalog is not None] or [DEFAULT_REPOSITORY_PATH]
 
 
 SYSTEM_INSTRUCTION = """\
@@ -201,7 +196,7 @@ def extract_ideas(
     if meeting is None:
         raise IdeaExtractorError(f"no meeting with id {meeting_id}")
 
-    targets = [repository] if repository is not None else _default_repositories()
+    targets = [repository] if repository is not None else _repos_with_catalog()
     stored: list[Idea] = []
     seen_keys: set[str] = set()
     failures: list[str] = []
@@ -226,11 +221,15 @@ def _extract_for_repository(meeting, repo_target, seen_keys: set[str]) -> list[I
     meeting_id = meeting.id
     onboarder = RepoOnboarder()
     try:
-        onboarded = onboarder.onboard(repo_target, return_repo=True)
-        if isinstance(onboarded, tuple):
-            repository_record, catalog = onboarded
-        else:  # Keep injected/custom onboarders that only return the catalog usable.
-            repository_record, catalog = None, onboarded
+        if isinstance(repo_target, Repository) and repo_target.catalog is not None:
+            # Saved catalog is all extraction needs; skip cloning/re-scanning the repo.
+            repository_record, catalog = repo_target, repo_target.catalog
+        else:
+            onboarded = onboarder.onboard(repo_target, return_repo=True)
+            if isinstance(onboarded, tuple):
+                repository_record, catalog = onboarded
+            else:  # Keep injected/custom onboarders that only return the catalog usable.
+                repository_record, catalog = None, onboarded
     except Exception as exc:
         log_event(
             logger,
