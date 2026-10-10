@@ -2,11 +2,13 @@
 
 import logging
 import re
-import subprocess
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+from runner import sandbox
+from runner.sandbox import SandboxResult
 
 logger = logging.getLogger(__name__)
 
@@ -117,24 +119,6 @@ def create_file(workspace: Path, path: str, content: str) -> str:
     return f"Successfully created {path}."
 
 
-def run_tests(workspace: Path, command: str) -> str:
-    """Run tests or arbitrary sandboxed commands."""
-    try:
-        result = subprocess.run(
-            command,
-            cwd=workspace,
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        out = f"Exit code: {result.returncode}\n"
-        if result.stdout:
-            out += f"STDOUT:\n{result.stdout[:4000]}\n"
-        if result.stderr:
-            out += f"STDERR:\n{result.stderr[:4000]}\n"
-        return out
-    except subprocess.TimeoutExpired:
-        return "Command timed out after 60 seconds."
-    except Exception as e:
-        return f"Error executing command: {e}"
+def run_tests(workspace: Path, command: str) -> SandboxResult:
+    """Run tests or other shell commands in the sandbox."""
+    return sandbox.run(command, workspace)
