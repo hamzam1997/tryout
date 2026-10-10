@@ -22,6 +22,7 @@ export default function IdeasPage({
   onApprove,
   onRetryAttempt,
   onOpenReport,
+  onWatchLive,
   onReject,
   onDelete,
 }) {
@@ -100,6 +101,7 @@ export default function IdeasPage({
               onApprove={onApprove}
               onRetryAttempt={onRetryAttempt}
               onOpenReport={onOpenReport}
+              onWatchLive={onWatchLive}
               onReject={onReject}
               onDelete={onDelete}
             />
