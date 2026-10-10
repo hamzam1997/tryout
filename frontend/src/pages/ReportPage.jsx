@@ -49,7 +49,11 @@ export default function ReportPage({ attemptId, onBack }) {
   }, [attemptId]);
 
   const files = parseDiff(attempt?.diff);
-  const mocks = files.filter((file) => /mock/i.test(file.path.split("/").pop()));
+  // A mock is any file the friction log says stands in for a service, or one named like a mock.
+  const stubPaths = new Set((attempt?.friction || []).map((log) => log.mock_implementation_path));
+  const mocks = files.filter(
+    (file) => stubPaths.has(file.path) || /mock/i.test(file.path.split("/").pop())
+  );
   const passed = attempt?.test_exit_code === 0;
 
   return (
