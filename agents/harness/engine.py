@@ -167,6 +167,13 @@ class AttemptHarness:
             "Your goal is to implement the approved idea, ground it in the architecture, and write tests.\n"
             "Explore the codebase, surgically edit files (avoid rewriting huge files), run test commands, "
             "and fix any errors before calling complete_attempt.\n"
+            "Match the repo's existing style, framework and file layout.\n"
+            "For every external service the idea needs (SMS, email, payments, webhooks, ...), create a "
+            "runnable mock adapter named after it (e.g. mock_twilio_client.py) that returns realistic "
+            "response payloads and records calls. Code under test must take the adapter by injection so "
+            "tests never need real credentials or network access.\n"
+            "Always create test_prototype.py that exercises the new logic against those mocks, run it, and "
+            "make it pass before calling complete_attempt. Never write secrets or real credentials.\n"
             f"Catalog test_command hint: {self.catalog.test_command}\n"
         )
         contents = [
