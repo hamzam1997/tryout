@@ -6,6 +6,7 @@ handling OAuth tokens securely in-memory without persisting credentials to disk.
 
 from __future__ import annotations
 
+import base64
 import io
 import logging
 import os
@@ -101,8 +102,10 @@ def _git_shallow_clone(
     cmd = ["git"]
 
     if token:
-        # Pass authorization header in memory only for this invocation
-        cmd.extend(["-c", f"http.extraHeader=Authorization: Bearer {token}"])
+        # Pass authorization header in memory only for this invocation.
+        # Git-over-HTTPS rejects Bearer; GitHub expects basic x-access-token.
+        basic = base64.b64encode(f"x-access-token:{token}".encode()).decode()
+        cmd.extend(["-c", f"http.extraHeader=Authorization: basic {basic}"])
 
     cmd.extend(["clone", "--depth", "1"])
     if branch:

@@ -11,7 +11,7 @@ from google.genai import types
 
 import database as db
 from agents.repo_onboarder import RepoOnboarder
-from config import BASE_DIR, settings
+from config import settings
 from llm import get_client
 from logging_setup import log_event
 from schemas import (
@@ -25,7 +25,16 @@ from schemas import (
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_REPOSITORY_PATH = BASE_DIR / "demo_repo" / "acme_store"
+DEFAULT_REPOSITORY_PATH = "https://github.com/hamzam1997/acme-store"
+
+
+def _repos_with_catalog() -> list[Repository | str | Path]:
+    """Every saved repo that has a catalog; the GitHub demo repo if none exist yet."""
+    # ponytail: one extraction call per repo; add a meeting→repo picker when repo count grows.
+    # Saved repos are used as-is (no re-onboarding); only the demo fallback is onboarded,
+    # tokenless, so it must be public.
+    return [r for r in db.list_repositories() if r.catalog is not None] or [DEFAULT_REPOSITORY_PATH]
+
 
 SYSTEM_INSTRUCTION = """\
 You are an idea extractor for engineering and operations meetings.
@@ -187,20 +196,47 @@ def extract_ideas(
     if meeting is None:
         raise IdeaExtractorError(f"no meeting with id {meeting_id}")
 
-    repo_target = repository if repository is not None else DEFAULT_REPOSITORY_PATH
+    targets = [repository] if repository is not None else _repos_with_catalog()
+    stored: list[Idea] = []
+    seen_keys: set[str] = set()
+    failures: list[str] = []
+    for target in targets:
+        try:
+            stored += _extract_for_repository(meeting, target, seen_keys)
+        except IdeaExtractorError as exc:
+            failures.append(str(exc))
+    if failures and len(failures) == len(targets):
+        raise IdeaExtractorError("; ".join(failures))
+
+    log_event(
+        logger,
+        "idea_extractor.stored",
+        meeting_id=meeting_id,
+        idea_count=len(stored),
+    )
+    return stored
+
+
+def _extract_for_repository(meeting, repo_target, seen_keys: set[str]) -> list[Idea]:
+    meeting_id = meeting.id
     onboarder = RepoOnboarder()
     try:
-        onboarded = onboarder.onboard(repo_target, return_repo=True)
-        if isinstance(onboarded, tuple):
-            repository_record, catalog = onboarded
-        else:  # Keep injected/custom onboarders that only return the catalog usable.
-            repository_record, catalog = None, onboarded
+        if isinstance(repo_target, Repository) and repo_target.catalog is not None:
+            # Saved catalog is all extraction needs; skip cloning/re-scanning the repo.
+            repository_record, catalog = repo_target, repo_target.catalog
+        else:
+            onboarded = onboarder.onboard(repo_target, return_repo=True)
+            if isinstance(onboarded, tuple):
+                repository_record, catalog = onboarded
+            else:  # Keep injected/custom onboarders that only return the catalog usable.
+                repository_record, catalog = None, onboarded
     except Exception as exc:
         log_event(
             logger,
             "idea_extractor.onboard_failed",
             level=logging.ERROR,
             meeting_id=meeting_id,
+            repository=str(repo_target),
             error=str(exc),
         )
         raise IdeaExtractorError(f"repository onboarding failed: {exc}") from exc
@@ -216,7 +252,6 @@ def extract_ideas(
     )
 
     stored: list[Idea] = []
-    seen_keys: set[str] = set()
     for candidate in batch.ideas:
         if not candidate.catalog_refs:
             log_event(
@@ -254,11 +289,4 @@ def extract_ideas(
 
         idea = db.create_idea(draft)
         stored.append(idea)
-
-    log_event(
-        logger,
-        "idea_extractor.stored",
-        meeting_id=meeting_id,
-        idea_count=len(stored),
-    )
     return stored

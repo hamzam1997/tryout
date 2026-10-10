@@ -3,6 +3,7 @@
 import datetime
 import json
 import logging
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -124,7 +125,18 @@ class AttemptHarness:
         logger.info(f"Harness Step [{action}]: {detail}")
 
     def _execute_tool(self, name: str, args: dict[str, Any]) -> str:
-        self._log_step(name, f"Executing {name} with args {list(args.keys())}")
+        if name == "search_code":
+            detail = f"Searching for '{args.get('query')}'"
+        elif name in ("view_file", "edit_file", "create_file"):
+            detail = f"{name} on {args.get('path')}"
+        elif name == "list_directory":
+            detail = f"Listing directory {args.get('path', '.')}"
+        elif name == "run_tests":
+            detail = f"Running tests: {args.get('command')}"
+        else:
+            detail = f"Executing {name}"
+            
+        self._log_step(name, detail)
         if name == "search_code":
             return search_code(self.workspace, args["query"])
         elif name == "list_directory":
@@ -139,18 +151,35 @@ class AttemptHarness:
             return run_tests(self.workspace, args["command"])
         return f"Unknown tool {name}"
 
+    def _staged_diff(self) -> str:
+        """Stage every change (incl. new files) and return the staged diff."""
+        git = lambda *a: subprocess.run(["git", *a], cwd=self.workspace, capture_output=True, text=True).stdout
+        git("add", "-A")
+        # The workspace copy skips .env/secret files; their absence must not ship as deletions.
+        deleted = [p for p in git("diff", "--staged", "--name-only", "--diff-filter=D", "-z").split("\0") if p]
+        if deleted:
+            git("reset", "-q", "--", *deleted)
+        return git("diff", "--staged")
+
     def run(self) -> HarnessResult:
         system_instruction = (
             "You are an autonomous senior SWE working inside a repository workspace.\n"
             "Your goal is to implement the approved idea, ground it in the architecture, and write tests.\n"
             "Explore the codebase, surgically edit files (avoid rewriting huge files), run test commands, "
             "and fix any errors before calling complete_attempt.\n"
+            "Match the repo's existing style, framework and file layout.\n"
+            "For every external service the idea needs (SMS, email, payments, webhooks, ...), create a "
+            "runnable mock adapter named after it (e.g. mock_twilio_client.py) whose methods RETURN realistic "
+            "response payloads (ids, status fields, like the real API would) and record calls. Code under test must take the adapter by injection so "
+            "tests never need real credentials or network access.\n"
+            "Always create test_prototype.py that exercises the new logic against those mocks, run it, and "
+            "make it pass before calling complete_attempt. Never write secrets or real credentials.\n"
             f"Catalog test_command hint: {self.catalog.test_command}\n"
         )
         contents = [
             types.Content(
                 role="user",
-                parts=[types.Part.from_text(
+                parts=[types.Part.from_text(text=
                     f"Approved Idea: {self.idea.title}\n{self.idea.description}\n"
                     f"Quote: {self.idea.quote}\n"
                     f"Catalog overview:\n{self.catalog.to_markdown()}"
@@ -186,7 +215,7 @@ class AttemptHarness:
                 # Prompt the model to use tools or finish
                 contents.append(types.Content(
                     role="user",
-                    parts=[types.Part.from_text("You must either use a tool or call complete_attempt to finish.")]
+                    parts=[types.Part.from_text(text="You must either use a tool or call complete_attempt to finish.")]
                 ))
                 continue
 
@@ -202,7 +231,8 @@ class AttemptHarness:
                         success=True,
                         summary=args.get("summary", "Done"),
                         pr_title=args.get("pr_title", self.idea.title),
-                        testing_notes=args.get("testing_notes", "")
+                        testing_notes=args.get("testing_notes", ""),
+                        diff=self._staged_diff()
                     )
                     break
                 
@@ -216,9 +246,6 @@ class AttemptHarness:
                 )
 
             if completed and result:
-                # Compute diff
-                diff_cmd = subprocess.run(["git", "diff"], cwd=self.workspace, capture_output=True, text=True)
-                result.diff = diff_cmd.stdout
                 self._log_step("complete", "Attempt implementation finished.")
                 return result
 
@@ -230,11 +257,10 @@ class AttemptHarness:
 
         self._log_step("timeout", "Reached max steps without completing attempt", status="failed")
         # Fallback completion
-        diff_cmd = subprocess.run(["git", "diff"], cwd=self.workspace, capture_output=True, text=True)
         return HarnessResult(
             success=False,
             summary="Timed out after maximum iterations. Incomplete.",
             pr_title=self.idea.title,
             testing_notes="",
-            diff=diff_cmd.stdout
+            diff=self._staged_diff()
         )

@@ -11,14 +11,15 @@ from flask import Blueprint, jsonify, request, session
 import database as db
 from agents.git_utils import parse_github_slug
 from agents.repo_onboarder import RepoOnboarder
-from config import BASE_DIR, settings
+from config import settings
 from schemas import ArchitectureCatalog, RepoSource, Repository
 
 logger = logging.getLogger(__name__)
 
 bp = Blueprint("repositories", __name__, url_prefix="/repositories")
 
-DEMO_REPO_PATH = BASE_DIR / "demo_repo" / "acme_store"
+# The demo is a real GitHub repo so approved demo ideas can open PRs.
+DEMO_REPO_SLUG = "hamzam1997/acme-store"
 
 
 def _serialise_repo(repo: Repository, include_catalog: bool = True) -> dict:
@@ -87,19 +88,6 @@ def delete_repository(repo_id: int):
     )
 
 
-def _run_demo_onboarding(repo_id: int, force_refresh: bool) -> None:
-    """Background worker for Demo repo onboarding."""
-    try:
-        logger.info("Starting background onboarding for demo repo (id=%s)...", repo_id)
-        onboarder = RepoOnboarder()
-        onboarder.onboard(DEMO_REPO_PATH, force_refresh=force_refresh)
-        db.set_repository_status(repo_id, "ready")
-        logger.info("Demo repo onboarding complete for id=%s.", repo_id)
-    except Exception as exc:
-        logger.exception("Demo repo background onboarding failed for id=%s: %s", repo_id, exc)
-        db.set_repository_status(repo_id, "failed", str(exc))
-
-
 def _run_github_onboarding(
     repo_id: int,
     repo_slug: str,
@@ -135,44 +123,10 @@ def onboard_repository():
     force_refresh = bool(body.get("force_refresh", False))
 
     if source_type in ("demo", "acme_store"):
-        if not DEMO_REPO_PATH.is_dir():
-            return jsonify({"error": f"Demo repository not found at {DEMO_REPO_PATH}"}), 500
+        source_type = "github"
+        body = {**body, "repo_full_name": DEMO_REPO_SLUG, "url": None}
 
-        source_path = str(DEMO_REPO_PATH)
-        repo = db.get_repository_by_source(source_path)
-        if repo:
-            db.set_repository_status(repo.id, "onboarding")
-            repo = db.get_repository(repo.id)
-        else:
-            repo = db.create_repository(
-                Repository(
-                    name="acme_store",
-                    source=source_path,
-                    source_type=RepoSource.DEMO,
-                    catalog_status="onboarding",
-                )
-            )
-
-        # Launch background thread
-        thread = threading.Thread(
-            target=_run_demo_onboarding,
-            args=(repo.id, force_refresh),
-            daemon=True,
-        )
-        thread.start()
-
-        return (
-            jsonify(
-                {
-                    "message": "Demo repository onboarding started in background.",
-                    "status": "onboarding",
-                    "repository": _serialise_repo(repo),
-                }
-            ),
-            202,
-        )
-
-    elif source_type == "github":
+    if source_type == "github":
         repo_slug = (body.get("repo_full_name") or body.get("url") or "").strip()
         if not repo_slug:
             return jsonify({"error": "repo_full_name or url is required for GitHub onboarding."}), 400

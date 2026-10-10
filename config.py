@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     google_cloud_location: str = "global"
 
     port: int = 8080
+    # Seed historical demo friction logs on boot (SEED_DEMO_DATA=1). Off by default.
+    seed_demo_data: bool = False
     debug: bool = Field(default=False, validation_alias="FLASK_DEBUG")
 
     # Database settings: Google Cloud Firestore

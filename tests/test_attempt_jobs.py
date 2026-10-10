@@ -77,6 +77,7 @@ class TestAttemptJobs(unittest.TestCase):
         )
         with (
             patch("agents.attempt_jobs.AttemptHarness") as mock_harness_class,
+            patch("agents.attempt_jobs.record_friction", return_value=[]),
             patch(
                 "agents.attempt_jobs.create_attempt_pull_request",
                 return_value=(
