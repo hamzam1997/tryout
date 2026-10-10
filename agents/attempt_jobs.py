@@ -10,6 +10,7 @@ from pathlib import Path
 
 import database as db
 
+from agents.friction_classifier import readiness_markdown, record_friction
 from agents.harness import AttemptHarness
 from agents.git_utils import fetch_github_repository
 from agents.github_pr import create_attempt_pull_request
@@ -163,7 +164,13 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
             attempt.test_stderr = "" if harness_result.success else "Harness run failed or timed out."
             db.update_attempt(attempt)
 
+            readiness_md = ""
             if attempt.diff:
+                friction = record_friction(
+                    attempt, idea, repo.catalog, attempt.diff,
+                    harness_result.testing_notes, settings.model_planning,
+                )
+                readiness_md = readiness_markdown(friction)
                 try:
                     # Parse modified files from git diff
                     import subprocess
@@ -177,7 +184,7 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
                         attempt_id=attempt.id,
                         idea_id=idea.id,
                         idea_title=harness_result.pr_title,
-                        summary=harness_result.summary,
+                        summary=harness_result.summary[:2500] + readiness_md,
                         repo_ref=repo_ref,
                         change_paths=change_paths,
                     )
