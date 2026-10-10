@@ -1,16 +1,7 @@
 import { useEffect, useState } from "react";
 import { getBottlenecks } from "../api";
 import LoadingRows from "../components/LoadingRows";
-
-const CATEGORY_LABELS = {
-  EXTERNAL_SERVICE_DEPENDENCY: "External service",
-  AUTH_CREDENTIAL_REQUIRED: "Credentials / auth",
-  SCHEMA_MIGRATION_REQUIRED: "Schema migration",
-  CROSS_TEAM_CONTRACT: "Cross-team contract",
-  PRODUCT_DECISION: "Product decision",
-};
-
-const label = (category) => CATEGORY_LABELS[category] || category;
+import { formatFrictionCategory as label } from "../lib/format";
 
 function Stat({ value, name, hint }) {
   return (
