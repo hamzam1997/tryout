@@ -12,8 +12,9 @@ from google.genai import types
 
 import database as db
 from llm import get_client
-from schemas import ArchitectureCatalog, Attempt, Idea, AttemptStep
+from schemas import ArchitectureCatalog, Attempt, Idea, AttemptStep, TechnicalPlan
 from config import settings
+from agents.planner import plan_markdown
 from agents.harness.tools import (
     search_code, list_directory, view_file, edit_file, create_file, run_tests
 )
@@ -106,11 +107,19 @@ class HarnessResult(BaseModel):
 
 
 class AttemptHarness:
-    def __init__(self, workspace: Path, catalog: ArchitectureCatalog, idea: Idea, attempt: Attempt):
+    def __init__(
+        self,
+        workspace: Path,
+        catalog: ArchitectureCatalog,
+        idea: Idea,
+        attempt: Attempt,
+        plan: TechnicalPlan | None = None,
+    ):
         self.workspace = workspace
         self.catalog = catalog
         self.idea = idea
         self.attempt = attempt
+        self.plan = plan
         self.max_steps = 25
         self.last_run = None
         self.client = get_client()
@@ -194,6 +203,7 @@ class AttemptHarness:
                     f"Approved Idea: {self.idea.title}\n{self.idea.description}\n"
                     f"Quote: {self.idea.quote}\n"
                     f"Catalog overview:\n{self.catalog.to_markdown()}"
+                    + (f"\n\nFollow this technical plan:\n{plan_markdown(self.plan)}" if self.plan else "")
                 )]
             )
         ]
