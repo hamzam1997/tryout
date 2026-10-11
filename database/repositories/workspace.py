@@ -4,10 +4,15 @@ from __future__ import annotations
 
 from database.client import get_firestore_client, get_next_id
 from database.documents import utc_now
-from schemas import Membership, Workspace, WorkspaceRole
+import secrets
+from datetime import timedelta
+
+from schemas import Invitation, Membership, Workspace, WorkspaceRole
 
 WORKSPACES = "workspaces"
 MEMBERSHIPS = "memberships"
+INVITATIONS = "invitations"
+INVITE_TTL = timedelta(days=7)
 
 
 def _membership_id(workspace_id: int, uid: str) -> str:
@@ -62,7 +67,40 @@ SCOPED_COLLECTIONS = ("repositories", "meetings", "ideas", "attempts", "friction
 def delete_workspace(workspace_id: int) -> None:
     """Delete a workspace with all its records and memberships."""
     client = get_firestore_client()
-    for collection in (*SCOPED_COLLECTIONS, MEMBERSHIPS):
+    for collection in (*SCOPED_COLLECTIONS, MEMBERSHIPS, INVITATIONS):
         for doc in client.collection(collection).where("workspace_id", "==", workspace_id).stream():
             client.collection(collection).document(doc.id).delete()
     client.collection(WORKSPACES).document(str(workspace_id)).delete()
+
+
+def create_invitation(workspace_id: int, email: str, role: WorkspaceRole, invited_by: str) -> Invitation:
+    now = utc_now()
+    invitation = Invitation(
+        token=secrets.token_urlsafe(24),
+        workspace_id=workspace_id,
+        email=email.strip().lower(),
+        role=role,
+        invited_by=invited_by,
+        created_at=now,
+        expires_at=now + INVITE_TTL,
+    )
+    save_invitation(invitation)
+    return invitation
+
+
+def save_invitation(invitation: Invitation) -> None:
+    get_firestore_client().collection(INVITATIONS).document(invitation.token).set(
+        invitation.model_dump(mode="json")
+    )
+
+
+def get_invitation(token: str) -> Invitation | None:
+    snap = get_firestore_client().collection(INVITATIONS).document(token).get()
+    return Invitation.model_validate(snap.to_dict()) if snap.exists else None
+
+
+def list_open_invitations(workspace_id: int) -> list[Invitation]:
+    now = utc_now()
+    docs = get_firestore_client().collection(INVITATIONS).where("workspace_id", "==", workspace_id).stream()
+    invitations = [Invitation.model_validate(d.to_dict()) for d in docs]
+    return sorted((i for i in invitations if i.is_open(now)), key=lambda i: i.created_at)

@@ -6,13 +6,15 @@ const PAGES = ["repositories", "meetings", "ideas", "bottlenecks", "settings"];
 export function parseRoute({ pathname, search }) {
   const [first, second] = pathname.split("/").filter(Boolean);
   if (first === "attempts" && Number(second)) return { view: "report", attemptId: Number(second) };
+  if (first === "invite" && second) return { view: "invite", token: second };
   const status = new URLSearchParams(search).get("status");
   if (first === "ideas") return { view: "ideas", status: status || "PENDING" };
   return { view: PAGES.includes(first) ? first : "repositories" };
 }
 
-export function routePath({ view, attemptId, status }) {
+export function routePath({ view, attemptId, status, token }) {
   if (view === "report") return `/attempts/${attemptId}`;
+  if (view === "invite") return `/invite/${token}`;
   if (view === "ideas" && status && status !== "PENDING") return `/ideas?status=${status}`;
   return `/${view}`;
 }

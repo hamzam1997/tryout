@@ -251,6 +251,7 @@ def firebase_sync():
         "email": claims.get("email"),
         "name": claims.get("name") or claims.get("email"),
         "avatar_url": claims.get("picture"),
+        "email_verified": bool(claims.get("email_verified")),
     }
 
     if github_token:

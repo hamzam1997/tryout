@@ -181,3 +181,30 @@ export function deleteWorkspace(id) {
     return parse(response);
   });
 }
+
+// Invitations
+export function listInvitations(workspaceId) {
+  return fetch(`/api/workspaces/${workspaceId}/invitations`).then(parse);
+}
+
+export function createInvitation(workspaceId, email, role) {
+  return fetch(`/api/workspaces/${workspaceId}/invitations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, role }),
+  }).then(parse);
+}
+
+export function revokeInvitation(workspaceId, token) {
+  return fetch(`/api/workspaces/${workspaceId}/invitations/${token}`, { method: "DELETE" }).then(
+    async (response) => (response.status === 204 ? true : parse(response))
+  );
+}
+
+export function getInvitation(token) {
+  return fetch(`/api/invitations/${encodeURIComponent(token)}`).then(parse);
+}
+
+export function acceptInvitation(token) {
+  return fetch(`/api/invitations/${encodeURIComponent(token)}/accept`, { method: "POST" }).then(parse);
+}
