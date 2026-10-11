@@ -9,6 +9,7 @@ import ReportPage from "./pages/ReportPage";
 import LiveAttemptModal from "./components/LiveAttemptModal";
 import TourBanner from "./components/TourBanner";
 import { onAuthChanged } from "./lib/firebase";
+import { useRoute } from "./lib/route";
 import {
   approveIdea,
   deleteIdea,
@@ -43,13 +44,15 @@ function pipelineStillRunning(meetings, ideas) {
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authChecking, setAuthChecking] = useState(true);
-  const [view, setView] = useState("repositories");
-  const [reportAttemptId, setReportAttemptId] = useState(null);
+  const [route, navigate] = useRoute();
+  const { view, attemptId: reportAttemptId } = route;
+  const setView = useCallback((next) => navigate({ view: next }), [navigate]);
   const [liveAttemptId, setLiveAttemptId] = useState(null);
   const [repositories, setRepositories] = useState([]);
   const [meetings, setMeetings] = useState([]);
   const [ideas, setIdeas] = useState([]);
-  const [ideaFilter, setIdeaFilter] = useState("PENDING");
+  const ideaFilter = route.status || "PENDING";
+  const setIdeaFilter = (status) => navigate({ view: "ideas", status });
   const [ideaCounts, setIdeaCounts] = useState({ PENDING: 0, IN_PROCESS: 0, DONE: 0, REJECTED: 0, ALL: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -243,9 +246,8 @@ export default function App() {
 
   const openReport = useCallback((attemptId) => {
     setLiveAttemptId(null);
-    setReportAttemptId(attemptId);
-    setView("report");
-  }, []);
+    navigate({ view: "report", attemptId });
+  }, [navigate]);
 
   async function handleApprove(ideaId, repositoryId) {
     setBusyId(ideaId);
