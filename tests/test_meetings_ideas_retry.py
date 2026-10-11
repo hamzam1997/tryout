@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import database as db
+from auth_helpers import login
 from agents import idea_jobs, meeting_jobs
 from agents.idea_extractor import IdeaExtractorError
 from app import app
@@ -27,7 +28,7 @@ class TestMeetingIdeasRetry(unittest.TestCase):
         db.set_database_path(Path(self._tmp.name) / "test.db")
         db.init_db()
         idea_jobs.set_force_sync(True)
-        self.client = app.test_client()
+        self.client = login(app.test_client())
         self.meeting = db.create_meeting(
             Meeting(
                 title="Ops huddle",
@@ -94,7 +95,7 @@ class TestMeetingMinutesBackground(unittest.TestCase):
         db.set_database_path(Path(self._tmp.name) / "test.db")
         db.init_db()
         meeting_jobs.set_force_sync(False)
-        self.client = app.test_client()
+        self.client = login(app.test_client())
 
     def tearDown(self):
         meeting_jobs.set_force_sync(False)

@@ -1,4 +1,5 @@
 import tempfile
+from auth_helpers import login
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -13,7 +14,7 @@ class TestSpaRoutes(unittest.TestCase):
         (dist / "index.html").write_text("<html>app</html>")
         self.patch = patch.object(flask_app, "FRONTEND_DIST", dist)
         self.patch.start()
-        self.client = flask_app.app.test_client()
+        self.client = login(flask_app.app.test_client())
 
     def tearDown(self):
         self.patch.stop()

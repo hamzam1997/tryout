@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import database as db
+from auth_helpers import login
 from app import app
 from schemas import Attempt, AttemptStatus, AttemptStep, FrictionCategory, FrictionLog, Idea, Meeting, Repository
 
@@ -13,7 +14,7 @@ class TestAttemptsView(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         db.set_database_path(Path(self.tmp.name) / "database")
         db.init_db()
-        self.client = app.test_client()
+        self.client = login(app.test_client())
 
     def tearDown(self):
         db.set_database_path(None)
@@ -47,7 +48,7 @@ class TestAttemptStream(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         db.set_database_path(Path(self.tmp.name) / "database")
         db.init_db()
-        self.client = app.test_client()
+        self.client = login(app.test_client())
         meeting = db.create_meeting(Meeting(title="Sync", transcript="t"))
         idea = db.create_idea(Idea(meeting_id=meeting.id, title="Idea"))
         repo = db.create_repository(Repository(name="r", source="/tmp/r"))

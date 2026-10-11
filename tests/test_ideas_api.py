@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import database as db
+from auth_helpers import login
 from app import app
 from schemas import ArchitectureCatalog, Idea, IdeaStatus, Meeting, MeetingSource, RepoSource, Repository
 
@@ -17,7 +18,7 @@ class TestIdeasApi(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         db.set_database_path(Path(self._tmp.name) / "test.db")
         db.init_db()
-        self.client = app.test_client()
+        self.client = login(app.test_client())
         self.meeting = db.create_meeting(
             Meeting(
                 title="Weekly ops",

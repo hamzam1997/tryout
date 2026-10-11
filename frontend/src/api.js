@@ -1,6 +1,10 @@
 // Vite proxies these to the Flask app in dev; same-origin in production.
 
+import { logoutUser } from "./lib/firebase";
+
 async function parse(response) {
+  // The server session is gone: sign out so the app shows the login page.
+  if (response.status === 401) logoutUser();
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(body.error || `Request failed (${response.status})`);

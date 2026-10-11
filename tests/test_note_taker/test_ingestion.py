@@ -1,6 +1,7 @@
 """Upload ingestion: persistence order, status transitions, and retry."""
 
 import io
+from auth_helpers import login
 import logging
 import tempfile
 import unittest
@@ -46,7 +47,7 @@ class IngestionTestCase(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         db.set_database_path(Path(self._tmp.name) / "test.db")
         db.init_db()
-        self.client = flask_app.app.test_client()
+        self.client = login(flask_app.app.test_client())
         # The failure-path tests exercise logger.exception on purpose.
         logging.getLogger("agents.note_taker").setLevel(logging.CRITICAL)
         logging.getLogger("agents.meeting_jobs").setLevel(logging.CRITICAL)
