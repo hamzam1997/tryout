@@ -196,6 +196,7 @@ def firebase_sync():
 
     if firebase_user:
         session["user"] = firebase_user
+        session.permanent = True  # survives browser restarts (PERMANENT_SESSION_LIFETIME)
 
     # Upsert user record into Firestore /users collection
     uid = firebase_user.get("uid")

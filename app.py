@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pathlib import Path
 
 from flask import Flask, jsonify, send_from_directory
@@ -21,6 +22,12 @@ configure_logging()
 
 app = Flask(__name__, static_folder=None)
 app.secret_key = settings.secret_key
+app.config.update(
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=not settings.debug,  # Cloud Run is HTTPS; local dev is not
+)
 init_db()
 
 try:

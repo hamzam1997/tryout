@@ -25,6 +25,16 @@ class AuthViewTestCase(unittest.TestCase):
         db.set_database_path(None)
         self._tmp.cleanup()
 
+    def test_firebase_sync_sets_a_persistent_session_cookie(self):
+        with mock.patch("views.auth.db.upsert_user", return_value=None):
+            resp = self.client.post(
+                "/api/auth/firebase-sync", json={"user": {"uid": "u1", "email": "a@x.com"}}
+            )
+        cookie = resp.headers.get("Set-Cookie", "")
+        self.assertIn("Expires=", cookie)  # not a browser-session cookie
+        self.assertIn("HttpOnly", cookie)
+        self.assertIn("SameSite=Lax", cookie)
+
     def test_github_status_unconfigured(self):
         with mock.patch.object(settings, "github_client_id", ""):
             resp = self.client.get("/api/auth/github/status")

@@ -8,7 +8,7 @@ import BottlenecksPage from "./pages/BottlenecksPage";
 import ReportPage from "./pages/ReportPage";
 import LiveAttemptModal from "./components/LiveAttemptModal";
 import TourBanner from "./components/TourBanner";
-import { onAuthChanged, checkSessionExpired } from "./lib/firebase";
+import { onAuthChanged } from "./lib/firebase";
 import {
   approveIdea,
   deleteIdea,
@@ -60,7 +60,7 @@ export default function App() {
   const [online, setOnline] = useState(null);
   const pollRef = useRef(null);
 
-  // Monitor auth state changes and session expiration
+  // Render nothing until Firebase reports whether a user is restored.
   useEffect(() => {
     const unsubscribe = onAuthChanged((user) => {
       setCurrentUser(user);
