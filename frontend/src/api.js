@@ -149,3 +149,35 @@ export function getBottlenecks() {
 export function getAttempt(id) {
   return fetch(`/api/attempts/${id}`).then(parse);
 }
+
+// Workspaces
+export function listWorkspaces() {
+  return fetch("/api/workspaces").then(parse);
+}
+
+export function createWorkspace(name) {
+  return fetch("/api/workspaces", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  }).then(parse);
+}
+
+export function switchWorkspace(id) {
+  return fetch(`/api/workspaces/${id}/switch`, { method: "POST" }).then(parse);
+}
+
+export function renameWorkspace(id, name) {
+  return fetch(`/api/workspaces/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  }).then(parse);
+}
+
+export function deleteWorkspace(id) {
+  return fetch(`/api/workspaces/${id}`, { method: "DELETE" }).then(async (response) => {
+    if (response.status === 204) return true;
+    return parse(response);
+  });
+}

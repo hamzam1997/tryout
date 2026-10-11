@@ -12,8 +12,7 @@ import sys
 
 import database as db
 from database.client import get_firestore_client
-
-COLLECTIONS = ("repositories", "meetings", "ideas", "attempts", "friction_logs")
+from database.repositories.workspace import SCOPED_COLLECTIONS
 
 
 def migrate(owner_email: str, name: str = "Default") -> tuple[int, int]:
@@ -24,7 +23,7 @@ def migrate(owner_email: str, name: str = "Default") -> tuple[int, int]:
     workspace = db.create_workspace(name, owner.uid)
     client = get_firestore_client()
     moved = 0
-    for collection in COLLECTIONS:
+    for collection in SCOPED_COLLECTIONS:
         for doc in client.collection(collection).stream():
             if (doc.to_dict() or {}).get("workspace_id") is None:
                 client.collection(collection).document(doc.id).set({"workspace_id": workspace.id}, merge=True)
