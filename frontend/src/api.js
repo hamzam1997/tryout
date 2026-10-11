@@ -136,3 +136,8 @@ export function logoutGithub() {
 export function health() {
   return fetch("/health").then((r) => r.ok);
 }
+
+// Bottleneck map
+export function getBottlenecks() {
+  return fetch("/bottlenecks").then(parse);
+}
