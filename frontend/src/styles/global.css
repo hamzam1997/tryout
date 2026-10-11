@@ -1997,3 +1997,38 @@ svg { flex: none; }
 .diff-del { background: var(--error-container); color: var(--error); }
 .diff-hunk { color: var(--primary); }
 .diff-meta { color: var(--on-surface-muted); }
+
+/* ── Live attempt modal ────────────────────────────────── */
+
+.live-modal {
+  width: min(760px, calc(100vw - 32px));
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-lg);
+  box-shadow: var(--elev-2);
+}
+.live-modal::backdrop { background: rgba(0, 0, 0, 0.4); }
+.live-head,
+.live-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-5) var(--s-6);
+}
+.live-head h2 { font-family: var(--font-display); font-size: var(--text-title); font-weight: 500; }
+.terminal {
+  height: min(420px, 60vh);
+  margin: 0 var(--s-6);
+  padding: var(--s-4);
+  overflow-y: auto;
+  border-radius: var(--r-sm);
+  background: #1f1f1f;
+  color: #e8eaed;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-label);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.terminal-muted { color: #9aa0a6; }
+.terminal-err { color: #f28b82; }

@@ -11,6 +11,8 @@ const BADGES = {
   REJECTED: ["badge-idle", "Rejected"],
 };
 
+const RUNNING = ["QUEUED", "PLANNING", "CODING", "TESTING"];
+
 function formatAttemptStatus(status) {
   if (status === "COMPLETE") return "done";
   if (status === "READY_FOR_REVIEW") return "ready for review";
@@ -25,6 +27,7 @@ export default function IdeaRow({
   onApprove,
   onRetryAttempt,
   onOpenReport,
+  onWatchLive,
   onReject,
   onDelete,
 }) {
@@ -253,6 +256,18 @@ export default function IdeaRow({
                     {busy ? "Retrying…" : "Retry attempt"}
                   </button>
                 )}
+              {latestAttempt.id && RUNNING.includes(latestAttempt.status) && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onWatchLive?.(latestAttempt.id);
+                  }}
+                >
+                  Watch live
+                </button>
+              )}
               {latestAttempt.id && latestAttempt.status === "COMPLETE" && (
                 <button
                   type="button"

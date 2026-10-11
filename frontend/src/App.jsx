@@ -6,6 +6,7 @@ import MeetingsPage from "./pages/MeetingsPage";
 import IdeasPage from "./pages/IdeasPage";
 import BottlenecksPage from "./pages/BottlenecksPage";
 import ReportPage from "./pages/ReportPage";
+import LiveAttemptModal from "./components/LiveAttemptModal";
 import { onAuthChanged, checkSessionExpired } from "./lib/firebase";
 import {
   approveIdea,
@@ -43,6 +44,7 @@ export default function App() {
   const [authChecking, setAuthChecking] = useState(true);
   const [view, setView] = useState("repositories");
   const [reportAttemptId, setReportAttemptId] = useState(null);
+  const [liveAttemptId, setLiveAttemptId] = useState(null);
   const [repositories, setRepositories] = useState([]);
   const [meetings, setMeetings] = useState([]);
   const [ideas, setIdeas] = useState([]);
@@ -238,11 +240,18 @@ export default function App() {
     }
   }
 
+  const openReport = useCallback((attemptId) => {
+    setLiveAttemptId(null);
+    setReportAttemptId(attemptId);
+    setView("report");
+  }, []);
+
   async function handleApprove(ideaId, repositoryId) {
     setBusyId(ideaId);
     setIdeasError("");
     try {
       const updated = await approveIdea(ideaId, repositoryId);
+      setLiveAttemptId(updated.latest_attempt?.id ?? null);
       setIdeas((current) =>
         ideaFilter === "PENDING"
           ? current.filter((idea) => idea.id !== updated.id)
@@ -262,6 +271,7 @@ export default function App() {
     setIdeasError("");
     try {
       const updated = await retryIdeaAttempt(ideaId);
+      setLiveAttemptId(updated.latest_attempt?.id ?? null);
       setIdeas((current) =>
         current.map((idea) => (idea.id === updated.id ? { ...idea, ...updated } : idea))
       );
@@ -396,15 +406,20 @@ export default function App() {
             }
             onApprove={handleApprove}
             onRetryAttempt={handleRetryAttempt}
-            onOpenReport={(attemptId) => {
-              setReportAttemptId(attemptId);
-              setView("report");
-            }}
+            onOpenReport={openReport}
+            onWatchLive={setLiveAttemptId}
             onReject={handleReject}
             onDelete={handleDeleteIdea}
           />
         )}
       </main>
+      {liveAttemptId && (
+        <LiveAttemptModal
+          attemptId={liveAttemptId}
+          onClose={() => setLiveAttemptId(null)}
+          onDone={openReport}
+        />
+      )}
     </div>
   );
 }
