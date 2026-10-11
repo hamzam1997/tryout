@@ -161,8 +161,10 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
             attempt = db.get_attempt(attempt_id) or attempt
             attempt.diff = harness_result.diff
             attempt.test_stdout = harness_result.testing_notes
-            attempt.test_exit_code = 0 if harness_result.success else 1
-            attempt.test_stderr = "" if harness_result.success else "Harness run failed or timed out."
+            attempt.test_exit_code = harness_result.test_exit_code
+            attempt.test_stderr = (
+                "" if harness_result.test_exit_code == 0 else harness_result.test_output
+            ) or ("" if harness_result.success else "Harness run failed or timed out.")
             db.update_attempt(attempt)
 
             readiness_md = ""
