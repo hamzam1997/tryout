@@ -8,6 +8,7 @@ runs in a daemon thread so the HTTP request can return immediately.
 from __future__ import annotations
 
 import logging
+import contextvars
 import threading
 
 import database as db
@@ -93,8 +94,9 @@ def on_minutes_ready(meeting_id: int) -> None:
         return
 
     worker = threading.Thread(
-        target=execute_idea_extraction,
-        args=(meeting_id,),
+        # copy_context: the job runs in the starting request's workspace
+        target=contextvars.copy_context().run,
+        args=(execute_idea_extraction, meeting_id,),
         name=f"idea-extract-{meeting_id}",
         daemon=True,
     )

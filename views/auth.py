@@ -9,10 +9,11 @@ from urllib.parse import urlencode
 import firebase_admin
 import requests
 from firebase_admin import auth as firebase_auth
-from flask import Blueprint, jsonify, redirect, request, session
+from flask import Blueprint, g, jsonify, redirect, request, session
 
 import database as db
 from config import settings
+from seed_history import seed_friction_history
 
 logger = logging.getLogger(__name__)
 
@@ -31,12 +32,46 @@ _PUBLIC_API = {
 
 
 def require_login():
-    """`before_request` hook: every /api call needs a server-verified user in the session."""
+    """`before_request` hook: every /api call needs a server-verified user and runs in
+    one of that user's workspaces. All database reads and writes are scoped to it."""
+    db.set_workspace(None)  # worker threads are reused; never inherit the last request's
     if not request.path.startswith("/api/") or request.path in _PUBLIC_API:
         return None
-    if not (session.get("user") or {}).get("uid"):
+    user = session.get("user") or {}
+    if not user.get("uid"):
         return jsonify({"error": "Sign in required."}), 401
+
+    membership = _resolve_membership(user)
+    if membership is None:
+        return jsonify({"error": "You are not a member of that workspace."}), 403
+    db.set_workspace(membership.workspace_id)
+    g.membership = membership
     return None
+
+
+def _resolve_membership(user: dict):
+    """The workspace asked for (header, else last used), or the user's first one."""
+    uid = user["uid"]
+    wanted = request.headers.get("X-Workspace-Id") or session.get("workspace_id")
+    if wanted:
+        membership = db.get_membership(int(wanted), uid)
+        if membership or request.headers.get("X-Workspace-Id"):
+            if membership:
+                session["workspace_id"] = membership.workspace_id
+            return membership  # an explicit header for a foreign workspace is a 403
+    memberships = db.list_memberships(uid=uid)
+    membership = memberships[0] if memberships else _create_personal_workspace(user)
+    session["workspace_id"] = membership.workspace_id
+    return membership
+
+
+def _create_personal_workspace(user: dict):
+    name = f"{user.get('name') or user.get('email') or 'My'}'s workspace"
+    workspace = db.create_workspace(name, user["uid"])
+    if settings.seed_demo_data:
+        db.set_workspace(workspace.id)
+        seed_friction_history()
+    return db.get_membership(workspace.id, user["uid"])
 
 
 def _verify_id_token(id_token: str) -> dict:

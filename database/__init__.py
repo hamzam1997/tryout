@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from database.scope import current_workspace, set_workspace
 from database.client import (
     force_in_memory_firestore,
     get_firestore_client,
@@ -18,6 +19,11 @@ from database.documents import (
     utc_now,
 )
 from database.repositories import (
+    add_member,
+    create_workspace,
+    get_membership,
+    get_workspace,
+    list_memberships,
     approve_idea,
     catalog_is_current,
     count_friction_by,
@@ -103,6 +109,7 @@ def init_db() -> None:
 
 def set_database_path(path=None) -> None:
     """Test compatibility hook for isolation in tests."""
+    set_workspace(None)  # a fresh database has no workspaces to be scoped to
     reset_in_memory_firestore()
     if path is not None:
         force_in_memory_firestore(True)
@@ -111,6 +118,13 @@ def set_database_path(path=None) -> None:
 
 
 __all__ = [
+    "add_member",
+    "create_workspace",
+    "current_workspace",
+    "get_membership",
+    "get_workspace",
+    "list_memberships",
+    "set_workspace",
     "init_db",
     "set_database_path",
     "get_firestore_client",

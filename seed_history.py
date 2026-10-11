@@ -78,6 +78,9 @@ def seed_friction_history() -> bool:
     return True
 
 
-if __name__ == "__main__":  # python seed_history.py
+if __name__ == "__main__":  # python seed_history.py <workspace_id>
+    import sys
+
     db.init_db()
+    db.set_workspace(int(sys.argv[1]))
     print("seeded" if seed_friction_history() else "already seeded")

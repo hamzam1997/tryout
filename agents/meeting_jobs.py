@@ -8,6 +8,7 @@ When minutes land, `take_notes` fires `on_minutes_ready` for idea extraction.
 from __future__ import annotations
 
 import logging
+import contextvars
 import threading
 
 import database as db
@@ -76,8 +77,9 @@ def queue_minutes(meeting_id: int) -> None:
         return
 
     worker = threading.Thread(
-        target=execute_minutes,
-        args=(meeting_id,),
+        # copy_context: the job runs in the starting request's workspace
+        target=contextvars.copy_context().run,
+        args=(execute_minutes, meeting_id,),
         name=f"meeting-minutes-{meeting_id}",
         daemon=True,
     )

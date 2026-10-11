@@ -10,7 +10,7 @@ from unittest.mock import patch
 import database as db
 from auth_helpers import login
 from app import app
-from schemas import ArchitectureCatalog, Idea, IdeaStatus, Meeting, MeetingSource, RepoSource, Repository
+from schemas import ArchitectureCatalog, Idea, IdeaStatus, Meeting, MeetingSource, RepoSource, Repository, WorkspaceRole
 
 
 class TestIdeasApi(unittest.TestCase):
@@ -72,6 +72,7 @@ class TestIdeasApi(unittest.TestCase):
         self.assertEqual(len(approved.get_json()), 1)
 
     def test_approve_and_reject_gates(self):
+        db.add_member(db.current_workspace(), "user-123", WorkspaceRole.MEMBER)
         with self.client.session_transaction() as sess:
             sess["user"] = {"uid": "user-123", "name": "Dana"}
         with patch("views.ideas.queue_attempt") as queue_attempt:
