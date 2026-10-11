@@ -6,10 +6,12 @@ from database.client import get_firestore_client, get_next_id
 import secrets
 from datetime import timedelta
 
+from database.crypto import decrypt, encrypt
 from database.documents import InvitationDoc, MembershipDoc, WorkspaceDoc, utc_now
 from schemas import Invitation, Membership, Workspace, WorkspaceRole
 
 INVITE_TTL = timedelta(days=7)
+GITHUB = "workspace_github"
 
 
 def create_workspace(name: str, owner_uid: str) -> Workspace:
@@ -72,6 +74,7 @@ def delete_workspace(workspace_id: int) -> None:
     for collection in (*SCOPED_COLLECTIONS, MembershipDoc.COLLECTION, InvitationDoc.COLLECTION):
         for doc in client.collection(collection).where("workspace_id", "==", workspace_id).stream():
             client.collection(collection).document(doc.id).delete()
+    client.collection(GITHUB).document(str(workspace_id)).delete()
     client.collection(WorkspaceDoc.COLLECTION).document(str(workspace_id)).delete()
 
 
@@ -105,3 +108,30 @@ def list_open_invitations(workspace_id: int) -> list[Invitation]:
     docs = get_firestore_client().collection(InvitationDoc.COLLECTION).where("workspace_id", "==", workspace_id).stream()
     invitations = [InvitationDoc.from_doc(d.to_dict()).to_domain() for d in docs]
     return sorted((i for i in invitations if i.is_open(now)), key=lambda i: i.created_at)
+
+
+def save_github_connection(workspace_id: int, token: str, login: str, connected_by: str) -> None:
+    get_firestore_client().collection(GITHUB).document(str(workspace_id)).set({
+        "token": encrypt(token),
+        "login": login,
+        "connected_by": connected_by,
+        "connected_at": utc_now().isoformat(),
+    })
+
+
+def get_github_connection(workspace_id: int) -> dict | None:
+    """Who connected GitHub and when; never includes the token."""
+    snap = get_firestore_client().collection(GITHUB).document(str(workspace_id)).get()
+    if not snap.exists:
+        return None
+    data = snap.to_dict()
+    return {k: data.get(k) for k in ("login", "connected_by", "connected_at")}
+
+
+def get_github_token(workspace_id: int) -> str | None:
+    snap = get_firestore_client().collection(GITHUB).document(str(workspace_id)).get()
+    return decrypt(snap.to_dict()["token"]) if snap.exists else None
+
+
+def delete_github_connection(workspace_id: int) -> None:
+    get_firestore_client().collection(GITHUB).document(str(workspace_id)).delete()

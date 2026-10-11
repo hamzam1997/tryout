@@ -7,12 +7,13 @@ import contextvars
 import threading
 from pathlib import Path
 
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, request
 
 import database as db
 from agents.git_utils import parse_github_slug
 from agents.repo_onboarder import RepoOnboarder
 from config import settings
+from views.workspaces import request_github_token
 from schemas import ArchitectureCatalog, RepoSource, Repository
 
 logger = logging.getLogger(__name__)
@@ -139,11 +140,7 @@ def onboard_repository():
 
         canonical_source = f"https://github.com/{owner}/{repo_name}"
         branch = body.get("branch") or None
-        token = (
-            session.get("github_token")
-            or request.headers.get("X-GitHub-Token")
-            or None
-        )
+        token = request_github_token() or request.headers.get("X-GitHub-Token") or None
 
         repo = db.get_repository_by_source(canonical_source)
         if repo:

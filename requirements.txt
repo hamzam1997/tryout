@@ -9,3 +9,4 @@ firebase-admin>=6.5.0
 
 # Pulled in by pydantic-settings; pinned here to keep builds reproducible.
 python-dotenv==1.2.3
+cryptography>=42

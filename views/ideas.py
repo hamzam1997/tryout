@@ -10,6 +10,7 @@ from flask import Blueprint, jsonify, request, session
 
 import database as db
 from agents.attempt_jobs import queue_attempt
+from views.workspaces import request_github_token
 from schemas import Attempt, AttemptStatus, IdeaStatus
 
 bp = Blueprint("ideas", __name__, url_prefix="/api/ideas")
@@ -142,7 +143,7 @@ def approve_idea_endpoint(idea_id: int):
         raise
 
     try:
-        queue_attempt(attempt.id, session.get("github_token"))
+        queue_attempt(attempt.id, request_github_token())
     except Exception as exc:
         db.set_attempt_status(attempt.id, AttemptStatus.FAILED, error=str(exc))
 
@@ -185,7 +186,7 @@ def retry_attempt_endpoint(idea_id: int):
         idea.status = IdeaStatus.IN_PROCESS
         db.update_idea(idea)
     try:
-        queue_attempt(attempt.id, session.get("github_token"))
+        queue_attempt(attempt.id, request_github_token())
     except Exception as exc:
         db.set_attempt_status(attempt.id, AttemptStatus.FAILED, error=str(exc))
 
