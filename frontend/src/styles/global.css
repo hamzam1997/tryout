@@ -1971,3 +1971,29 @@ svg { flex: none; }
   cursor: pointer;
   text-decoration: underline;
 }
+
+/* ── Attempt report ────────────────────────────────────── */
+
+.report-section { margin-bottom: var(--s-4); }
+.report-file { margin-top: var(--s-3); }
+.report-file summary {
+  cursor: pointer;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-body-sm);
+  color: var(--primary);
+}
+.code-block {
+  margin-top: var(--s-2);
+  padding: var(--s-3) var(--s-4);
+  overflow-x: auto;
+  border-radius: var(--r-sm);
+  background: var(--surface-container);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--text-label);
+  line-height: 1.5;
+  white-space: pre;
+}
+.diff-add { background: var(--ok-container); color: var(--ok); }
+.diff-del { background: var(--error-container); color: var(--error); }
+.diff-hunk { color: var(--primary); }
+.diff-meta { color: var(--on-surface-muted); }

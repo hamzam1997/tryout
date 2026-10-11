@@ -6,6 +6,7 @@ from config import settings
 from database import init_db
 from logging_setup import configure_logging
 from seed_history import seed_friction_history
+from views.attempts import bp as attempts_bp
 from views.auth import bp as auth_bp
 from views.bottlenecks import bp as bottlenecks_bp
 from views.ideas import bp as ideas_bp
@@ -33,6 +34,7 @@ app.register_blueprint(meetings_bp)
 app.register_blueprint(ideas_bp)
 app.register_blueprint(repositories_bp)
 app.register_blueprint(bottlenecks_bp)
+app.register_blueprint(attempts_bp)
 
 
 @app.get("/health")

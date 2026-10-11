@@ -24,6 +24,7 @@ export default function IdeaRow({
   deleting,
   onApprove,
   onRetryAttempt,
+  onOpenReport,
   onReject,
   onDelete,
 }) {
@@ -252,6 +253,18 @@ export default function IdeaRow({
                     {busy ? "Retrying…" : "Retry attempt"}
                   </button>
                 )}
+              {latestAttempt.id && latestAttempt.status === "COMPLETE" && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onOpenReport?.(latestAttempt.id);
+                  }}
+                >
+                  View report
+                </button>
+              )}
               {latestAttempt.pull_request_url && (
                 <p className="detail-note">
                   <a href={latestAttempt.pull_request_url} target="_blank" rel="noreferrer">

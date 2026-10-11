@@ -141,3 +141,7 @@ export function health() {
 export function getBottlenecks() {
   return fetch("/bottlenecks").then(parse);
 }
+
+export function getAttempt(id) {
+  return fetch(`/attempts/${id}`).then(parse);
+}

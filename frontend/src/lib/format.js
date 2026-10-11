@@ -71,3 +71,15 @@ export function formatPriority(priority) {
   const labels = { high: "High", medium: "Medium", low: "Low" };
   return labels[key] || priority;
 }
+
+const FRICTION_LABELS = {
+  EXTERNAL_SERVICE_DEPENDENCY: "External service",
+  AUTH_CREDENTIAL_REQUIRED: "Credentials / auth",
+  SCHEMA_MIGRATION_REQUIRED: "Schema migration",
+  CROSS_TEAM_CONTRACT: "Cross-team contract",
+  PRODUCT_DECISION: "Product decision",
+};
+
+export function formatFrictionCategory(category) {
+  return FRICTION_LABELS[category] || category;
+}

@@ -5,6 +5,7 @@ import RepositoriesPage from "./pages/RepositoriesPage";
 import MeetingsPage from "./pages/MeetingsPage";
 import IdeasPage from "./pages/IdeasPage";
 import BottlenecksPage from "./pages/BottlenecksPage";
+import ReportPage from "./pages/ReportPage";
 import { onAuthChanged, checkSessionExpired } from "./lib/firebase";
 import {
   approveIdea,
@@ -41,6 +42,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authChecking, setAuthChecking] = useState(true);
   const [view, setView] = useState("repositories");
+  const [reportAttemptId, setReportAttemptId] = useState(null);
   const [repositories, setRepositories] = useState([]);
   const [meetings, setMeetings] = useState([]);
   const [ideas, setIdeas] = useState([]);
@@ -375,6 +377,8 @@ export default function App() {
           />
         ) : view === "bottlenecks" ? (
           <BottlenecksPage />
+        ) : view === "report" ? (
+          <ReportPage attemptId={reportAttemptId} onBack={() => setView("ideas")} />
         ) : (
           <IdeasPage
             ideas={ideas}
@@ -392,6 +396,10 @@ export default function App() {
             }
             onApprove={handleApprove}
             onRetryAttempt={handleRetryAttempt}
+            onOpenReport={(attemptId) => {
+              setReportAttemptId(attemptId);
+              setView("report");
+            }}
             onReject={handleReject}
             onDelete={handleDeleteIdea}
           />
