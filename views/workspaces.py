@@ -19,14 +19,21 @@ def _name_from_body() -> str | None:
     return name[:80] or None
 
 
-def _owned(workspace_id: int):
-    """The workspace if the user owns it, else an error response."""
+def member_with_role(workspace_id: int, *roles: WorkspaceRole):
+    """(membership, None) if the user holds one of `roles` there, else (None, error response)."""
     membership = db.get_membership(workspace_id, _uid())
     if membership is None:
         return None, (jsonify({"error": "workspace not found"}), 404)
-    if membership.role != WorkspaceRole.OWNER:
-        return None, (jsonify({"error": "Only the workspace owner can do that."}), 403)
-    return db.get_workspace(workspace_id), None
+    if membership.role not in roles:
+        allowed = " or ".join(r.value for r in roles)
+        return None, (jsonify({"error": f"Only a workspace {allowed} can do that."}), 403)
+    return membership, None
+
+
+def _owned(workspace_id: int):
+    """The workspace if the user owns it, else an error response."""
+    _, error = member_with_role(workspace_id, WorkspaceRole.OWNER)
+    return (None, error) if error else (db.get_workspace(workspace_id), None)
 
 
 @bp.get("")
