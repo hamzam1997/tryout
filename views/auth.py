@@ -13,6 +13,7 @@ from flask import Blueprint, g, jsonify, redirect, request, session
 
 import database as db
 from config import settings
+from schemas import WorkspaceRole
 from seed_history import seed_friction_history
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,23 @@ def require_login():
         return jsonify({"error": "You are not a member of that workspace."}), 403
     db.set_workspace(membership.workspace_id)
     g.membership = membership
+    if not _role_allows(membership.role):
+        return jsonify({"error": "Only a workspace admin or owner can do that."}), 403
     return None
+
+
+# Members read, approve, reject and run attempts. Changing what the workspace works
+# on (repositories, meetings) and deleting ideas needs an admin or owner.
+# Workspace, member and invitation endpoints check roles per workspace themselves.
+_ADMIN_WRITE_PREFIXES = ("/api/repositories", "/api/meetings")
+
+
+def _role_allows(role: WorkspaceRole) -> bool:
+    if role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN) or request.method in ("GET", "HEAD", "OPTIONS"):
+        return True
+    if request.path.startswith(_ADMIN_WRITE_PREFIXES):
+        return False
+    return not (request.method == "DELETE" and request.path.startswith("/api/ideas/"))
 
 
 def _resolve_membership(user: dict):

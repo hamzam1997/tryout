@@ -208,3 +208,22 @@ export function getInvitation(token) {
 export function acceptInvitation(token) {
   return fetch(`/api/invitations/${encodeURIComponent(token)}/accept`, { method: "POST" }).then(parse);
 }
+
+// Members
+export function listMembers(workspaceId) {
+  return fetch(`/api/workspaces/${workspaceId}/members`).then(parse);
+}
+
+export function changeMemberRole(workspaceId, uid, role) {
+  return fetch(`/api/workspaces/${workspaceId}/members/${encodeURIComponent(uid)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role }),
+  }).then(parse);
+}
+
+export function removeMember(workspaceId, uid) {
+  return fetch(`/api/workspaces/${workspaceId}/members/${encodeURIComponent(uid)}`, { method: "DELETE" }).then(
+    async (response) => (response.status === 204 ? true : parse(response))
+  );
+}

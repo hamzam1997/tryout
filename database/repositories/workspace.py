@@ -41,6 +41,16 @@ def add_member(workspace_id: int, uid: str, role: WorkspaceRole) -> Membership:
     return membership
 
 
+def set_member_role(workspace_id: int, uid: str, role: WorkspaceRole) -> None:
+    get_firestore_client().collection(MEMBERSHIPS).document(_membership_id(workspace_id, uid)).set(
+        {"role": role.value}, merge=True
+    )
+
+
+def remove_member(workspace_id: int, uid: str) -> None:
+    get_firestore_client().collection(MEMBERSHIPS).document(_membership_id(workspace_id, uid)).delete()
+
+
 def get_membership(workspace_id: int, uid: str) -> Membership | None:
     snap = get_firestore_client().collection(MEMBERSHIPS).document(_membership_id(workspace_id, uid)).get()
     return Membership.model_validate(snap.to_dict()) if snap.exists else None

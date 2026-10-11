@@ -63,8 +63,10 @@ __all__ = [
     "get_workspace",
     "list_memberships",
     "list_open_invitations",
+    "remove_member",
     "rename_workspace",
     "save_invitation",
+    "set_member_role",
     # Repository
     "catalog_is_current",
     "create_repository",
@@ -123,6 +125,8 @@ from database.repositories.workspace import (  # noqa: E402
     get_workspace,
     list_memberships,
     list_open_invitations,
+    remove_member,
     rename_workspace,
     save_invitation,
+    set_member_role,
 )
