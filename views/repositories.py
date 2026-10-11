@@ -16,7 +16,7 @@ from schemas import ArchitectureCatalog, RepoSource, Repository
 
 logger = logging.getLogger(__name__)
 
-bp = Blueprint("repositories", __name__, url_prefix="/repositories")
+bp = Blueprint("repositories", __name__, url_prefix="/api/repositories")
 
 # The demo is a real GitHub repo so approved demo ideas can open PRs.
 DEMO_REPO_SLUG = "hamzam1997/acme-store"

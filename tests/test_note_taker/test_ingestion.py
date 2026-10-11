@@ -37,7 +37,7 @@ MINUTES = MeetingMinutes(
 def upload(client, content=VTT, filename="weekly-ops.vtt", **form):
     data = {"file": (io.BytesIO(content.encode()), filename), **form}
     return client.post(
-        "/meetings/upload", data=data, content_type="multipart/form-data"
+        "/api/meetings/upload", data=data, content_type="multipart/form-data"
     )
 
 
@@ -135,7 +135,7 @@ class TestModelFailure(IngestionTestCase):
 class TestRejections(IngestionTestCase):
     def test_missing_file_rejected(self):
         response = self.client.post(
-            "/meetings/upload", data={}, content_type="multipart/form-data"
+            "/api/meetings/upload", data={}, content_type="multipart/form-data"
         )
         self.assertEqual(response.status_code, 400)
 
@@ -145,7 +145,7 @@ class TestRejections(IngestionTestCase):
     def test_non_utf8_upload_rejected(self):
         data = {"file": (io.BytesIO(b"\xff\xfe\x00bad"), "notes.vtt")}
         response = self.client.post(
-            "/meetings/upload", data=data, content_type="multipart/form-data"
+            "/api/meetings/upload", data=data, content_type="multipart/form-data"
         )
         self.assertEqual(response.status_code, 400)
 
@@ -165,18 +165,18 @@ class TestReadEndpoints(IngestionTestCase):
     def test_list_and_get(self, _):
         meeting_id = upload(self.client).get_json()["meeting"]["id"]
 
-        listed = self.client.get("/meetings").get_json()
+        listed = self.client.get("/api/meetings").get_json()
         self.assertEqual(len(listed), 1)
         self.assertNotIn("transcript", listed[0])
         self.assertIn("speakers", listed[0])
 
-        fetched = self.client.get(f"/meetings/{meeting_id}").get_json()
+        fetched = self.client.get(f"/api/meetings/{meeting_id}").get_json()
         self.assertEqual(fetched["id"], meeting_id)
         self.assertIn("transcript", fetched)
         self.assertIsNotNone(fetched.get("minutes"))
 
     def test_get_unknown_meeting_is_404(self):
-        self.assertEqual(self.client.get("/meetings/9999").status_code, 404)
+        self.assertEqual(self.client.get("/api/meetings/9999").status_code, 404)
 
     @mock.patch("agents.note_taker.generate_minutes", return_value=MINUTES)
     def test_duplicate_transcript_reuses_meeting(self, _):
@@ -204,11 +204,11 @@ class TestReadEndpoints(IngestionTestCase):
         )
         self.assertEqual(len(db.list_ideas(meeting_id=meeting_id)), 1)
 
-        response = self.client.delete(f"/meetings/{meeting_id}")
+        response = self.client.delete(f"/api/meetings/{meeting_id}")
         self.assertEqual(response.status_code, 204)
         self.assertIsNone(db.get_meeting(meeting_id))
         self.assertEqual(db.list_ideas(meeting_id=meeting_id), [])
-        self.assertEqual(self.client.delete("/meetings/9999").status_code, 404)
+        self.assertEqual(self.client.delete("/api/meetings/9999").status_code, 404)
 
 
 if __name__ == "__main__":

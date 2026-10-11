@@ -15,7 +15,7 @@ from agents.transcript import TranscriptError
 from config import BASE_DIR
 from schemas import IdeasExtractStatus, MeetingSource, MeetingStatus
 
-bp = Blueprint("meetings", __name__, url_prefix="/meetings")
+bp = Blueprint("meetings", __name__, url_prefix="/api/meetings")
 
 ALLOWED_SUFFIXES = (".vtt", ".srt", ".txt")
 MAX_TRANSCRIPT_BYTES = 2 * 1024 * 1024

@@ -20,7 +20,7 @@ class TestAttemptsView(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_missing_attempt_is_404(self):
-        self.assertEqual(self.client.get("/attempts/999").status_code, 404)
+        self.assertEqual(self.client.get("/api/attempts/999").status_code, 404)
 
     def test_report_includes_idea_title_and_friction(self):
         meeting = db.create_meeting(Meeting(title="Sync", transcript="t"))
@@ -31,7 +31,7 @@ class TestAttemptsView(unittest.TestCase):
             attempt_id=attempt.id, category=FrictionCategory.PRODUCT_DECISION, service_name="x",
         ))
 
-        body = self.client.get(f"/attempts/{attempt.id}").get_json()
+        body = self.client.get(f"/api/attempts/{attempt.id}").get_json()
 
         self.assertEqual(body["idea_title"], "Refund alert")
         self.assertEqual(body["diff"], "d")
@@ -63,17 +63,17 @@ class TestAttemptStream(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_finished_attempt_streams_all_steps_then_done(self):
-        body = self.client.get(f"/attempts/{self.attempt.id}/stream").get_data(as_text=True)
+        body = self.client.get(f"/api/attempts/{self.attempt.id}/stream").get_data(as_text=True)
         self.assertEqual(body.count("event: step"), 2)
         self.assertIn("id: 2\nevent: step", body)
         self.assertTrue(body.rstrip().endswith('data: {"status": "COMPLETE"}'))
 
     def test_reconnect_resumes_after_last_event_id(self):
         body = self.client.get(
-            f"/attempts/{self.attempt.id}/stream", headers={"Last-Event-ID": "1"}
+            f"/api/attempts/{self.attempt.id}/stream", headers={"Last-Event-ID": "1"}
         ).get_data(as_text=True)
         self.assertEqual(body.count("event: step"), 1)
         self.assertIn('"action": "complete"', body)
 
     def test_missing_attempt_is_404(self):
-        self.assertEqual(self.client.get("/attempts/999/stream").status_code, 404)
+        self.assertEqual(self.client.get("/api/attempts/999/stream").status_code, 404)

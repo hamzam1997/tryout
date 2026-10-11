@@ -54,13 +54,13 @@ class RepositoriesViewTestCase(unittest.TestCase):
         self._tmp.cleanup()
 
     def test_list_repositories_empty(self):
-        resp = self.client.get("/repositories")
+        resp = self.client.get("/api/repositories")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.get_json(), [])
 
     @mock.patch("views.repositories.threading.Thread")
     def test_onboard_demo_repo_uses_github_demo(self, _thread):
-        resp = self.client.post("/repositories/onboard", json={"source_type": "demo"})
+        resp = self.client.post("/api/repositories/onboard", json={"source_type": "demo"})
         self.assertEqual(resp.status_code, 202)
         repo = resp.get_json()["repository"]
         self.assertEqual(repo["source_type"], "github")
@@ -87,7 +87,7 @@ class RepositoriesViewTestCase(unittest.TestCase):
             sess["github_token"] = "fake-token"
 
         resp = self.client.post(
-            "/repositories/onboard",
+            "/api/repositories/onboard",
             json={"source_type": "github", "repo_full_name": "org/payment-service"},
         )
         self.assertEqual(resp.status_code, 202)
@@ -97,17 +97,17 @@ class RepositoriesViewTestCase(unittest.TestCase):
 
         # Retrieve catalog endpoint after sync completion
         repo_id = data["repository"]["id"]
-        cat_resp = self.client.get(f"/repositories/{repo_id}/catalog")
+        cat_resp = self.client.get(f"/api/repositories/{repo_id}/catalog")
         self.assertEqual(cat_resp.status_code, 200)
         self.assertEqual(cat_resp.get_json()["name"], "test-service")
 
     def test_onboard_invalid_source_type(self):
-        resp = self.client.post("/repositories/onboard", json={"source_type": "bitbucket"})
+        resp = self.client.post("/api/repositories/onboard", json={"source_type": "bitbucket"})
         self.assertEqual(resp.status_code, 400)
         self.assertIn("error", resp.get_json())
 
     def test_get_nonexistent_repository(self):
-        resp = self.client.get("/repositories/9999")
+        resp = self.client.get("/api/repositories/9999")
         self.assertEqual(resp.status_code, 404)
 
     def test_delete_repository(self):
@@ -122,7 +122,7 @@ class RepositoriesViewTestCase(unittest.TestCase):
         self.assertIsNotNone(db.get_repository(repo.id))
 
         # Delete it via API
-        resp = self.client.delete(f"/repositories/{repo.id}")
+        resp = self.client.delete(f"/api/repositories/{repo.id}")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.get_json()["id"], repo.id)
 
@@ -130,5 +130,5 @@ class RepositoriesViewTestCase(unittest.TestCase):
         self.assertIsNone(db.get_repository(repo.id))
 
     def test_delete_nonexistent_repository(self):
-        resp = self.client.delete("/repositories/9999")
+        resp = self.client.delete("/api/repositories/9999")
         self.assertEqual(resp.status_code, 404)

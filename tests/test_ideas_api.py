@@ -55,7 +55,7 @@ class TestIdeasApi(unittest.TestCase):
         self._tmp.cleanup()
 
     def test_list_ideas_includes_meeting_title(self):
-        response = self.client.get("/ideas")
+        response = self.client.get("/api/ideas")
         self.assertEqual(response.status_code, 200)
         body = response.get_json()
         self.assertEqual(len(body), 1)
@@ -65,8 +65,8 @@ class TestIdeasApi(unittest.TestCase):
 
     def test_list_ideas_filters_by_status(self):
         db.set_idea_status(self.idea.id, IdeaStatus.APPROVED)
-        pending = self.client.get("/ideas?status=PENDING")
-        approved = self.client.get("/ideas?status=APPROVED")
+        pending = self.client.get("/api/ideas?status=PENDING")
+        approved = self.client.get("/api/ideas?status=APPROVED")
         self.assertEqual(pending.get_json(), [])
         self.assertEqual(len(approved.get_json()), 1)
 
@@ -75,7 +75,7 @@ class TestIdeasApi(unittest.TestCase):
             sess["user"] = {"uid": "user-123", "name": "Dana"}
         with patch("views.ideas.queue_attempt") as queue_attempt:
             approved = self.client.post(
-                f"/ideas/{self.idea.id}/approve",
+                f"/api/ideas/{self.idea.id}/approve",
                 json={"repository_id": self.repository.id},
             )
         self.assertEqual(approved.status_code, 202)
@@ -89,7 +89,7 @@ class TestIdeasApi(unittest.TestCase):
         self.assertEqual(attempts[0].repository_id, self.repository.id)
         queue_attempt.assert_called_once()
 
-        again = self.client.post(f"/ideas/{self.idea.id}/approve")
+        again = self.client.post(f"/api/ideas/{self.idea.id}/approve")
         self.assertEqual(again.status_code, 409)
 
         other = db.create_idea(
@@ -100,26 +100,26 @@ class TestIdeasApi(unittest.TestCase):
                 status=IdeaStatus.PENDING,
             )
         )
-        rejected = self.client.post(f"/ideas/{other.id}/reject")
+        rejected = self.client.post(f"/api/ideas/{other.id}/reject")
         self.assertEqual(rejected.status_code, 200)
         self.assertEqual(rejected.get_json()["status"], "REJECTED")
 
     def test_get_missing_idea(self):
-        response = self.client.get("/ideas/9999")
+        response = self.client.get("/api/ideas/9999")
         self.assertEqual(response.status_code, 404)
 
     def test_delete_idea(self):
-        response = self.client.delete(f"/ideas/{self.idea.id}")
+        response = self.client.delete(f"/api/ideas/{self.idea.id}")
         self.assertEqual(response.status_code, 204)
         self.assertIsNone(db.get_idea(self.idea.id))
         self.assertIsNotNone(db.get_meeting(self.meeting.id))
 
-        missing = self.client.delete("/ideas/9999")
+        missing = self.client.delete("/api/ideas/9999")
         self.assertEqual(missing.status_code, 404)
 
     def test_get_idea_detail_vs_summary(self):
         # Summary from list_ideas does not include heavy fields
-        list_resp = self.client.get("/ideas")
+        list_resp = self.client.get("/api/ideas")
         self.assertEqual(list_resp.status_code, 200)
         summary = list_resp.get_json()[0]
         self.assertNotIn("description", summary)
@@ -127,7 +127,7 @@ class TestIdeasApi(unittest.TestCase):
         self.assertNotIn("quote", summary)
 
         # GET /ideas/<id> returns all details
-        detail_resp = self.client.get(f"/ideas/{self.idea.id}")
+        detail_resp = self.client.get(f"/api/ideas/{self.idea.id}")
         self.assertEqual(detail_resp.status_code, 200)
         detail = detail_resp.get_json()
         self.assertEqual(detail["id"], self.idea.id)
@@ -136,7 +136,7 @@ class TestIdeasApi(unittest.TestCase):
         self.assertEqual(detail["quote"], self.idea.quote)
 
     def test_get_idea_counts(self):
-        resp = self.client.get("/ideas/counts")
+        resp = self.client.get("/api/ideas/counts")
         self.assertEqual(resp.status_code, 200)
         counts = resp.get_json()
         self.assertEqual(counts["PENDING"], 1)

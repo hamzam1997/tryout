@@ -47,7 +47,7 @@ class TestMeetingIdeasRetry(unittest.TestCase):
             "agents.idea_jobs.extract_ideas",
             side_effect=IdeaExtractorError("catalog missing"),
         ):
-            response = self.client.post(f"/meetings/{self.meeting.id}/extract-ideas")
+            response = self.client.post(f"/api/meetings/{self.meeting.id}/extract-ideas")
 
         self.assertEqual(response.status_code, 202)
         meeting = db.get_meeting(self.meeting.id)
@@ -61,7 +61,7 @@ class TestMeetingIdeasRetry(unittest.TestCase):
             ideas_error="old failure",
         )
         with patch("agents.idea_jobs.extract_ideas", return_value=[]):
-            response = self.client.post(f"/meetings/{self.meeting.id}/extract-ideas")
+            response = self.client.post(f"/api/meetings/{self.meeting.id}/extract-ideas")
 
         self.assertEqual(response.status_code, 202)
         meeting = db.get_meeting(self.meeting.id)
@@ -76,7 +76,7 @@ class TestMeetingIdeasRetry(unittest.TestCase):
                 status=MeetingStatus.PENDING,
             )
         )
-        response = self.client.post(f"/meetings/{pending.id}/extract-ideas")
+        response = self.client.post(f"/api/meetings/{pending.id}/extract-ideas")
         self.assertEqual(response.status_code, 409)
 
     def test_minutes_ready_queues_idea_job(self):
@@ -105,7 +105,7 @@ class TestMeetingMinutesBackground(unittest.TestCase):
     def test_upload_queues_minutes_in_background(self, mock_thread):
         data = {"file": (io.BytesIO(VTT.encode()), "ops.vtt"), "title": "Ops"}
         response = self.client.post(
-            "/meetings/upload", data=data, content_type="multipart/form-data"
+            "/api/meetings/upload", data=data, content_type="multipart/form-data"
         )
 
         self.assertEqual(response.status_code, 202)
