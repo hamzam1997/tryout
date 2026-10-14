@@ -7,16 +7,13 @@ import {
   signOut,
   onAuthStateChanged,
   setPersistence,
-  browserSessionPersistence,
+  browserLocalPersistence,
 } from "firebase/auth";
 
 let authInstance = null;
 let googleProviderInstance = null;
 let githubProviderInstance = null;
 let initPromise = null;
-
-const SESSION_EXPIRY_MS = 2 * 60 * 60 * 1000; // 2 hours
-const SESSION_TIMESTAMP_KEY = "tryout_session_login_time";
 
 /**
  * Fetch Firebase client configuration dynamically from server runtime.
@@ -53,8 +50,8 @@ export async function getFirebaseAuth() {
       const app = apps.length > 0 ? apps[0] : initializeApp(config);
       authInstance = getAuth(app);
 
-      // Set session persistence to browser session only (closes on tab/window close)
-      await setPersistence(authInstance, browserSessionPersistence).catch(() => {});
+      // Stay signed in across tabs and browser restarts until the user signs out.
+      await setPersistence(authInstance, browserLocalPersistence).catch(() => {});
 
       googleProviderInstance = new GoogleAuthProvider();
       githubProviderInstance = new GithubAuthProvider();
@@ -77,36 +74,14 @@ export async function getFirebaseAuth() {
 }
 
 /**
- * Check if the current session has exceeded its maximum duration.
+ * Create (or refresh) the Flask session for a Firebase user.
  */
-export function checkSessionExpired() {
-  const loginTime = sessionStorage.getItem(SESSION_TIMESTAMP_KEY);
-  if (!loginTime) return false;
-  const elapsed = Date.now() - parseInt(loginTime, 10);
-  return elapsed > SESSION_EXPIRY_MS;
-}
-
-/**
- * Stamp current login time.
- */
-function stampSessionTime() {
-  sessionStorage.setItem(SESSION_TIMESTAMP_KEY, Date.now().toString());
-}
-
-/**
- * Sign in using Google OAuth via Firebase.
- */
-export async function loginWithGoogle() {
-  const { auth, googleProvider } = await getFirebaseAuth();
-  const result = await signInWithPopup(auth, googleProvider);
-  const user = result.user;
-  stampSessionTime();
-
-  // Sync session and persist user with Flask backend & Firestore
-  await fetch("/api/auth/firebase-sync", {
+function syncSession(user, githubToken) {
+  return fetch("/api/auth/firebase-sync", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
+      github_token: githubToken,
       user: {
         uid: user.uid,
         email: user.email,
@@ -115,8 +90,16 @@ export async function loginWithGoogle() {
       },
     }),
   });
+}
 
-  return user;
+/**
+ * Sign in using Google OAuth via Firebase.
+ */
+export async function loginWithGoogle() {
+  const { auth, googleProvider } = await getFirebaseAuth();
+  const result = await signInWithPopup(auth, googleProvider);
+  await syncSession(result.user);
+  return result.user;
 }
 
 /**
@@ -130,22 +113,8 @@ export async function loginWithGitHub() {
   const credential = GithubAuthProvider.credentialFromResult(result);
   const githubToken = credential?.accessToken;
   const user = result.user;
-  stampSessionTime();
 
-  // Sync GitHub token and persist user with Flask backend & Firestore
-  const syncResp = await fetch("/api/auth/firebase-sync", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      github_token: githubToken,
-      user: {
-        uid: user.uid,
-        email: user.email,
-        name: user.displayName || user.email,
-        avatar_url: user.photoURL,
-      },
-    }),
-  });
+  const syncResp = await syncSession(user, githubToken);
 
   const syncData = await syncResp.json().catch(() => ({}));
   return { user, githubToken, syncData };
@@ -155,7 +124,6 @@ export async function loginWithGitHub() {
  * Log out from Firebase and clear the Flask session and local session storage.
  */
 export async function logoutUser() {
-  sessionStorage.removeItem(SESSION_TIMESTAMP_KEY);
   try {
     const { auth } = await getFirebaseAuth();
     await signOut(auth).catch(() => {});
@@ -167,16 +135,17 @@ export async function logoutUser() {
 }
 
 /**
- * Subscribe to auth state changes with automatic session expiry enforcement.
+ * Subscribe to auth state changes. A user restored from a previous visit gets a
+ * fresh server session if the old one is gone.
  */
 export function onAuthChanged(callback) {
   let unsubscribeAuth = null;
   getFirebaseAuth()
     .then(({ auth }) => {
-      unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-        if (user && checkSessionExpired()) {
-          logoutUser().then(() => callback(null));
-          return;
+      unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+        if (user) {
+          const me = await fetch("/api/auth/me").catch(() => null);
+          if (!me?.ok) await syncSession(user).catch(() => {});
         }
         callback(user);
       });
