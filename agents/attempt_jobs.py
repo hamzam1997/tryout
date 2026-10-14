@@ -13,12 +13,13 @@ import database as db
 
 from agents.friction_classifier import readiness_markdown, record_friction
 from agents.harness import AttemptHarness
+from agents.planner import generate_plan
 from agents.git_utils import fetch_github_repository
 from agents.github_pr import create_attempt_pull_request
 from agents.repo_onboarder import compute_source_ref
 from config import settings
 from logging_setup import log_event
-from schemas import AttemptStatus, AttemptStep, IdeaStatus, PlanStep, RepoSource, TechnicalPlan
+from schemas import AttemptStatus, AttemptStep, IdeaStatus, RepoSource, TechnicalPlan
 
 logger = logging.getLogger(__name__)
 
@@ -82,49 +83,23 @@ def _copy_source(repo, github_token: str | None, destination: Path) -> tuple[Pat
     return destination, commit_sha
 
 
-def _relevant_context(root: Path, idea, plan, catalog) -> str:
-    wanted: set[str] = set()
-    refs = {ref.strip().strip("/") for ref in idea.catalog_refs if ref.strip()}
-    for step in plan.repo_changes:
-        if step.target:
-            wanted.add(step.target.strip().strip("/"))
-    for file_role in catalog.key_files:
-        if any(ref in file_role.path or ref in file_role.role for ref in refs):
-            wanted.add(file_role.path.strip().strip("/"))
-    for module in catalog.modules:
-        if any(ref in module.path or ref in module.name for ref in refs):
-            wanted.add(module.path.strip().strip("/"))
-
-    candidates = []
-    for file_path, relative in walk_repository(root):
-        filename = Path(relative).name.lower()
-        if file_path.is_symlink() or any(part.startswith(".") for part in Path(relative).parts):
-            continue
-        if _is_sensitive_filename(filename):
-            continue
-        candidates.append((file_path, relative))
-
-    selected = []
-    for file_path, relative in candidates:
-        if any(relative == path or relative.startswith(path.rstrip("/") + "/") for path in wanted):
-            selected.append((file_path, relative))
-    if not selected:
-        selected = candidates[:10]
-
-    parts = []
-    budget = 60_000
-    for path, relative in selected[:20]:
-        try:
-            content = path.read_text(encoding="utf-8")
-        except (OSError, UnicodeError):
-            continue
-        content = content[:8_000]
-        block = f"\n--- {relative} ---\n{content}\n"
-        if len(block) > budget:
-            break
-        parts.append(block)
-        budget -= len(block)
-    return "".join(parts)
+def _plan(attempt, idea, catalog) -> TechnicalPlan | None:
+    """Plan before coding; the attempt still runs (unplanned) if planning fails."""
+    meeting = db.get_meeting(idea.meeting_id)
+    try:
+        plan = generate_plan(idea, meeting, catalog, settings.model_planning)
+    except Exception:
+        logger.exception("Planning failed for attempt %s", attempt.id)
+        return None
+    attempt.plan = plan
+    attempt.events.append(AttemptStep(
+        timestamp=datetime.now(timezone.utc),
+        action="plan",
+        detail=f"{len(plan.repo_changes)} repo change(s), "
+        f"{len(plan.external_requirements)} external requirement(s)",
+    ))
+    db.update_attempt(attempt)
+    return plan
 
 
 def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
@@ -147,14 +122,16 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
             attempt.repo_ref = repo_ref
             db.update_attempt(attempt)
 
+            plan = _plan(attempt, idea, repo.catalog)
+
             db.set_attempt_status(attempt_id, AttemptStatus.CODING)
             attempt = db.get_attempt(attempt_id) or attempt
-            
             harness = AttemptHarness(
                 workspace=workspace,
                 catalog=repo.catalog,
                 idea=idea,
-                attempt=attempt
+                attempt=attempt,
+                plan=plan,
             )
             harness_result = harness.run()
             
