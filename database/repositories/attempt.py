@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from database.client import get_firestore_client, get_next_id
-from database.scope import exists, scoped, stamped
+from database.scope import exists, scoped
 from database.documents import AttemptDoc, utc_now
 from schemas import Attempt, AttemptStatus
 
@@ -14,7 +14,7 @@ def create_attempt(attempt: Attempt) -> Attempt:
     attempt.id = attempt_id
 
     doc = AttemptDoc.from_domain(attempt)
-    client.collection(AttemptDoc.COLLECTION).document(str(attempt_id)).set(stamped(doc.to_doc()))
+    client.collection(AttemptDoc.COLLECTION).document(str(attempt_id)).set(doc.to_doc())
     return attempt
 
 

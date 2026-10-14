@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from database.client import get_firestore_client, get_next_id
-from database.scope import exists, scoped, stamped
+from database.scope import exists, scoped
 from database.documents import IdeaDoc, MeetingDoc
 from schemas import (
     IdeasExtractStatus,
@@ -23,7 +23,7 @@ def create_meeting(meeting: Meeting) -> Meeting:
     meeting.id = meeting_id
 
     doc = MeetingDoc.from_domain(meeting)
-    client.collection(MeetingDoc.COLLECTION).document(str(meeting_id)).set(stamped(doc.to_doc()))
+    client.collection(MeetingDoc.COLLECTION).document(str(meeting_id)).set(doc.to_doc())
     return meeting
 
 

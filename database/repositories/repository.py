@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from database.client import get_firestore_client, get_next_id
-from database.scope import exists, scoped, stamped
+from database.scope import exists, scoped
 from database.documents import RepositoryDoc, utc_now
 from schemas import ArchitectureCatalog, Repository
 
@@ -14,7 +14,7 @@ def create_repository(repo: Repository) -> Repository:
     repo.id = repo_id
 
     doc = RepositoryDoc.from_domain(repo)
-    client.collection(RepositoryDoc.COLLECTION).document(str(repo_id)).set(stamped(doc.to_doc()))
+    client.collection(RepositoryDoc.COLLECTION).document(str(repo_id)).set(doc.to_doc())
     return repo
 
 

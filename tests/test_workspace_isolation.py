@@ -25,6 +25,7 @@ class TestWorkspaceIsolation(unittest.TestCase):
             attempt_id=self.attempt.id, category=FrictionCategory.PRODUCT_DECISION, service_name="b-svc",
         ))
         self.meeting, self.repo = meeting, repo
+        self.b_workspace_id = db.current_workspace()
         # A, in a separate workspace
         self.a = login(app.test_client(), uid="a", name="A")
 
@@ -62,6 +63,11 @@ class TestWorkspaceIsolation(unittest.TestCase):
         self.assertEqual(membership.role.value, "owner")
         self.assertEqual(db.get_workspace(membership.workspace_id).name, "Nia's workspace")
 
+    def test_update_outside_a_workspace_keeps_the_records_workspace(self):
+        db.set_workspace(None)  # like a CLI script: unscoped, so the doc's workspace_id is None
+        db.update_repository(self.repo)
+        db.set_workspace(self.b_workspace_id)
+        self.assertIsNotNone(db.get_repository(self.repo.id))
 
 if __name__ == "__main__":
     unittest.main()

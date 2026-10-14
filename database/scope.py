@@ -22,10 +22,3 @@ def exists(snapshot) -> bool:
     workspace_id = current_workspace()
     return workspace_id is None or (snapshot.to_dict() or {}).get("workspace_id") == workspace_id
 
-
-def stamped(data: dict) -> dict:
-    """Tag a new document with the current workspace."""
-    workspace_id = current_workspace()
-    if workspace_id is not None:
-        data["workspace_id"] = workspace_id
-    return data

@@ -11,6 +11,7 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, Field
 
 import schemas
+from context import current_workspace
 
 
 def utc_now() -> datetime:
@@ -32,10 +33,13 @@ class RepositoryDoc(BaseModel):
     catalog_status: str = "ready"
     catalog_error: str | None = None
     catalog_generated_at: str | None = None
+    # ponytail: domain objects don't carry it, so it comes from the request's workspace
+    workspace_id: int | None = Field(default_factory=current_workspace)
     created_at: str = Field(default_factory=lambda: utc_now().isoformat())
 
     def to_doc(self) -> dict[str, Any]:
-        return self.model_dump(mode="json")
+        # Never write workspace_id: None, or an update would drop the record out of its workspace.
+        return self.model_dump(mode="json", exclude={"workspace_id"} if self.workspace_id is None else None)
 
     @classmethod
     def from_doc(cls, data: dict[str, Any]) -> RepositoryDoc:
@@ -104,10 +108,13 @@ class MeetingDoc(BaseModel):
     status: str = "PENDING"
     ideas_status: str = "PENDING"
     ideas_error: str | None = None
+    # ponytail: domain objects don't carry it, so it comes from the request's workspace
+    workspace_id: int | None = Field(default_factory=current_workspace)
     created_at: str = Field(default_factory=lambda: utc_now().isoformat())
 
     def to_doc(self) -> dict[str, Any]:
-        return self.model_dump(mode="json")
+        # Never write workspace_id: None, or an update would drop the record out of its workspace.
+        return self.model_dump(mode="json", exclude={"workspace_id"} if self.workspace_id is None else None)
 
     @classmethod
     def from_doc(cls, data: dict[str, Any]) -> MeetingDoc:
@@ -185,10 +192,13 @@ class IdeaDoc(BaseModel):
     status: str = "PENDING"
     approved_by: str | None = None
     approved_at: str | None = None
+    # ponytail: domain objects don't carry it, so it comes from the request's workspace
+    workspace_id: int | None = Field(default_factory=current_workspace)
     created_at: str = Field(default_factory=lambda: utc_now().isoformat())
 
     def to_doc(self) -> dict[str, Any]:
-        return self.model_dump(mode="json")
+        # Never write workspace_id: None, or an update would drop the record out of its workspace.
+        return self.model_dump(mode="json", exclude={"workspace_id"} if self.workspace_id is None else None)
 
     @classmethod
     def from_doc(cls, data: dict[str, Any]) -> IdeaDoc:
@@ -269,10 +279,13 @@ class AttemptDoc(BaseModel):
     events: list[dict] = Field(default_factory=list)
     started_at: str | None = None
     finished_at: str | None = None
+    # ponytail: domain objects don't carry it, so it comes from the request's workspace
+    workspace_id: int | None = Field(default_factory=current_workspace)
     created_at: str = Field(default_factory=lambda: utc_now().isoformat())
 
     def to_doc(self) -> dict[str, Any]:
-        return self.model_dump(mode="json")
+        # Never write workspace_id: None, or an update would drop the record out of its workspace.
+        return self.model_dump(mode="json", exclude={"workspace_id"} if self.workspace_id is None else None)
 
     @classmethod
     def from_doc(cls, data: dict[str, Any]) -> AttemptDoc:
@@ -354,10 +367,13 @@ class FrictionLogDoc(BaseModel):
     mock_implementation_path: str = ""
     required_action: str = ""
     readiness_checklist: list[dict[str, Any]] = Field(default_factory=list)
+    # ponytail: domain objects don't carry it, so it comes from the request's workspace
+    workspace_id: int | None = Field(default_factory=current_workspace)
     created_at: str = Field(default_factory=lambda: utc_now().isoformat())
 
     def to_doc(self) -> dict[str, Any]:
-        return self.model_dump(mode="json")
+        # Never write workspace_id: None, or an update would drop the record out of its workspace.
+        return self.model_dump(mode="json", exclude={"workspace_id"} if self.workspace_id is None else None)
 
     @classmethod
     def from_doc(cls, data: dict[str, Any]) -> FrictionLogDoc:
