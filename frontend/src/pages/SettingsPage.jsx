@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { deleteWorkspace, listWorkspaces, renameWorkspace } from "../api";
+import GitHubCard from "../components/GitHubCard";
 import InvitationsCard from "../components/InvitationsCard";
 import LoadingRows from "../components/LoadingRows";
 import MembersCard from "../components/MembersCard";
@@ -92,6 +93,8 @@ export default function SettingsPage() {
           <MembersCard workspaceId={workspace.id} myRole={workspace.role} />
 
           {(isOwner || workspace.role === "admin") && <InvitationsCard workspaceId={workspace.id} />}
+
+          <GitHubCard workspaceId={workspace.id} canManage={isOwner || workspace.role === "admin"} />
 
           {isOwner && (
             <section className="card report-section">

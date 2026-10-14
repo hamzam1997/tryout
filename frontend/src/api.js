@@ -227,3 +227,18 @@ export function removeMember(workspaceId, uid) {
     async (response) => (response.status === 204 ? true : parse(response))
   );
 }
+
+// Workspace GitHub connection
+export function getWorkspaceGitHub(workspaceId) {
+  return fetch(`/api/workspaces/${workspaceId}/github`).then(parse);
+}
+
+export function connectWorkspaceGitHub(workspaceId) {
+  return fetch(`/api/workspaces/${workspaceId}/github`, { method: "POST" }).then(parse);
+}
+
+export function disconnectWorkspaceGitHub(workspaceId) {
+  return fetch(`/api/workspaces/${workspaceId}/github`, { method: "DELETE" }).then(
+    async (response) => (response.status === 204 ? true : parse(response))
+  );
+}
