@@ -517,6 +517,21 @@ class Membership(BaseModel):
     created_at: datetime | None = None
 
 
+class Invitation(BaseModel):
+    token: str
+    workspace_id: int
+    email: str
+    role: WorkspaceRole = WorkspaceRole.MEMBER
+    invited_by: str
+    created_at: datetime
+    expires_at: datetime
+    accepted_at: datetime | None = None
+    revoked: bool = False
+
+    def is_open(self, now: datetime) -> bool:
+        return not self.revoked and self.accepted_at is None and now < self.expires_at
+
+
 class User(BaseModel):
     uid: str
     email: str | None = None

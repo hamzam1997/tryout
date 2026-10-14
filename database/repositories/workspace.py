@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 from database.client import get_firestore_client, get_next_id
-from database.documents import MembershipDoc, WorkspaceDoc, utc_now
-from schemas import Membership, Workspace, WorkspaceRole
+import secrets
+from datetime import timedelta
+
+from database.documents import InvitationDoc, MembershipDoc, WorkspaceDoc, utc_now
+from schemas import Invitation, Membership, Workspace, WorkspaceRole
+
+INVITE_TTL = timedelta(days=7)
 
 
 def create_workspace(name: str, owner_uid: str) -> Workspace:
@@ -44,7 +49,7 @@ def list_memberships(*, uid: str | None = None, workspace_id: int | None = None)
 
 
 def rename_workspace(workspace_id: int, name: str) -> None:
-    get_firestore_client().collection(WORKSPACES).document(str(workspace_id)).set({"name": name}, merge=True)
+    get_firestore_client().collection(WorkspaceDoc.COLLECTION).document(str(workspace_id)).set({"name": name}, merge=True)
 
 
 # Collections whose documents carry a workspace_id (see database/scope.py).
@@ -54,7 +59,39 @@ SCOPED_COLLECTIONS = ("repositories", "meetings", "ideas", "attempts", "friction
 def delete_workspace(workspace_id: int) -> None:
     """Delete a workspace with all its records and memberships."""
     client = get_firestore_client()
-    for collection in (*SCOPED_COLLECTIONS, MEMBERSHIPS):
+    for collection in (*SCOPED_COLLECTIONS, MembershipDoc.COLLECTION, InvitationDoc.COLLECTION):
         for doc in client.collection(collection).where("workspace_id", "==", workspace_id).stream():
             client.collection(collection).document(doc.id).delete()
-    client.collection(WORKSPACES).document(str(workspace_id)).delete()
+    client.collection(WorkspaceDoc.COLLECTION).document(str(workspace_id)).delete()
+
+
+def create_invitation(workspace_id: int, email: str, role: WorkspaceRole, invited_by: str) -> Invitation:
+    now = utc_now()
+    invitation = Invitation(
+        token=secrets.token_urlsafe(24),
+        workspace_id=workspace_id,
+        email=email.strip().lower(),
+        role=role,
+        invited_by=invited_by,
+        created_at=now,
+        expires_at=now + INVITE_TTL,
+    )
+    save_invitation(invitation)
+    return invitation
+
+
+def save_invitation(invitation: Invitation) -> None:
+    doc = InvitationDoc.from_domain(invitation)
+    get_firestore_client().collection(InvitationDoc.COLLECTION).document(doc.token).set(doc.to_doc())
+
+
+def get_invitation(token: str) -> Invitation | None:
+    snap = get_firestore_client().collection(InvitationDoc.COLLECTION).document(token).get()
+    return InvitationDoc.from_doc(snap.to_dict()).to_domain() if snap.exists else None
+
+
+def list_open_invitations(workspace_id: int) -> list[Invitation]:
+    now = utc_now()
+    docs = get_firestore_client().collection(InvitationDoc.COLLECTION).where("workspace_id", "==", workspace_id).stream()
+    invitations = [InvitationDoc.from_doc(d.to_dict()).to_domain() for d in docs]
+    return sorted((i for i in invitations if i.is_open(now)), key=lambda i: i.created_at)

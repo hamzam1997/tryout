@@ -10,6 +10,7 @@ from views.attempts import bp as attempts_bp
 from views.auth import bp as auth_bp, require_login
 from views.bottlenecks import bp as bottlenecks_bp
 from views.ideas import bp as ideas_bp
+from views.invitations import bp as invitations_bp
 from views.meetings import bp as meetings_bp
 from views.repositories import bp as repositories_bp
 from views.workspaces import bp as workspaces_bp
@@ -39,6 +40,7 @@ app.register_blueprint(repositories_bp)
 app.register_blueprint(bottlenecks_bp)
 app.register_blueprint(attempts_bp)
 app.register_blueprint(workspaces_bp)
+app.register_blueprint(invitations_bp)
 
 
 @app.get("/health")

@@ -7,6 +7,7 @@ import IdeasPage from "./pages/IdeasPage";
 import BottlenecksPage from "./pages/BottlenecksPage";
 import ReportPage from "./pages/ReportPage";
 import SettingsPage from "./pages/SettingsPage";
+import InvitePage from "./pages/InvitePage";
 import LiveAttemptModal from "./components/LiveAttemptModal";
 import TourBanner from "./components/TourBanner";
 import { onAuthChanged } from "./lib/firebase";
@@ -402,6 +403,8 @@ export default function App() {
           />
         ) : view === "bottlenecks" ? (
           <BottlenecksPage />
+        ) : view === "invite" ? (
+          <InvitePage token={route.token} />
         ) : view === "settings" ? (
           <SettingsPage />
         ) : view === "report" ? (

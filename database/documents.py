@@ -533,3 +533,53 @@ class MembershipDoc(BaseModel):
             role=membership.role.value,
             created_at=created,
         )
+
+
+class InvitationDoc(BaseModel):
+    """Document stored in Firestore `/invitations/{token}`."""
+
+    COLLECTION: ClassVar[str] = "invitations"
+
+    token: str
+    workspace_id: int
+    email: str
+    role: str = "member"
+    invited_by: str
+    created_at: str = Field(default_factory=lambda: utc_now().isoformat())
+    expires_at: str
+    accepted_at: str | None = None
+    revoked: bool = False
+
+    def to_doc(self) -> dict[str, Any]:
+        return self.model_dump(mode="json")
+
+    @classmethod
+    def from_doc(cls, data: dict[str, Any]) -> InvitationDoc:
+        return cls.model_validate(data)
+
+    def to_domain(self) -> schemas.Invitation:
+        return schemas.Invitation(
+            token=self.token,
+            workspace_id=self.workspace_id,
+            email=self.email,
+            role=schemas.WorkspaceRole(self.role),
+            invited_by=self.invited_by,
+            created_at=datetime.fromisoformat(self.created_at),
+            expires_at=datetime.fromisoformat(self.expires_at),
+            accepted_at=datetime.fromisoformat(self.accepted_at) if self.accepted_at else None,
+            revoked=self.revoked,
+        )
+
+    @classmethod
+    def from_domain(cls, invitation: schemas.Invitation) -> InvitationDoc:
+        return cls(
+            token=invitation.token,
+            workspace_id=invitation.workspace_id,
+            email=invitation.email,
+            role=invitation.role.value,
+            invited_by=invitation.invited_by,
+            created_at=invitation.created_at.isoformat(),
+            expires_at=invitation.expires_at.isoformat(),
+            accepted_at=invitation.accepted_at.isoformat() if invitation.accepted_at else None,
+            revoked=invitation.revoked,
+        )
