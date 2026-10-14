@@ -12,8 +12,9 @@ from google.genai import types
 
 import database as db
 from llm import get_client
-from schemas import ArchitectureCatalog, Attempt, Idea, AttemptStep
+from schemas import ArchitectureCatalog, Attempt, Idea, AttemptStep, TechnicalPlan
 from config import settings
+from agents.planner import plan_markdown
 from agents.harness.tools import (
     search_code, list_directory, view_file, edit_file, create_file, run_tests
 )
@@ -100,15 +101,27 @@ class HarnessResult(BaseModel):
     pr_title: str
     testing_notes: str
     diff: str = ""
+    # Outcome of the last command run in the sandbox (normally the test suite).
+    test_exit_code: int | None = None
+    test_output: str = ""
 
 
 class AttemptHarness:
-    def __init__(self, workspace: Path, catalog: ArchitectureCatalog, idea: Idea, attempt: Attempt):
+    def __init__(
+        self,
+        workspace: Path,
+        catalog: ArchitectureCatalog,
+        idea: Idea,
+        attempt: Attempt,
+        plan: TechnicalPlan | None = None,
+    ):
         self.workspace = workspace
         self.catalog = catalog
         self.idea = idea
         self.attempt = attempt
+        self.plan = plan
         self.max_steps = 25
+        self.last_run = None
         self.client = get_client()
 
     def _log_step(self, action: str, detail: str, status: str = "completed"):
@@ -148,8 +161,15 @@ class AttemptHarness:
         elif name == "create_file":
             return create_file(self.workspace, args["path"], args["content"])
         elif name == "run_tests":
-            return run_tests(self.workspace, args["command"])
+            # ponytail: last run wins; it is the test suite when the agent finishes by testing.
+            self.last_run = run_tests(self.workspace, args["command"])
+            return self.last_run.to_text()
         return f"Unknown tool {name}"
+
+    def _test_outcome(self) -> dict:
+        if self.last_run is None:
+            return {}
+        return {"test_exit_code": self.last_run.exit_code, "test_output": self.last_run.to_text()}
 
     def _staged_diff(self) -> str:
         """Stage every change (incl. new files) and return the staged diff."""
@@ -183,6 +203,7 @@ class AttemptHarness:
                     f"Approved Idea: {self.idea.title}\n{self.idea.description}\n"
                     f"Quote: {self.idea.quote}\n"
                     f"Catalog overview:\n{self.catalog.to_markdown()}"
+                    + (f"\n\nFollow this technical plan:\n{plan_markdown(self.plan)}" if self.plan else "")
                 )]
             )
         ]
@@ -232,7 +253,8 @@ class AttemptHarness:
                         summary=args.get("summary", "Done"),
                         pr_title=args.get("pr_title", self.idea.title),
                         testing_notes=args.get("testing_notes", ""),
-                        diff=self._staged_diff()
+                        diff=self._staged_diff(),
+                        **self._test_outcome(),
                     )
                     break
                 
@@ -262,5 +284,6 @@ class AttemptHarness:
             summary="Timed out after maximum iterations. Incomplete.",
             pr_title=self.idea.title,
             testing_notes="",
-            diff=self._staged_diff()
+            diff=self._staged_diff(),
+            **self._test_outcome(),
         )

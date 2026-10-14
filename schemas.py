@@ -359,9 +359,16 @@ class PlanStep(BaseModel):
 
 class TechnicalPlan(BaseModel):
     summary: str = ""
-    repo_changes: list[PlanStep] = Field(default_factory=list)
-    external_requirements: list[str] = Field(default_factory=list)
-    mock_strategy: str = ""
+    repo_changes: list[PlanStep] = Field(
+        default_factory=list, description="Ordered changes to files inside this repository"
+    )
+    external_requirements: list[str] = Field(
+        default_factory=list,
+        description="Services, APIs, credentials or other teams' systems this repo does not own",
+    )
+    mock_strategy: str = Field(
+        default="", description="How each external requirement is mocked for local tests"
+    )
 
 
 class ReadinessItem(BaseModel):

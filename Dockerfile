@@ -28,4 +28,6 @@ COPY --from=frontend /build/dist ./frontend/dist
 # Cloud Run injects PORT; default keeps local `docker run` working.
 ENV PORT=8080
 
-CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 app:app
+# One worker so attempt threads and their DB writes stay in one process. Each open live
+# stream (SSE) holds a thread for up to 240s, hence more threads than CPU would suggest.
+CMD exec gunicorn --bind :$PORT --workers 1 --threads 16 app:app

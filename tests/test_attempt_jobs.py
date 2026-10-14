@@ -62,6 +62,11 @@ class TestAttemptJobs(unittest.TestCase):
         self.attempt = db.create_attempt(
             Attempt(idea_id=self.idea.id, repository_id=self.repository.id)
         )
+        self.plan = TechnicalPlan(
+            summary="Change the greeting",
+            repo_changes=[PlanStep(order=1, action="edit", target="app.py")],
+            external_requirements=["notifications-service"],
+        )
 
     def tearDown(self):
         db.set_database_path(None)
@@ -78,6 +83,7 @@ class TestAttemptJobs(unittest.TestCase):
         with (
             patch("agents.attempt_jobs.AttemptHarness") as mock_harness_class,
             patch("agents.attempt_jobs.record_friction", return_value=[]),
+            patch("agents.attempt_jobs.generate_plan", return_value=self.plan),
             patch(
                 "agents.attempt_jobs.create_attempt_pull_request",
                 return_value=(
@@ -94,6 +100,8 @@ class TestAttemptJobs(unittest.TestCase):
 
         result = db.get_attempt(self.attempt.id)
         self.assertEqual(result.status, AttemptStatus.COMPLETE)
+        self.assertEqual(result.plan, self.plan)
+        self.assertEqual(mock_harness_class.call_args.kwargs["plan"], self.plan)
         self.assertEqual(result.pull_request_url, "https://github.com/org/repo/pull/1")
 if __name__ == '__main__':
     unittest.main()
