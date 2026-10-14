@@ -1,47 +1,62 @@
-/* Design tokens, following Material 3 as Google Careers uses it.
-   Nothing else in the app should hardcode a colour or a size. */
+/* tryout design tokens. Nothing else in the app hardcodes a colour, a size or a curve.
+   Light is the default; dark follows the system setting. */
 
 :root {
-  /* Primary — Google blue */
-  --primary: #0b57d0;
-  --primary-hover: #0842a0;
+  color-scheme: light;
+
+  /* Accent — one blue, used for actions, links, focus and selection */
+  --primary: #2b59e8;
+  --primary-hover: #1f47c7;
   --on-primary: #ffffff;
-  --primary-container: #d3e3fd;
-  --on-primary-container: #041e49;
+  --primary-container: #ebf0ff;
+  --on-primary-container: #1a3fb3;
 
-  /* Surfaces — M3 tonal greys */
+  /* Surfaces */
   --surface: #ffffff;
-  --surface-dim: #f8fafd;
-  --surface-container: #f0f4f9;
-  --surface-container-high: #e9eef6;
+  --surface-dim: #f6f7f9;            /* app background */
+  --surface-container: #f1f3f6;      /* hover, subtle fills */
+  --surface-container-high: #e7eaef; /* tracks, pressed */
+  --surface-raised: #ffffff;         /* drawer, modal, popovers */
+  --scrim: rgba(15, 18, 25, 0.42);
 
-  /* Text — Google uses 87% black for body rather than a flat grey */
-  --on-surface: #1f1f1f;
-  --on-surface-strong: rgba(0, 0, 0, 0.87);
-  --on-surface-variant: #444746;
-  --on-surface-muted: #5f6368;
+  /* Text */
+  --on-surface: #14161b;
+  --on-surface-strong: #14161b;
+  --on-surface-variant: #464c57;
+  --on-surface-muted: #646b77;
 
-  --outline: #747775;
-  --outline-variant: #c4c7c5;
-  --outline-faint: #e1e3e1;
+  /* Lines */
+  --outline: #b4bac4;         /* input borders */
+  --outline-variant: #d5d9e0; /* control borders */
+  --outline-faint: #e6e8ec;   /* card hairlines, dividers */
 
-  /* Status */
-  --ok: #146c2e;         --ok-container: #c4eed0;
-  --warn: #8f5000;       --warn-container: #ffdfa0;
-  --error: #b3261e;      --error-container: #f9dedc;
-  --neutral: #444746;    --neutral-container: #e9eef6;
+  /* Status — text on its container, each about 5:1 or better */
+  --ok: #157038;       --ok-container: #e2f4e8;
+  --warn: #8a5300;     --warn-container: #fcefd4;
+  --error: #c0261e;    --error-container: #fde7e5;
+  --neutral: #4a505b;  --neutral-container: #eef0f3;
+  --info: #1a3fb3;     --info-container: #ebf0ff;
 
-  /* Type — Google Sans for display, Roboto for everything else */
-  --font-display: "Google Sans", "Google Sans Display", Roboto, Arial, sans-serif;
-  --font: Roboto, "Google Sans Text", RobotoDraft, Helvetica, Arial, sans-serif;
+  /* Code and terminal */
+  --code-bg: #f4f5f8;
+  --terminal-bg: #12141a;
+  --terminal-fg: #e6e8ee;
+  --terminal-muted: #8b93a1;
+  --terminal-err: #ff8a80;
+
+  /* Type */
+  --font-display: "Geist Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font: "Geist Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   --text-label-sm: 0.6875rem;  /* 11 */
   --text-label: 0.75rem;       /* 12 */
-  --text-body-sm: 0.875rem;    /* 14 */
-  --text-body: 1rem;           /* 16 */
-  --text-title-sm: 1rem;
-  --text-title: 1.125rem;      /* 18 */
-  --text-headline: 1.75rem;    /* 28 */
+  --text-body-sm: 0.8125rem;   /* 13 */
+  --text-body: 0.875rem;       /* 14 */
+  --text-title-sm: 0.9375rem;  /* 15 */
+  --text-title: 1rem;          /* 16 */
+  --text-headline: 1.5rem;     /* 24 */
+  --text-display: 2.75rem;     /* 44 */
 
   /* Space — 4px base */
   --s-1: 4px;
@@ -54,27 +69,64 @@
   --s-10: 40px;
   --s-12: 48px;
 
-  /* Shape — M3 leans on large radii, and full pills for actions */
+  /* Shape */
   --r-xs: 4px;
-  --r-sm: 8px;
-  --r-md: 12px;
-  --r-lg: 16px;
-  --r-xl: 28px;
-  --r-full: 100px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-full: 999px;
 
-  /* Elevation — M3 level 1 and 2 */
-  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
-  --elev-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  /* Elevation */
+  --elev-1: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --elev-2: 0 4px 12px rgba(16, 24, 40, 0.08), 0 1px 3px rgba(16, 24, 40, 0.06);
+  --elev-3: 0 24px 48px rgba(16, 24, 40, 0.16), 0 4px 12px rgba(16, 24, 40, 0.08);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--primary) 28%, transparent);
 
-  --sidebar-w: 272px;
-  --content-max: 960px;
+  --sidebar-w: 248px;
+  --content-max: 1040px;
 
   --ease: cubic-bezier(0.2, 0, 0, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
 
-  /* Atmosphere — stay in the Google-blue family */
-  --glow-soft: color-mix(in srgb, var(--primary) 10%, transparent);
-  --glow-mid: color-mix(in srgb, var(--primary) 18%, transparent);
-  --mesh-a: #e8f1ff;
-  --mesh-b: #f8fafd;
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --primary: #7d9bff;
+    --primary-hover: #9db3ff;
+    --on-primary: #0b1640;
+    --primary-container: #1c2647;
+    --on-primary-container: #c4d2ff;
+
+    --surface: #16181d;
+    --surface-dim: #0f1115;
+    --surface-container: #1d2027;
+    --surface-container-high: #262a33;
+    --surface-raised: #1b1e24;
+    --scrim: rgba(0, 0, 0, 0.6);
+
+    --on-surface: #eceef2;
+    --on-surface-strong: #eceef2;
+    --on-surface-variant: #b5bbc6;
+    --on-surface-muted: #8e95a2;
+
+    --outline: #4a505c;
+    --outline-variant: #353a44;
+    --outline-faint: #262a32;
+
+    --ok: #6fd394;       --ok-container: #13301f;
+    --warn: #f0b85a;     --warn-container: #34260c;
+    --error: #ff8a80;    --error-container: #3d1715;
+    --neutral: #b5bbc6;  --neutral-container: #262a33;
+    --info: #c4d2ff;     --info-container: #1c2647;
+
+    --code-bg: #1d2027;
+    --terminal-bg: #0b0c0f;
+
+    --elev-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --elev-2: 0 4px 12px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.4);
+    --elev-3: 0 24px 48px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
 }

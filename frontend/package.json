@@ -11,6 +11,8 @@
     "test": "node src/lib/route.check.mjs"
   },
   "dependencies": {
+    "@fontsource/geist-mono": "^5.2.5",
+    "@fontsource/geist-sans": "^5.2.5",
     "firebase": "^12.19.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

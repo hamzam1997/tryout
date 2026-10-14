@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import Icon from "./Icon";
 
 // Streams /attempts/<id>/stream into a terminal view; hands off to the report when done.
 export default function LiveAttemptModal({ attemptId, onClose, onDone }) {
@@ -30,16 +31,21 @@ export default function LiveAttemptModal({ attemptId, onClose, onDone }) {
           <p className="card-eyebrow">Attempt #{attemptId}</p>
           <h2>Agent at work</h2>
         </div>
-        <span className="badge badge-idle">
-          <span className="spinner" />
-          {status.toLowerCase()}
+        <span className="live-head-actions">
+          <span className="badge badge-warn">
+            <span className="spinner" />
+            {status.charAt(0) + status.slice(1).toLowerCase()}
+          </span>
+          <button type="button" className="icon-btn" aria-label="Close" onClick={() => dialogRef.current?.close()}>
+            <Icon name="close" />
+          </button>
         </span>
       </header>
       <pre className="terminal" aria-live="polite">
         {steps.length === 0 && <div className="terminal-muted">Waiting for the agent to start…</div>}
         {steps.map((step, i) => (
           <div key={i} className={step.status === "failed" ? "terminal-err" : ""}>
-            <span className="terminal-muted">{new Date(step.timestamp).toLocaleTimeString()} </span>
+            <span className="terminal-muted">{new Date(step.timestamp).toLocaleTimeString()}</span>{" "}
             <strong>{step.action}</strong> {step.detail}
           </div>
         ))}

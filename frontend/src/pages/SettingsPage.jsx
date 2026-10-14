@@ -51,6 +51,11 @@ export default function SettingsPage() {
         <div>
           <p className="page-kicker">Workspace</p>
           <h1>Settings</h1>
+          {workspace && (
+            <p className="page-sub">
+              {workspace.name} · you are {{ owner: "the owner", admin: "an admin" }[workspace.role] || "a member"}
+            </p>
+          )}
         </div>
       </header>
 
@@ -63,7 +68,7 @@ export default function SettingsPage() {
             <div className="card-head">
               <div>
                 <h2>General</h2>
-                <p className="card-hint">Your role: {workspace.role}</p>
+                <p className="card-hint">Only the owner can rename the workspace.</p>
               </div>
             </div>
             <form className="card-body settings-form" onSubmit={handleRename}>
@@ -97,15 +102,15 @@ export default function SettingsPage() {
           <GitHubCard workspaceId={workspace.id} canManage={isOwner || workspace.role === "admin"} />
 
           {isOwner && (
-            <section className="card report-section">
+            <section className="card report-section danger-card">
               <div className="card-head">
                 <div>
-                  <h2>Danger zone</h2>
+                  <h2>Delete workspace</h2>
                   <p className="card-hint">Deleting a workspace removes all of its data for every member.</p>
                 </div>
               </div>
               <div className="card-body">
-                <button type="button" className="btn btn-secondary btn-danger" onClick={handleDelete}>
+                <button type="button" className="btn btn-danger-solid" onClick={handleDelete}>
                   Delete workspace
                 </button>
               </div>

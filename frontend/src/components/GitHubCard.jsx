@@ -35,7 +35,8 @@ export default function GitHubCard({ workspaceId, canManage }) {
         {error && <div className="alert alert-error">{error}</div>}
         {status?.connected ? (
           <>
-            <span className="detail-note is-ok">
+            <span className="connection-status">
+              <span className="dot is-up" />
               Connected as <strong>{status.login}</strong> since {formatDate(status.connected_at)}
             </span>
             {canManage && (
@@ -46,7 +47,10 @@ export default function GitHubCard({ workspaceId, canManage }) {
           </>
         ) : (
           <>
-            <span className="card-hint">Not connected. Attempts use the approver's own GitHub sign-in until it is.</span>
+            <span className="connection-status">
+              <span className="dot" />
+              Not connected. Attempts use the approver's own GitHub sign-in until it is.
+            </span>
             {canManage && (
               <>
                 <a className="btn btn-primary" href={`/api/auth/github/login?workspace=${workspaceId}`}>

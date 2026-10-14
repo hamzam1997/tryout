@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { createWorkspace, listWorkspaces, switchWorkspace } from "../api";
+import Icon from "./Icon";
 
 // A full reload after switching guarantees no page keeps the old workspace's data.
 const reloadInto = () => window.location.assign("/repositories");
 
-export default function WorkspaceSwitcher({ onOpenSettings }) {
+export default function WorkspaceSwitcher() {
   const [data, setData] = useState(null);
 
   useEffect(() => {
@@ -25,11 +26,19 @@ export default function WorkspaceSwitcher({ onOpenSettings }) {
     reloadInto();
   }
 
-  if (!data) return null;
+  if (!data) return <div className="workspace-switcher is-loading" aria-hidden="true" />;
+  const current = data.workspaces.find((ws) => ws.id === data.current);
   return (
-    <div className="workspace-switcher">
-      <label className="nav-label" htmlFor="workspace-select">Workspace</label>
-      <select id="workspace-select" className="input" value={data.current} onChange={handleChange}>
+    <label className="workspace-switcher">
+      <span className="workspace-initial" aria-hidden="true">
+        {(current?.name || "W")[0].toUpperCase()}
+      </span>
+      <span className="workspace-text">
+        <span className="workspace-label">Workspace</span>
+        <span className="workspace-name">{current?.name || "Workspace"}</span>
+      </span>
+      <Icon name="chevronDown" className="workspace-chevron" />
+      <select aria-label="Switch workspace" value={data.current} onChange={handleChange}>
         {data.workspaces.map((ws) => (
           <option key={ws.id} value={ws.id}>
             {ws.name}
@@ -37,9 +46,6 @@ export default function WorkspaceSwitcher({ onOpenSettings }) {
         ))}
         <option value="new">+ New workspace…</option>
       </select>
-      <button type="button" className="link-btn" onClick={onOpenSettings}>
-        Workspace settings
-      </button>
-    </div>
+    </label>
   );
 }

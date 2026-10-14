@@ -1,3 +1,5 @@
+import Icon from "./Icon";
+
 // The five-step demo journey, shown above every page.
 const STEPS = [
   { view: "repositories", label: "Onboard repo" },
@@ -8,6 +10,7 @@ const STEPS = [
 ];
 
 export default function TourBanner({ view, done, onNavigate }) {
+  if (!STEPS.some((step) => step.view === view)) return null;
   return (
     <nav className="tour" aria-label="Demo journey">
       <ol>
@@ -23,8 +26,10 @@ export default function TourBanner({ view, done, onNavigate }) {
                 // The report needs an attempt; its step leads to the ideas where attempts live.
                 onClick={() => onNavigate(step.view === "report" ? "ideas" : step.view)}
               >
-                <span className="tour-num">{done[i] && !current ? "✓" : i + 1}</span>
-                {step.label}
+                <span className="tour-num">
+                  {done[i] && !current ? <Icon name="check" size={12} /> : i + 1}
+                </span>
+                <span className="tour-label">{step.label}</span>
               </button>
             </li>
           );

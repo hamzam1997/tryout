@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createInvitation, listInvitations, revokeInvitation } from "../api";
+import { formatDate } from "../lib/format";
+import { Avatar } from "./Icon";
 
 // Owners and admins: invite by email and manage pending invites.
 export default function InvitationsCard({ workspaceId }) {
@@ -58,19 +60,23 @@ export default function InvitationsCard({ workspaceId }) {
           <button type="submit" className="btn btn-primary">Create invite link</button>
         </form>
         {lastLink && (
-          <p className="detail-note">
-            Send this link: <input className="input invite-link" readOnly value={lastLink}
-              onFocus={(event) => event.target.select()} aria-label="Invite link" />
-          </p>
+          <div className="field invite-link-field">
+            <label htmlFor="invite-link">Send this link to your teammate</label>
+            <input id="invite-link" className="input invite-link" readOnly value={lastLink}
+              onFocus={(event) => event.target.select()} />
+          </div>
         )}
         {invitations.length > 0 && (
-          <ul className="log-list invite-list">
+          <ul className="member-list invite-list">
             {invitations.map((invitation) => (
-              <li key={invitation.token} className="log-item log-top">
-                <strong>{invitation.email}</strong>
-                <span className="log-owner">{invitation.role}</span>
-                <span className="log-owner">expires {new Date(invitation.expires_at).toLocaleDateString()}</span>
-                <button type="button" className="link-btn" onClick={() => handleRevoke(invitation.token)}>
+              <li key={invitation.token} className="member-row">
+                <Avatar name={invitation.email} size={32} />
+                <span className="member-id">
+                  <strong>{invitation.email}</strong>
+                  <span className="member-email">Pending · expires {formatDate(invitation.expires_at)}</span>
+                </span>
+                <span className="badge badge-idle role-badge">{invitation.role}</span>
+                <button type="button" className="btn btn-ghost btn-sm btn-danger" onClick={() => handleRevoke(invitation.token)}>
                   Revoke
                 </button>
               </li>

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { loadDemoMeeting, uploadTranscript } from "../api";
+import Icon from "./Icon";
 
 const ACCEPTED = [".vtt", ".srt", ".txt"];
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -100,16 +101,16 @@ export default function Uploader({ onUploaded }) {
       <div className="card-head">
         <div>
           <h2>Upload a transcript</h2>
-          <span className="card-hint">
-            {ACCEPTED.join(", ")} · max 2MB · processes in the background
-          </span>
+          <p className="card-hint">
+            {ACCEPTED.join(", ")} up to 2 MB. Minutes and ideas process in the background.
+          </p>
         </div>
         <button
           type="button"
           className="btn btn-secondary btn-sm"
           onClick={handleLoadDemo}
         >
-          Load Demo Transcript (Acme Store)
+          Load demo transcript
         </button>
       </div>
 
@@ -123,7 +124,7 @@ export default function Uploader({ onUploaded }) {
                 <div className="file-size">{formatSize(file.size)}</div>
               </div>
               <button type="button" className="file-x" onClick={clear} aria-label="Remove file">
-                &times;
+                <Icon name="close" />
               </button>
             </div>
           ) : (
@@ -133,10 +134,7 @@ export default function Uploader({ onUploaded }) {
               onDragLeave={() => setDragging(false)}
               onDrop={onDrop}
             >
-              <svg className="drop-icon" viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 15.5V4m0 0L8.5 7.5M12 4l3.5 3.5" />
-                <path d="M4.5 15.5v3a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3" />
-              </svg>
+              <span className="drop-icon"><Icon name="upload" size={18} /></span>
               <span className="drop-title">
                 Drop a transcript here, or <span className="link">browse</span>
               </span>
@@ -180,9 +178,7 @@ export default function Uploader({ onUploaded }) {
           {notice && !error && <div className="alert alert-ok">{notice}</div>}
 
           <div className="form-foot">
-            <p className="form-note">
-              Minutes and ideas process in the list below — you can upload another file right away.
-            </p>
+            <p className="form-note">You can queue another file as soon as this one is sent.</p>
             <button type="submit" className="btn btn-primary" disabled={!file}>
               Upload
             </button>

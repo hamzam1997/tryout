@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getAttempt } from "../api";
 import LoadingRows from "../components/LoadingRows";
 import { formatFrictionCategory } from "../lib/format";
+import Icon from "../components/Icon";
 
 // Split a unified diff into one entry per file.
 function parseDiff(diff) {
@@ -60,15 +61,17 @@ export default function ReportPage({ attemptId, onBack }) {
     <div className="container">
       <header className="page-head">
         <div>
-          <button type="button" className="link-btn" onClick={onBack}>
-            ← Back to ideas
+          <button type="button" className="back-link" onClick={onBack}>
+            <Icon name="arrowLeft" size={14} />
+            Back to ideas
           </button>
           <p className="page-kicker">Step 4 · Attempt report</p>
           <h1>{attempt?.idea_title || "Attempt report"}</h1>
           {attempt?.pull_request_url && (
-            <p className="page-sub">
-              <a href={attempt.pull_request_url} target="_blank" rel="noreferrer">
+            <p className="page-actions">
+              <a className="btn btn-secondary" href={attempt.pull_request_url} target="_blank" rel="noreferrer">
                 View pull request
+                <Icon name="external" size={14} />
               </a>
             </p>
           )}
@@ -135,20 +138,20 @@ export default function ReportPage({ attemptId, onBack }) {
             ) : (
               mocks.map((file) => (
                 <details key={file.path} className="report-file" open>
-                  <summary>{file.path}</summary>
+                  <summary><Icon name="file" size={14} />{file.path}</summary>
                   <pre className="code-block">{addedContent(file)}</pre>
                 </details>
               ))
             )}
           </Section>
 
-          <Section title="Code change" hint={`${files.length} file(s) changed.`}>
+          <Section title="Code change" hint={`${files.length} ${files.length === 1 ? "file" : "files"} changed.`}>
             {files.length === 0 ? (
               <p className="card-hint">No code changes were generated.</p>
             ) : (
               files.map((file) => (
                 <details key={file.path} className="report-file">
-                  <summary>{file.path}</summary>
+                  <summary><Icon name="file" size={14} />{file.path}</summary>
                   <pre className="code-block diff">
                     {file.lines.map((line, i) => (
                       <div key={i} className={lineClass(line)}>
