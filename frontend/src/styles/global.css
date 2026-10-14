@@ -575,7 +575,7 @@ code, pre, kbd { font-family: var(--font-mono); }
 .btn-danger { color: var(--error); }
 .btn-ghost.btn-danger:hover:not(:disabled) { background: var(--error-container); color: var(--error); }
 
-.btn-danger-solid { background: var(--error); color: #fff; }
+.btn-danger-solid { background: var(--error); color: var(--surface); }
 .btn-danger-solid:hover:not(:disabled) { background: color-mix(in srgb, var(--error) 88%, #000); }
 
 .btn-github svg { fill: currentColor; }
