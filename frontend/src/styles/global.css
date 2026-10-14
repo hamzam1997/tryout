@@ -2079,3 +2079,4 @@ svg { flex: none; }
 .settings-form .field-narrow { flex: 0 0 140px; min-width: 0; }
 .invite-link { margin-top: var(--s-2); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .invite-list { margin-top: var(--s-5); }
+.member-role { width: auto; height: 32px; padding: 0 var(--s-2); }

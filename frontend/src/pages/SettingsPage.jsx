@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { deleteWorkspace, listWorkspaces, renameWorkspace } from "../api";
 import InvitationsCard from "../components/InvitationsCard";
 import LoadingRows from "../components/LoadingRows";
+import MembersCard from "../components/MembersCard";
 
 export default function SettingsPage() {
   const [workspace, setWorkspace] = useState(null);
@@ -87,6 +88,8 @@ export default function SettingsPage() {
               {message && <span className="detail-note is-ok">{message}</span>}
             </form>
           </section>
+
+          <MembersCard workspaceId={workspace.id} myRole={workspace.role} />
 
           {(isOwner || workspace.role === "admin") && <InvitationsCard workspaceId={workspace.id} />}
 

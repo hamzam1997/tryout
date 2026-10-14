@@ -84,3 +84,68 @@ def delete_workspace(workspace_id: int):
     db.delete_workspace(workspace_id)
     session.pop("workspace_id", None)  # the next request falls back to another workspace
     return "", 204
+
+
+def _owner_count(workspace_id: int) -> int:
+    return sum(m.role == WorkspaceRole.OWNER for m in db.list_memberships(workspace_id=workspace_id))
+
+
+@bp.get("/<int:workspace_id>/members")
+def list_members(workspace_id: int):
+    _, error = member_with_role(workspace_id, *WorkspaceRole)
+    if error:
+        return error
+    members = []
+    for membership in db.list_memberships(workspace_id=workspace_id):
+        user = db.get_user(membership.uid)
+        members.append({
+            "uid": membership.uid,
+            "name": (user.name if user else None) or membership.uid,
+            "email": user.email if user else None,
+            "role": membership.role.value,
+            "joined_at": membership.created_at.isoformat() if membership.created_at else None,
+            "you": membership.uid == _uid(),
+        })
+    return jsonify(members)
+
+
+@bp.patch("/<int:workspace_id>/members/<uid>")
+def change_role(workspace_id: int, uid: str):
+    me, error = member_with_role(workspace_id, WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
+    if error:
+        return error
+    target = db.get_membership(workspace_id, uid)
+    if target is None:
+        return jsonify({"error": "member not found"}), 404
+    try:
+        role = WorkspaceRole((request.get_json(silent=True) or {}).get("role"))
+    except ValueError:
+        return jsonify({"error": "Role must be owner, admin or member."}), 400
+    if me.role != WorkspaceRole.OWNER and WorkspaceRole.OWNER in (role, target.role):
+        return jsonify({"error": "Only an owner can grant or change the owner role."}), 403
+    if target.role == WorkspaceRole.OWNER and role != WorkspaceRole.OWNER and _owner_count(workspace_id) == 1:
+        return jsonify({"error": "A workspace needs at least one owner."}), 409
+    db.set_member_role(workspace_id, uid, role)
+    return jsonify({"uid": uid, "role": role.value})
+
+
+@bp.delete("/<int:workspace_id>/members/<uid>")
+def remove_member(workspace_id: int, uid: str):
+    """Leave (yourself) or remove someone (admin / owner)."""
+    if uid == _uid():
+        me, error = member_with_role(workspace_id, *WorkspaceRole)
+    else:
+        me, error = member_with_role(workspace_id, WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
+    if error:
+        return error
+    target = db.get_membership(workspace_id, uid)
+    if target is None:
+        return jsonify({"error": "member not found"}), 404
+    if target.role == WorkspaceRole.OWNER and me.role != WorkspaceRole.OWNER:
+        return jsonify({"error": "Only an owner can remove an owner."}), 403
+    if target.role == WorkspaceRole.OWNER and _owner_count(workspace_id) == 1:
+        return jsonify({"error": "A workspace needs at least one owner. Delete it or make someone else owner first."}), 409
+    db.remove_member(workspace_id, uid)
+    if uid == _uid():
+        session.pop("workspace_id", None)
+    return "", 204
