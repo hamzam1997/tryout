@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from database.client import get_firestore_client, get_next_id
-from database.scope import exists, scoped, stamped
+from database.scope import exists, scoped
 from database.documents import AttemptDoc, FrictionLogDoc, IdeaDoc, utc_now
 from schemas import Idea, IdeaStatus
 
@@ -14,7 +14,7 @@ def create_idea(idea: Idea) -> Idea:
     idea.id = idea_id
 
     doc = IdeaDoc.from_domain(idea)
-    client.collection(IdeaDoc.COLLECTION).document(str(idea_id)).set(stamped(doc.to_doc()))
+    client.collection(IdeaDoc.COLLECTION).document(str(idea_id)).set(doc.to_doc())
     return idea
 
 

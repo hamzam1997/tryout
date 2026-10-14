@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from database.scope import current_workspace, set_workspace
+from context import current_workspace, set_workspace
 from database.client import (
     force_in_memory_firestore,
     get_firestore_client,

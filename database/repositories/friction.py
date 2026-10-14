@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from database.client import get_firestore_client, get_next_id
-from database.scope import exists, scoped, stamped
+from database.scope import exists, scoped
 from database.documents import FrictionLogDoc
 from schemas import FrictionLog
 
@@ -17,7 +17,7 @@ def create_friction_log(log: FrictionLog) -> FrictionLog:
     log.id = log_id
 
     doc = FrictionLogDoc.from_domain(log)
-    client.collection(FrictionLogDoc.COLLECTION).document(str(log_id)).set(stamped(doc.to_doc()))
+    client.collection(FrictionLogDoc.COLLECTION).document(str(log_id)).set(doc.to_doc())
     return log
 
 
