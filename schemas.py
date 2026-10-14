@@ -497,6 +497,26 @@ class FrictionLog(BaseModel):
     created_at: datetime | None = None
 
 
+class WorkspaceRole(str, Enum):
+    OWNER = "owner"
+    ADMIN = "admin"
+    MEMBER = "member"
+
+
+class Workspace(BaseModel):
+    id: int | None = None
+    name: str
+    created_by: str
+    created_at: datetime | None = None
+
+
+class Membership(BaseModel):
+    workspace_id: int
+    uid: str
+    role: WorkspaceRole = WorkspaceRole.MEMBER
+    created_at: datetime | None = None
+
+
 class User(BaseModel):
     uid: str
     email: str | None = None

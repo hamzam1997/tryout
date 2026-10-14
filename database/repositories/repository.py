@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from database.client import get_firestore_client, get_next_id
+from database.scope import exists, scoped
 from database.documents import RepositoryDoc, utc_now
 from schemas import ArchitectureCatalog, Repository
 
@@ -20,7 +21,7 @@ def create_repository(repo: Repository) -> Repository:
 def get_repository(repo_id: int) -> Repository | None:
     client = get_firestore_client()
     doc_ref = client.collection(RepositoryDoc.COLLECTION).document(str(repo_id)).get()
-    if not doc_ref.exists:
+    if not exists(doc_ref):
         return None
     doc = RepositoryDoc.from_doc(doc_ref.to_dict())
     return doc.to_domain()
@@ -28,7 +29,7 @@ def get_repository(repo_id: int) -> Repository | None:
 
 def get_repository_by_source(source: str) -> Repository | None:
     client = get_firestore_client()
-    query = client.collection(RepositoryDoc.COLLECTION).where("source", "==", source)
+    query = scoped(client.collection(RepositoryDoc.COLLECTION)).where("source", "==", source)
     docs = list(query.stream())
     if not docs:
         return None
@@ -38,12 +39,13 @@ def get_repository_by_source(source: str) -> Repository | None:
 
 def list_repositories() -> list[Repository]:
     client = get_firestore_client()
-    docs = client.collection(RepositoryDoc.COLLECTION).order_by("id").stream()
+    docs = scoped(client.collection(RepositoryDoc.COLLECTION)).stream()
     result = []
     for d in docs:
         data = d.to_dict()
         if data:
             result.append(RepositoryDoc.from_doc(data).to_domain())
+    result.sort(key=lambda r: r.id)
     return result
 
 
@@ -103,7 +105,7 @@ def delete_repository(repo_id: int) -> bool:
     """Delete a repository document from Firestore."""
     client = get_firestore_client()
     doc_ref = client.collection(RepositoryDoc.COLLECTION).document(str(repo_id))
-    if not doc_ref.get().exists:
+    if not exists(doc_ref.get()):
         return False
     doc_ref.delete()
     return True

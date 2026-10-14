@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import contextvars
 import threading
 from pathlib import Path
 
@@ -160,8 +161,9 @@ def onboard_repository():
 
         # Launch background thread
         thread = threading.Thread(
-            target=_run_github_onboarding,
-            args=(repo.id, canonical_source, branch, token, force_refresh),
+            # copy_context: the job runs in the starting request's workspace
+            target=contextvars.copy_context().run,
+            args=(_run_github_onboarding, repo.id, canonical_source, branch, token, force_refresh),
             daemon=True,
         )
         thread.start()

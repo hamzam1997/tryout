@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from database.client import get_firestore_client, get_next_id
+from database.scope import exists, scoped
 from database.documents import AttemptDoc, FrictionLogDoc, IdeaDoc, utc_now
 from schemas import Idea, IdeaStatus
 
@@ -20,7 +21,7 @@ def create_idea(idea: Idea) -> Idea:
 def get_idea(idea_id: int) -> Idea | None:
     client = get_firestore_client()
     doc_ref = client.collection(IdeaDoc.COLLECTION).document(str(idea_id)).get()
-    if not doc_ref.exists:
+    if not exists(doc_ref):
         return None
     return IdeaDoc.from_doc(doc_ref.to_dict()).to_domain()
 
@@ -29,7 +30,7 @@ def list_ideas(
     status: IdeaStatus | None = None, meeting_id: int | None = None
 ) -> list[Idea]:
     client = get_firestore_client()
-    query = client.collection(IdeaDoc.COLLECTION)
+    query = scoped(client.collection(IdeaDoc.COLLECTION))
     if status is not None:
         query = query.where("status", "==", status.value)
     if meeting_id is not None:
@@ -48,7 +49,7 @@ def list_ideas(
 def get_idea_counts() -> dict[str, int]:
     client = get_firestore_client()
     counts = {s.value: 0 for s in IdeaStatus}
-    docs = client.collection(IdeaDoc.COLLECTION).stream()
+    docs = scoped(client.collection(IdeaDoc.COLLECTION)).stream()
     for d in docs:
         data = d.to_dict() or {}
         st = data.get("status")
@@ -92,7 +93,7 @@ def find_idea_by_key(idea_key: str, meeting_id: int | None = None) -> Idea | Non
     if not idea_key:
         return None
     client = get_firestore_client()
-    query = client.collection(IdeaDoc.COLLECTION).where("idea_key", "==", idea_key)
+    query = scoped(client.collection(IdeaDoc.COLLECTION)).where("idea_key", "==", idea_key)
     if meeting_id is not None:
         query = query.where("meeting_id", "==", meeting_id)
     docs = list(query.stream())
@@ -114,18 +115,18 @@ def delete_idea(idea_id: int) -> bool:
     """Delete idea and cascade delete related attempts and friction logs."""
     client = get_firestore_client()
     doc_ref = client.collection(IdeaDoc.COLLECTION).document(str(idea_id))
-    if not doc_ref.get().exists:
+    if not exists(doc_ref.get()):
         return False
 
     # Cascading attempt & friction log cleanup
     attempts = list(
-        client.collection(AttemptDoc.COLLECTION).where("idea_id", "==", idea_id).stream()
+        scoped(client.collection(AttemptDoc.COLLECTION)).where("idea_id", "==", idea_id).stream()
     )
     for att in attempts:
         att_id = int(att.id)
         # Delete friction logs
         flogs = list(
-            client.collection(FrictionLogDoc.COLLECTION).where("attempt_id", "==", att_id).stream()
+            scoped(client.collection(FrictionLogDoc.COLLECTION)).where("attempt_id", "==", att_id).stream()
         )
         for flog in flogs:
             client.collection(FrictionLogDoc.COLLECTION).document(flog.id).delete()
@@ -133,7 +134,7 @@ def delete_idea(idea_id: int) -> bool:
 
     # Nullify original_idea_id references
     child_ideas = list(
-        client.collection(IdeaDoc.COLLECTION).where("original_idea_id", "==", idea_id).stream()
+        scoped(client.collection(IdeaDoc.COLLECTION)).where("original_idea_id", "==", idea_id).stream()
     )
     for c in child_ideas:
         client.collection(IdeaDoc.COLLECTION).document(c.id).set({"original_idea_id": None}, merge=True)

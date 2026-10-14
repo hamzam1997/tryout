@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import shutil
 import tempfile
+import contextvars
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -220,8 +221,9 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
 def queue_attempt(attempt_id: int, github_token: str | None = None) -> None:
     """Start the attempt worker without blocking the approval request."""
     worker = threading.Thread(
-        target=execute_attempt,
-        args=(attempt_id, github_token),
+        # copy_context: the job runs in the starting request's workspace
+        target=contextvars.copy_context().run,
+        args=(execute_attempt, attempt_id, github_token),
         name=f"idea-attempt-{attempt_id}",
         daemon=True,
     )

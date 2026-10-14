@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from database.client import get_firestore_client, get_next_id
+from database.scope import exists, scoped
 from database.documents import FrictionLogDoc
 from schemas import FrictionLog
 
@@ -22,7 +23,7 @@ def create_friction_log(log: FrictionLog) -> FrictionLog:
 
 def list_friction_logs(attempt_id: int | None = None) -> list[FrictionLog]:
     client = get_firestore_client()
-    query = client.collection(FrictionLogDoc.COLLECTION)
+    query = scoped(client.collection(FrictionLogDoc.COLLECTION))
     if attempt_id is not None:
         query = query.where("attempt_id", "==", attempt_id)
 
@@ -42,7 +43,7 @@ def count_friction_by(column: str) -> list[tuple[str, int]]:
         raise ValueError(f"cannot group friction logs by {column!r}")
 
     client = get_firestore_client()
-    docs = client.collection(FrictionLogDoc.COLLECTION).stream()
+    docs = scoped(client.collection(FrictionLogDoc.COLLECTION)).stream()
 
     counter: Counter[str] = Counter()
     for d in docs:

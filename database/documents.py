@@ -11,6 +11,7 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, Field
 
 import schemas
+from context import current_workspace
 
 
 def utc_now() -> datetime:
@@ -32,10 +33,13 @@ class RepositoryDoc(BaseModel):
     catalog_status: str = "ready"
     catalog_error: str | None = None
     catalog_generated_at: str | None = None
+    # ponytail: domain objects don't carry it, so it comes from the request's workspace
+    workspace_id: int | None = Field(default_factory=current_workspace)
     created_at: str = Field(default_factory=lambda: utc_now().isoformat())
 
     def to_doc(self) -> dict[str, Any]:
-        return self.model_dump(mode="json")
+        # Never write workspace_id: None, or an update would drop the record out of its workspace.
+        return self.model_dump(mode="json", exclude={"workspace_id"} if self.workspace_id is None else None)
 
     @classmethod
     def from_doc(cls, data: dict[str, Any]) -> RepositoryDoc:
@@ -104,10 +108,13 @@ class MeetingDoc(BaseModel):
     status: str = "PENDING"
     ideas_status: str = "PENDING"
     ideas_error: str | None = None
+    # ponytail: domain objects don't carry it, so it comes from the request's workspace
+    workspace_id: int | None = Field(default_factory=current_workspace)
     created_at: str = Field(default_factory=lambda: utc_now().isoformat())
 
     def to_doc(self) -> dict[str, Any]:
-        return self.model_dump(mode="json")
+        # Never write workspace_id: None, or an update would drop the record out of its workspace.
+        return self.model_dump(mode="json", exclude={"workspace_id"} if self.workspace_id is None else None)
 
     @classmethod
     def from_doc(cls, data: dict[str, Any]) -> MeetingDoc:
@@ -185,10 +192,13 @@ class IdeaDoc(BaseModel):
     status: str = "PENDING"
     approved_by: str | None = None
     approved_at: str | None = None
+    # ponytail: domain objects don't carry it, so it comes from the request's workspace
+    workspace_id: int | None = Field(default_factory=current_workspace)
     created_at: str = Field(default_factory=lambda: utc_now().isoformat())
 
     def to_doc(self) -> dict[str, Any]:
-        return self.model_dump(mode="json")
+        # Never write workspace_id: None, or an update would drop the record out of its workspace.
+        return self.model_dump(mode="json", exclude={"workspace_id"} if self.workspace_id is None else None)
 
     @classmethod
     def from_doc(cls, data: dict[str, Any]) -> IdeaDoc:
@@ -269,10 +279,13 @@ class AttemptDoc(BaseModel):
     events: list[dict] = Field(default_factory=list)
     started_at: str | None = None
     finished_at: str | None = None
+    # ponytail: domain objects don't carry it, so it comes from the request's workspace
+    workspace_id: int | None = Field(default_factory=current_workspace)
     created_at: str = Field(default_factory=lambda: utc_now().isoformat())
 
     def to_doc(self) -> dict[str, Any]:
-        return self.model_dump(mode="json")
+        # Never write workspace_id: None, or an update would drop the record out of its workspace.
+        return self.model_dump(mode="json", exclude={"workspace_id"} if self.workspace_id is None else None)
 
     @classmethod
     def from_doc(cls, data: dict[str, Any]) -> AttemptDoc:
@@ -354,10 +367,13 @@ class FrictionLogDoc(BaseModel):
     mock_implementation_path: str = ""
     required_action: str = ""
     readiness_checklist: list[dict[str, Any]] = Field(default_factory=list)
+    # ponytail: domain objects don't carry it, so it comes from the request's workspace
+    workspace_id: int | None = Field(default_factory=current_workspace)
     created_at: str = Field(default_factory=lambda: utc_now().isoformat())
 
     def to_doc(self) -> dict[str, Any]:
-        return self.model_dump(mode="json")
+        # Never write workspace_id: None, or an update would drop the record out of its workspace.
+        return self.model_dump(mode="json", exclude={"workspace_id"} if self.workspace_id is None else None)
 
     @classmethod
     def from_doc(cls, data: dict[str, Any]) -> FrictionLogDoc:
@@ -448,4 +464,72 @@ class UserDoc(BaseModel):
             github_login=user.github_login,
             created_at=created,
             last_login_at=last_login,
+        )
+
+
+class WorkspaceDoc(BaseModel):
+    """Document stored in Firestore `/workspaces/{id}`."""
+
+    COLLECTION: ClassVar[str] = "workspaces"
+
+    id: int
+    name: str
+    created_by: str
+    created_at: str = Field(default_factory=lambda: utc_now().isoformat())
+
+    def to_doc(self) -> dict[str, Any]:
+        return self.model_dump(mode="json")
+
+    @classmethod
+    def from_doc(cls, data: dict[str, Any]) -> WorkspaceDoc:
+        return cls.model_validate(data)
+
+    def to_domain(self) -> schemas.Workspace:
+        created = datetime.fromisoformat(self.created_at) if self.created_at else None
+        return schemas.Workspace(id=self.id, name=self.name, created_by=self.created_by, created_at=created)
+
+    @classmethod
+    def from_domain(cls, workspace: schemas.Workspace) -> WorkspaceDoc:
+        created = workspace.created_at.isoformat() if workspace.created_at else utc_now().isoformat()
+        return cls(id=workspace.id or 0, name=workspace.name, created_by=workspace.created_by, created_at=created)
+
+
+class MembershipDoc(BaseModel):
+    """Document stored in Firestore `/memberships/{workspace_id}_{uid}`."""
+
+    COLLECTION: ClassVar[str] = "memberships"
+
+    workspace_id: int
+    uid: str
+    role: str = "member"
+    created_at: str = Field(default_factory=lambda: utc_now().isoformat())
+
+    @property
+    def doc_id(self) -> str:
+        return f"{self.workspace_id}_{self.uid}"
+
+    def to_doc(self) -> dict[str, Any]:
+        return self.model_dump(mode="json")
+
+    @classmethod
+    def from_doc(cls, data: dict[str, Any]) -> MembershipDoc:
+        return cls.model_validate(data)
+
+    def to_domain(self) -> schemas.Membership:
+        created = datetime.fromisoformat(self.created_at) if self.created_at else None
+        return schemas.Membership(
+            workspace_id=self.workspace_id,
+            uid=self.uid,
+            role=schemas.WorkspaceRole(self.role),
+            created_at=created,
+        )
+
+    @classmethod
+    def from_domain(cls, membership: schemas.Membership) -> MembershipDoc:
+        created = membership.created_at.isoformat() if membership.created_at else utc_now().isoformat()
+        return cls(
+            workspace_id=membership.workspace_id,
+            uid=membership.uid,
+            role=membership.role.value,
+            created_at=created,
         )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from database.client import get_firestore_client, get_next_id
+from database.scope import exists, scoped
 from database.documents import IdeaDoc, MeetingDoc
 from schemas import (
     IdeasExtractStatus,
@@ -29,7 +30,7 @@ def create_meeting(meeting: Meeting) -> Meeting:
 def get_meeting(meeting_id: int) -> Meeting | None:
     client = get_firestore_client()
     doc_ref = client.collection(MeetingDoc.COLLECTION).document(str(meeting_id)).get()
-    if not doc_ref.exists:
+    if not exists(doc_ref):
         return None
     doc = MeetingDoc.from_doc(doc_ref.to_dict())
     return doc.to_domain()
@@ -42,7 +43,7 @@ def find_meeting_by_external_id(external_id: str) -> Meeting | None:
     client = get_firestore_client()
     try:
         docs = list(
-            client.collection(MeetingDoc.COLLECTION)
+            scoped(client.collection(MeetingDoc.COLLECTION))
             .where("external_id", "==", external_id)
             .stream()
         )
@@ -62,7 +63,7 @@ def find_meeting_by_transcript(transcript: str) -> Meeting | None:
     client = get_firestore_client()
     try:
         docs = list(
-            client.collection(MeetingDoc.COLLECTION)
+            scoped(client.collection(MeetingDoc.COLLECTION))
             .where("transcript", "==", transcript)
             .stream()
         )
@@ -77,7 +78,7 @@ def find_meeting_by_transcript(transcript: str) -> Meeting | None:
 
 def list_meetings() -> list[Meeting]:
     client = get_firestore_client()
-    docs = client.collection(MeetingDoc.COLLECTION).order_by("id", direction="DESCENDING").stream()
+    docs = scoped(client.collection(MeetingDoc.COLLECTION)).stream()
     meetings = []
     for d in docs:
         data = d.to_dict()
@@ -134,12 +135,12 @@ def delete_meeting(meeting_id: int) -> bool:
     """Delete meeting and cascade delete its ideas from Firestore."""
     client = get_firestore_client()
     doc_ref = client.collection(MeetingDoc.COLLECTION).document(str(meeting_id))
-    if not doc_ref.get().exists:
+    if not exists(doc_ref.get()):
         return False
 
     # Cascade delete ideas belonging to this meeting
     idea_docs = list(
-        client.collection(IdeaDoc.COLLECTION).where("meeting_id", "==", meeting_id).stream()
+        scoped(client.collection(IdeaDoc.COLLECTION)).where("meeting_id", "==", meeting_id).stream()
     )
     for idoc in idea_docs:
         client.collection(IdeaDoc.COLLECTION).document(idoc.id).delete()

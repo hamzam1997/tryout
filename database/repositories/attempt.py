@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from database.client import get_firestore_client, get_next_id
+from database.scope import exists, scoped
 from database.documents import AttemptDoc, utc_now
 from schemas import Attempt, AttemptStatus
 
@@ -20,14 +21,14 @@ def create_attempt(attempt: Attempt) -> Attempt:
 def get_attempt(attempt_id: int) -> Attempt | None:
     client = get_firestore_client()
     doc_ref = client.collection(AttemptDoc.COLLECTION).document(str(attempt_id)).get()
-    if not doc_ref.exists:
+    if not exists(doc_ref):
         return None
     return AttemptDoc.from_doc(doc_ref.to_dict()).to_domain()
 
 
 def list_attempts(idea_id: int | None = None) -> list[Attempt]:
     client = get_firestore_client()
-    query = client.collection(AttemptDoc.COLLECTION)
+    query = scoped(client.collection(AttemptDoc.COLLECTION))
     if idea_id is not None:
         query = query.where("idea_id", "==", idea_id)
 

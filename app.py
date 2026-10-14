@@ -6,7 +6,6 @@ from flask import Flask, jsonify, send_from_directory
 from config import settings
 from database import init_db
 from logging_setup import configure_logging
-from seed_history import seed_friction_history
 from views.attempts import bp as attempts_bp
 from views.auth import bp as auth_bp, require_login
 from views.bottlenecks import bp as bottlenecks_bp
@@ -30,11 +29,6 @@ app.config.update(
 )
 init_db()
 
-try:
-    if settings.seed_demo_data:  # off by default; set SEED_DEMO_DATA=1 on the demo deploy only
-        seed_friction_history()
-except Exception:  # seeding must never stop the app from booting
-    app.logger.exception("history seeding failed")
 
 app.before_request(require_login)
 app.register_blueprint(auth_bp)

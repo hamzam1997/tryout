@@ -5,11 +5,13 @@ from pathlib import Path
 from unittest.mock import patch
 
 import app as flask_app
+import database as db
 
 
 class TestSpaRoutes(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
+        db.set_database_path(Path(self.tmp.name) / "database")
         dist = Path(self.tmp.name)
         (dist / "index.html").write_text("<html>app</html>")
         self.patch = patch.object(flask_app, "FRONTEND_DIST", dist)
@@ -17,6 +19,7 @@ class TestSpaRoutes(unittest.TestCase):
         self.client = login(flask_app.app.test_client())
 
     def tearDown(self):
+        db.set_database_path(None)
         self.patch.stop()
         self.tmp.cleanup()
 
