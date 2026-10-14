@@ -29,15 +29,26 @@ export default function InvitePage({ token }) {
         <div>
           <p className="page-kicker">Invitation</p>
           <h1>{invitation ? `Join ${invitation.workspace.name}` : "Workspace invitation"}</h1>
-          {invitation && <p className="page-sub">You were invited as {invitation.role}.</p>}
+          {invitation && <p className="page-sub">Someone on {invitation.workspace.name} invited you to collaborate.</p>}
         </div>
       </header>
       {error && <div className="alert alert-error">{error}</div>}
       {!invitation && !error && <LoadingRows label="Checking invitation…" />}
       {invitation && (
-        <button type="button" className="btn btn-primary" disabled={busy} onClick={handleAccept}>
-          {busy ? "Joining…" : "Join workspace"}
-        </button>
+        <section className="card invite-card">
+          <div className="card-body invite-body">
+            <span className="workspace-initial is-lg" aria-hidden="true">
+              {invitation.workspace.name[0].toUpperCase()}
+            </span>
+            <div className="invite-text">
+              <strong>{invitation.workspace.name}</strong>
+              <span className="card-hint">You'll join as {invitation.role} and see its repositories, meetings and ideas.</span>
+            </div>
+            <button type="button" className="btn btn-primary" disabled={busy} onClick={handleAccept}>
+              {busy ? "Joining…" : "Join workspace"}
+            </button>
+          </div>
+        </section>
       )}
     </div>
   );

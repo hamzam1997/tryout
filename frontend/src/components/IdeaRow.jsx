@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getIdea } from "../api";
 import { formatDateTime, formatPriority, formatRelative } from "../lib/format";
 import DeleteIconButton from "./DeleteIconButton";
+import Icon from "./Icon";
 
 const BADGES = {
   PENDING: ["badge-warn", "Needs approval"],
@@ -131,6 +132,7 @@ export default function IdeaRow({
                   onClick={(event) => event.stopPropagation()}
                 >
                   View PR
+                  <Icon name="external" size={12} />
                 </a>
               </>
             )}
@@ -143,9 +145,7 @@ export default function IdeaRow({
           </span>
         </span>
 
-        <svg className="chevron" viewBox="0 0 20 20" aria-hidden="true">
-          <path d="m6 8 4 4 4-4" />
-        </svg>
+        <Icon name="chevronDown" className="chevron" />
       </button>
 
       {open && (
@@ -241,6 +241,7 @@ export default function IdeaRow({
                 Attempt · {formatAttemptStatus(latestAttempt.status)}
               </h4>
               {latestAttempt.error && <div className="alert alert-error">{latestAttempt.error}</div>}
+              <div className="attempt-actions">
               {["FAILED", "READY_FOR_REVIEW"].includes(latestAttempt.status) &&
                 !latestAttempt.pull_request_url && (
                   <button
@@ -281,15 +282,17 @@ export default function IdeaRow({
                 </button>
               )}
               {latestAttempt.pull_request_url && (
-                <p className="detail-note">
-                  <a href={latestAttempt.pull_request_url} target="_blank" rel="noreferrer">
-                    View pull request
-                  </a>
-                </p>
+                <a className="btn btn-secondary" href={latestAttempt.pull_request_url} target="_blank" rel="noreferrer">
+                  View pull request
+                  <Icon name="external" size={14} />
+                </a>
               )}
               {latestAttempt.branch_name && !latestAttempt.pull_request_url && (
-                <p className="detail-note">Generated branch: {latestAttempt.branch_name}</p>
+                <span className="detail-note">
+                  Branch <code className="inline-code">{latestAttempt.branch_name}</code>
+                </span>
               )}
+              </div>
               {latestAttempt.plan && (
                 <>
                   <p className="detail-body">{latestAttempt.plan.summary}</p>
@@ -297,9 +300,9 @@ export default function IdeaRow({
                     <ol className="attempt-steps">
                       {latestAttempt.plan.repo_changes.map((step) => (
                         <li key={`${step.order}-${step.target}`}>
-                          <strong>{step.target || step.action}</strong>
-                          {step.target && step.action ? ` — ${step.action}` : ""}
-                          {step.rationale && <span> {step.rationale}</span>}
+                          <code className="inline-code">{step.target || step.action}</code>
+                          {step.target && step.action ? ` ${step.action}` : ""}
+                          {step.rationale && <span className="step-rationale"> — {step.rationale}</span>}
                         </li>
                       ))}
                     </ol>
@@ -314,15 +317,14 @@ export default function IdeaRow({
 
               {latestAttempt.events && latestAttempt.events.length > 0 && (
                 <div className="attempt-events">
-                  <h4 className="detail-subhead">Agent Harness Logs</h4>
-                  <ul className="attempt-steps">
+                  <h4 className="detail-label">Agent log</h4>
+                  <ul className="event-list">
                     {latestAttempt.events.map((event, idx) => (
-                      <li key={idx}>
+                      <li key={idx} className={event.status === "failed" ? "is-failed" : undefined}>
                         <span className="timestamp">{new Date(event.timestamp).toLocaleTimeString()}</span>
-                        {" - "}
                         <strong>{event.action}</strong>
-                        {event.detail && <span>: {event.detail}</span>}
-                        {event.status === "failed" && <span style={{color: "red"}}> (Failed)</span>}
+                        {event.detail && <span>{event.detail}</span>}
+                        {event.status === "failed" && <span className="badge badge-err">Failed</span>}
                       </li>
                     ))}
                   </ul>
@@ -337,7 +339,7 @@ export default function IdeaRow({
                 <p className="detail-note">No code changes were generated.</p>
               ) : null}
               {latestAttempt.test_stdout && (
-                <p className="detail-note">{latestAttempt.test_stdout}</p>
+                <p className="detail-note">Tests: {latestAttempt.test_stdout}</p>
               )}
             </section>
           )}
@@ -362,7 +364,7 @@ export default function IdeaRow({
                 </div>
               ) : readyRepositories.length === 1 ? (
                 <p className="detail-note">
-                  Attempt in <strong>{readyRepositories[0].name}</strong>
+                  Runs in <strong>{readyRepositories[0].name}</strong>
                 </p>
               ) : (
                 <p className="detail-note">

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { changeMemberRole, listMembers, removeMember } from "../api";
 import { formatDate } from "../lib/format";
+import { Avatar } from "./Icon";
 
 const ROLES = ["owner", "admin", "member"];
 
@@ -46,12 +47,15 @@ export default function MembersCard({ workspaceId, myRole }) {
       </div>
       <div className="card-body">
         {error && <div className="alert alert-error">{error}</div>}
-        <ul className="log-list">
+        <ul className="member-list">
           {members.map((member) => (
-            <li key={member.uid} className="log-item log-top">
-              <strong>{member.name}{member.you ? " (you)" : ""}</strong>
-              {member.email && <span className="log-owner">{member.email}</span>}
-              <span className="log-owner">joined {formatDate(member.joined_at)}</span>
+            <li key={member.uid} className="member-row">
+              <Avatar name={member.name || member.email} size={32} />
+              <span className="member-id">
+                <strong>{member.name}{member.you && <span className="you-tag">You</span>}</strong>
+                {member.email && <span className="member-email">{member.email}</span>}
+              </span>
+              <span className="member-joined">Joined {formatDate(member.joined_at)}</span>
               {canManage && !member.you ? (
                 <select
                   className="input member-role"
@@ -62,13 +66,13 @@ export default function MembersCard({ workspaceId, myRole }) {
                   {ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
                 </select>
               ) : (
-                <span className="badge badge-idle">{member.role}</span>
+                <span className="badge badge-idle role-badge">{member.role}</span>
               )}
               {member.you ? (
-                <button type="button" className="link-btn" onClick={() => handleLeave(member.uid)}>Leave</button>
+                <button type="button" className="btn btn-ghost btn-sm btn-danger" onClick={() => handleLeave(member.uid)}>Leave</button>
               ) : (
                 canManage && (
-                  <button type="button" className="link-btn" onClick={() => run(() => removeMember(workspaceId, member.uid))}>
+                  <button type="button" className="btn btn-ghost btn-sm btn-danger" onClick={() => run(() => removeMember(workspaceId, member.uid))}>
                     Remove
                   </button>
                 )

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getMeeting } from "../api";
 import { formatRelative, formatSource } from "../lib/format";
 import DeleteIconButton from "./DeleteIconButton";
+import Icon from "./Icon";
 
 const BADGES = {
   PROCESSED: ["badge-ok", "Ready"],
@@ -65,7 +66,14 @@ export default function MeetingRow({
     ? "Writing minutes"
     : ideasRunning
       ? "Extracting ideas"
-      : badgeLabel;
+      : ideasFailed && meeting.status === "PROCESSED"
+        ? "Ideas failed"
+        : badgeLabel;
+  const statusClass = pipelineRunning
+    ? "badge-warn"
+    : ideasFailed && meeting.status === "PROCESSED"
+      ? "badge-err"
+      : badgeClass;
 
   return (
     <article
@@ -82,7 +90,7 @@ export default function MeetingRow({
         <span className="row-main">
           <span className="row-title-line">
             <span className="row-title">{meeting.title}</span>
-            <span className={`badge badge-inline ${pipelineRunning ? "badge-warn" : badgeClass}`}>
+            <span className={`badge badge-inline ${statusClass}`}>
               {pipelineRunning && <span className="spinner" />}
               {statusLabel}
             </span>
@@ -109,18 +117,10 @@ export default function MeetingRow({
                 </span>
               </>
             )}
-            {ideasFailed && !pipelineRunning && (
-              <>
-                <span className="sep">·</span>
-                <span className="meta-warn">Ideas failed</span>
-              </>
-            )}
           </span>
         </span>
 
-        <svg className="chevron" viewBox="0 0 20 20" aria-hidden="true">
-          <path d="m6 8 4 4 4-4" />
-        </svg>
+        <Icon name="chevronDown" className="chevron" />
       </button>
 
       {open && (
@@ -137,13 +137,13 @@ export default function MeetingRow({
           {detailsError && <div className="alert alert-error">{detailsError}</div>}
           {ideasFailed && (
             <section className="detail ideas-failure">
-              <h4 className="detail-label">Idea extraction failed</h4>
               <div className="alert alert-error">
-                {meeting.ideas_error || "Idea extraction failed."}
+                <div>
+                  <strong>Idea extraction failed.</strong>{" "}
+                  {meeting.ideas_error || ""}
+                  <p className="alert-note">Minutes were saved. Retry without re-uploading the transcript.</p>
+                </div>
               </div>
-              <p className="detail-note">
-                Minutes were saved. Retry ideas without re-uploading the transcript.
-              </p>
               {canRetryIdeas && (
                 <div className="idea-actions">
                   <button
@@ -162,14 +162,13 @@ export default function MeetingRow({
 
           {!ideasFailed && !ideasRunning && canRetryIdeas && (
             <section className="detail ideas-retry">
-              <h4 className="detail-label">Ideas</h4>
-              <p className="detail-note">
-                Re-run catalog-grounded extraction if the inbox looks empty or stale.
-              </p>
-              <div className="idea-actions">
+              <div className="inline-action">
+                <p className="detail-note">
+                  Inbox looks empty or stale? Re-run catalog-grounded extraction.
+                </p>
                 <button
                   type="button"
-                  className="btn btn-secondary"
+                  className="btn btn-secondary btn-sm"
                   disabled={retrying || deleting}
                   onClick={() => onRetryIdeas?.(meeting.id)}
                 >

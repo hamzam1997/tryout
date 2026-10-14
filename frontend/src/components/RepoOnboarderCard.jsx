@@ -9,6 +9,10 @@ import {
 } from "../api";
 import { loginWithGitHub, logoutUser } from "../lib/firebase";
 import DeleteIconButton from "./DeleteIconButton";
+import Icon from "./Icon";
+
+const GITHUB_PREFIX = "https://github.com/";
+const shortSource = (source = "") => source.replace(GITHUB_PREFIX, "");
 
 export default function RepoOnboarderCard({
   repositories,
@@ -173,6 +177,20 @@ export default function RepoOnboarderCard({
     }
   }
 
+  async function handleRetry(repo) {
+    setErrorMsg("");
+    try {
+      const res = await onboardRepository(
+        repo.source_type === "demo"
+          ? { sourceType: "demo", forceRefresh: true }
+          : { sourceType: "github", repoFullName: shortSource(repo.source), forceRefresh: true }
+      );
+      if (onOnboarded) onOnboarded(res.repository);
+    } catch (err) {
+      setErrorMsg(err.message);
+    }
+  }
+
   async function handleDeleteRepo(repoId, repoName) {
     if (!window.confirm(`Are you sure you want to remove '${repoName}'?`)) {
       return;
@@ -201,34 +219,36 @@ export default function RepoOnboarderCard({
     <div className="card onboarding-card">
       <div className="card-head">
         <div>
-          <p className="card-eyebrow">Architecture intake</p>
           <h2>Onboard a repository</h2>
           <p className="card-hint">
-            Connect once. Gemini maps modules, routes, and owners into a shared
-            catalog — the filter every later idea must pass.
+            Pick a source. Analysis runs in the background, so you can leave this page.
           </p>
         </div>
       </div>
 
       <div className="card-body">
         {/* Source Mode Tabs */}
-        <div className="onboarding-tabs">
+        <div className="onboarding-tabs" role="tablist" aria-label="Repository source">
           <button
             type="button"
             className={`tab-btn ${tab === "github" ? "is-active" : ""}`}
+            role="tab"
+            aria-selected={tab === "github"}
             onClick={() => { setTab("github"); setErrorMsg(""); }}
           >
             <svg className="tab-icon" viewBox="0 0 16 16" aria-hidden="true">
               <path fillRule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
             </svg>
-            GitHub Integration
+            GitHub
           </button>
           <button
             type="button"
             className={`tab-btn ${tab === "demo" ? "is-active" : ""}`}
+            role="tab"
+            aria-selected={tab === "demo"}
             onClick={() => { setTab("demo"); setErrorMsg(""); }}
           >
-            One-Click Demo Repo
+            Demo repository
           </button>
         </div>
 
@@ -242,13 +262,13 @@ export default function RepoOnboarderCard({
                 <div className="connect-prompt">
                   <h3>Connect with GitHub</h3>
                   <p>
-                    Authenticate securely via OAuth to select and onboard any of your public or private repositories.
+                    Sign in with GitHub to pick any public or private repository you can read.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={handleConnectWithGitHub}
-                  className="btn btn-primary btn-github"
+                  className="btn btn-dark btn-github"
                 >
                   <svg className="btn-icon" viewBox="0 0 16 16" aria-hidden="true">
                     <path fillRule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
@@ -339,7 +359,7 @@ export default function RepoOnboarderCard({
                         onClick={handleOnboardGithub}
                         disabled={onboarding || !selectedRepoFullName}
                       >
-                        {onboarding ? "Starting…" : "Onboard Repository"}
+                        {onboarding ? "Starting…" : "Onboard repository"}
                       </button>
                     </div>
                   </div>
@@ -354,14 +374,14 @@ export default function RepoOnboarderCard({
           <div className="tab-pane">
             <div className="demo-box">
               <div className="demo-info">
-                <h3>Acme Store Sandbox Service</h3>
+                <h3>Acme Store sandbox</h3>
                 <p>
-                  A realistic microservice repository featuring inventory management, orders, Stripe payments adapter, and missing notification permissions designed to exercise prototype attempts and friction detection.
+                  A small Flask service with orders, refunds and a Stripe adapter. It is missing a notifications permission on purpose, so attempts hit a real blocker.
                 </p>
                 <div className="specs-preview">
-                  <span>Stack: <strong>Python / Flask</strong></span>
-                  <span>Repo: <a href="https://github.com/hamzam1997/acme-store" target="_blank" rel="noreferrer"><code>hamzam1997/acme-store</code></a></span>
-                  <span>Contains: Models, Routes, CODEOWNERS</span>
+                  <span><span className="spec-label">Stack</span>Python · Flask</span>
+                  <span><span className="spec-label">Repository</span><a href="https://github.com/hamzam1997/acme-store" target="_blank" rel="noreferrer">hamzam1997/acme-store</a></span>
+                  <span><span className="spec-label">Includes</span>Models, routes, CODEOWNERS</span>
                 </div>
               </div>
               <button
@@ -376,7 +396,7 @@ export default function RepoOnboarderCard({
                     Starting…
                   </>
                 ) : (
-                  "Connect Acme Store demo"
+                  "Connect demo repository"
                 )}
               </button>
             </div>
@@ -394,7 +414,10 @@ export default function RepoOnboarderCard({
         {/* Already Onboarded Repositories Section */}
         {repositories && repositories.length > 0 && (
           <div className="onboarded-repos-section">
-            <h3>Connected Codebases</h3>
+            <div className="subsection-head">
+              <h3>Connected repositories</h3>
+              <span className="section-count">{repositories.length}</span>
+            </div>
             <div className="repos-grid">
               {repositories.map((repo) => {
                 const isOnboarding = repo.catalog_status === "onboarding";
@@ -404,18 +427,24 @@ export default function RepoOnboarderCard({
                   <div key={repo.id} className="repo-summary-card">
                     <div className="repo-card-head">
                       <div className="repo-card-title">
-                        <strong>{repo.name}</strong>
-                        <span className={`badge badge-${repo.source_type}`}>{repo.source_type}</span>
+                        <strong className="repo-card-name">{repo.name}</strong>
+                        <span className="repo-source-sub">
+                          {repo.source_type === "demo" ? "Demo" : repo.source_type === "github" ? "GitHub" : "Local"}
+                          {" · "}
+                          <code>{shortSource(repo.source)}</code>
+                        </span>
                       </div>
 
                       <div className="repo-card-actions">
                         {isOnboarding ? (
-                          <span className="badge badge-warn status-pulse">
-                            <span className="spinner spinner-xs" /> Analyzing…
+                          <span className="badge badge-warn">
+                            <span className="spinner" /> Analyzing
                           </span>
                         ) : isFailed ? (
                           <span className="badge badge-err">Failed</span>
-                        ) : null}
+                        ) : (
+                          <span className="badge badge-ok">Ready</span>
+                        )}
                         {!isOnboarding && (
                           <DeleteIconButton
                             label={`Remove ${repo.name}`}
@@ -426,11 +455,10 @@ export default function RepoOnboarderCard({
                       </div>
                     </div>
 
-                    <p className="repo-source-sub"><code>{repo.source}</code></p>
 
                     {isOnboarding && (
                       <p className="repo-analyzing-note">
-                        Gemini 2.5 Flash is analyzing architecture modules, data models, routes, and team owners in the background…
+                        Mapping modules, data models, routes and owners…
                       </p>
                     )}
 
@@ -441,15 +469,29 @@ export default function RepoOnboarderCard({
                     )}
 
                     {!isOnboarding && !isFailed && repo.catalog && (
-                      <div className="repo-card-stats">
-                        <span>{repo.catalog.language}</span>
-                        {repo.catalog.framework && <span>• {repo.catalog.framework}</span>}
-                        {repo.catalog.modules?.length > 0 && (
-                          <span>• {repo.catalog.modules.length} modules</span>
-                        )}
-                        {repo.catalog.api_routes?.length > 0 && (
-                          <span>• {repo.catalog.api_routes.length} routes</span>
-                        )}
+                      <p className="repo-card-stats">
+                        {[
+                          repo.catalog.language,
+                          repo.catalog.framework,
+                          repo.catalog.modules?.length > 0 && `${repo.catalog.modules.length} modules`,
+                          repo.catalog.api_routes?.length > 0 && `${repo.catalog.api_routes.length} routes`,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    )}
+
+                    {isFailed && (
+                      <div className="repo-card-foot">
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => handleRetry(repo)}
+                          disabled={onboarding}
+                        >
+                          <Icon name="refresh" size={14} />
+                          Retry analysis
+                        </button>
                       </div>
                     )}
 
@@ -466,7 +508,10 @@ export default function RepoOnboarderCard({
                               <span className="spinner spinner-xs" /> Loading catalog…
                             </>
                           ) : (
-                            "View Catalog →"
+                            <>
+                              View catalog
+                              <Icon name="arrowRight" size={14} />
+                            </>
                           )}
                         </button>
                       </div>

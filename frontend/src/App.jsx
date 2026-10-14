@@ -10,6 +10,7 @@ import SettingsPage from "./pages/SettingsPage";
 import InvitePage from "./pages/InvitePage";
 import LiveAttemptModal from "./components/LiveAttemptModal";
 import TourBanner from "./components/TourBanner";
+import { Logo } from "./components/Icon";
 import { onAuthChanged } from "./lib/firebase";
 import { useRoute } from "./lib/route";
 import {
@@ -338,11 +339,10 @@ export default function App() {
 
   if (authChecking) {
     return (
-      <div className="landing-wrap">
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", color: "var(--on-surface-variant)" }}>
-          <div className="spinner" style={{ width: "32px", height: "32px", borderWidth: "3px" }} />
-          <span>Loading workspace...</span>
-        </div>
+      <div className="boot-screen" role="status">
+        <Logo size={36} />
+        <span className="spinner spinner-muted" />
+        <span className="sr-only">Loading workspace…</span>
       </div>
     );
   }
@@ -367,6 +367,7 @@ export default function App() {
       />
 
       <main className="main">
+        <div className="main-inner">
         <TourBanner
           view={view}
           onNavigate={setView}
@@ -432,6 +433,7 @@ export default function App() {
             onDelete={handleDeleteIdea}
           />
         )}
+        </div>
       </main>
       {liveAttemptId && (
         <LiveAttemptModal
