@@ -465,3 +465,71 @@ class UserDoc(BaseModel):
             created_at=created,
             last_login_at=last_login,
         )
+
+
+class WorkspaceDoc(BaseModel):
+    """Document stored in Firestore `/workspaces/{id}`."""
+
+    COLLECTION: ClassVar[str] = "workspaces"
+
+    id: int
+    name: str
+    created_by: str
+    created_at: str = Field(default_factory=lambda: utc_now().isoformat())
+
+    def to_doc(self) -> dict[str, Any]:
+        return self.model_dump(mode="json")
+
+    @classmethod
+    def from_doc(cls, data: dict[str, Any]) -> WorkspaceDoc:
+        return cls.model_validate(data)
+
+    def to_domain(self) -> schemas.Workspace:
+        created = datetime.fromisoformat(self.created_at) if self.created_at else None
+        return schemas.Workspace(id=self.id, name=self.name, created_by=self.created_by, created_at=created)
+
+    @classmethod
+    def from_domain(cls, workspace: schemas.Workspace) -> WorkspaceDoc:
+        created = workspace.created_at.isoformat() if workspace.created_at else utc_now().isoformat()
+        return cls(id=workspace.id or 0, name=workspace.name, created_by=workspace.created_by, created_at=created)
+
+
+class MembershipDoc(BaseModel):
+    """Document stored in Firestore `/memberships/{workspace_id}_{uid}`."""
+
+    COLLECTION: ClassVar[str] = "memberships"
+
+    workspace_id: int
+    uid: str
+    role: str = "member"
+    created_at: str = Field(default_factory=lambda: utc_now().isoformat())
+
+    @property
+    def doc_id(self) -> str:
+        return f"{self.workspace_id}_{self.uid}"
+
+    def to_doc(self) -> dict[str, Any]:
+        return self.model_dump(mode="json")
+
+    @classmethod
+    def from_doc(cls, data: dict[str, Any]) -> MembershipDoc:
+        return cls.model_validate(data)
+
+    def to_domain(self) -> schemas.Membership:
+        created = datetime.fromisoformat(self.created_at) if self.created_at else None
+        return schemas.Membership(
+            workspace_id=self.workspace_id,
+            uid=self.uid,
+            role=schemas.WorkspaceRole(self.role),
+            created_at=created,
+        )
+
+    @classmethod
+    def from_domain(cls, membership: schemas.Membership) -> MembershipDoc:
+        created = membership.created_at.isoformat() if membership.created_at else utc_now().isoformat()
+        return cls(
+            workspace_id=membership.workspace_id,
+            uid=membership.uid,
+            role=membership.role.value,
+            created_at=created,
+        )
