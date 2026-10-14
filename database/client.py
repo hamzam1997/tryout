@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import os
 import threading
+import time
 from typing import Any
 
 from config import settings
@@ -308,7 +309,47 @@ def get_next_id(entity_name: str) -> int:
 
         transaction = client.transaction()
         return _increment_in_transaction(transaction, counter_ref)
-    except Exception as exc:
-        logger.warning("Failed transactional counter, using document count fallback: %s", exc)
-        # Fallback: count documents in collection
-        return len(list(client.collection(entity_name).stream())) + 1
+    except Exception:
+        # A "count + 1" fallback hands concurrent writers the same id and overwrites docs.
+        logger.exception("Could not allocate a %s id", entity_name)
+        raise
+
+
+LOCK_TTL_SECONDS = 120
+
+
+def claim(key: str) -> bool:
+    """Take a cross-process lock; False if someone else holds it. Pair with release().
+    A holder that died is ignored after LOCK_TTL_SECONDS."""
+    # ponytail: TTL lock, not a lease; a holder slower than the TTL can overlap the next one.
+    client = get_firestore_client()
+    now = time.time()
+    if isinstance(client, InMemoryFirestoreClient):
+        with client._lock:
+            locks = client._collections.setdefault("locks", InMemoryCollectionReference("locks", client))
+            held = locks._get_doc(key)
+            if held and now - held["at"] < LOCK_TTL_SECONDS:
+                return False
+            locks._set_doc(key, {"at": now})
+            return True
+
+    from google.api_core.exceptions import AlreadyExists
+
+    ref = client.collection("locks").document(key)
+    try:
+        ref.create({"at": now})
+        return True
+    except AlreadyExists:
+        snap = ref.get()
+        if snap.exists and now - snap.to_dict().get("at", 0) < LOCK_TTL_SECONDS:
+            return False
+        ref.delete()
+        try:
+            ref.create({"at": now})
+            return True
+        except AlreadyExists:
+            return False
+
+
+def release(key: str) -> None:
+    get_firestore_client().collection("locks").document(key).delete()

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import secrets
+import time
 from urllib.parse import urlencode
 
 import firebase_admin
@@ -74,21 +75,42 @@ def _resolve_membership(user: dict):
         membership = db.get_membership(int(wanted), uid)
         if membership or request.headers.get("X-Workspace-Id"):
             if membership:
-                session["workspace_id"] = membership.workspace_id
+                _remember_workspace(membership.workspace_id)
             return membership  # an explicit header for a foreign workspace is a 403
     memberships = db.list_memberships(uid=uid)
     membership = memberships[0] if memberships else _create_personal_workspace(user)
-    session["workspace_id"] = membership.workspace_id
+    if membership:
+        _remember_workspace(membership.workspace_id)
     return membership
 
 
+def _remember_workspace(workspace_id: int) -> None:
+    # Writing the cookie on every response lets a slow in-flight request undo a switch.
+    if session.get("workspace_id") != workspace_id:
+        session["workspace_id"] = workspace_id
+
+
 def _create_personal_workspace(user: dict):
-    name = f"{user.get('name') or user.get('email') or 'My'}'s workspace"
-    workspace = db.create_workspace(name, user["uid"])
-    if settings.seed_demo_data:
-        db.set_workspace(workspace.id)
-        seed_friction_history()
-    return db.get_membership(workspace.id, user["uid"])
+    """Exactly one personal workspace, even when parallel requests all find none."""
+    uid = user["uid"]
+    lock = f"personal-workspace:{uid}"
+    if not db.claim(lock):
+        for _ in range(50):  # another request is creating it; wait for its membership
+            time.sleep(0.1)
+            if memberships := db.list_memberships(uid=uid):
+                return memberships[0]
+        return None
+    try:
+        if memberships := db.list_memberships(uid=uid):
+            return memberships[0]  # created between our check and the claim
+        name = f"{user.get('name') or user.get('email') or 'My'}'s workspace"
+        workspace = db.create_workspace(name, uid)
+        if settings.seed_demo_data:
+            db.set_workspace(workspace.id)
+            seed_friction_history()
+        return db.get_membership(workspace.id, uid)
+    finally:
+        db.release(lock)
 
 
 def _verify_id_token(id_token: str) -> dict:
@@ -132,6 +154,7 @@ def github_login():
     redirect_uri = _get_redirect_uri()
     session["oauth_state"] = state
     session["oauth_redirect_uri"] = redirect_uri
+    session["oauth_connect_workspace"] = request.args.get("workspace", type=int)
 
     params = {
         "client_id": client_id,
@@ -210,6 +233,9 @@ def github_callback():
     session["github_token"] = access_token
     if user_data:
         session["github_user"] = user_data
+    # Already signed in (e.g. with Google): GitHub is a credential, not a new identity.
+    # Replacing the user here made them a stranger to their own workspace.
+    if user_data and not (session.get("user") or {}).get("uid"):
         # Generate stable UID for GitHub user and persist to Firestore
         gh_uid = f"github:{user_data.get('login')}"
         session["user"] = {
@@ -229,11 +255,27 @@ def github_callback():
             )
         except Exception as db_err:
             logger.warning("Could not persist GitHub user to Firestore: %s", db_err)
+        _resolve_membership(session["user"])
 
     session.pop("oauth_state", None)
     session.pop("oauth_redirect_uri", None)
+    workspace_id = session.pop("oauth_connect_workspace", None)
+    if workspace_id and user_data:
+        error = _connect_workspace_github(workspace_id, access_token, user_data["login"])
+        if error:
+            return redirect(f"/settings?auth_error={error}")
+        return redirect("/settings?github_connected=1")
 
     return redirect("/?auth_success=1")
+
+
+def _connect_workspace_github(workspace_id: int, token: str, login: str) -> str | None:
+    uid = (session.get("user") or {}).get("uid")
+    membership = db.get_membership(workspace_id, uid) if uid else None
+    if membership is None or membership.role not in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN):
+        return "Only+a+workspace+admin+or+owner+can+connect+GitHub."
+    db.save_github_connection(workspace_id, token, login, uid)
+    return None
 
 
 @bp.get("/firebase-config")
@@ -292,6 +334,9 @@ def firebase_sync():
     if firebase_user:
         session["user"] = firebase_user
         session.permanent = True  # survives browser restarts (PERMANENT_SESSION_LIFETIME)
+        # Make the personal workspace here, once, before the app fires its parallel
+        # data requests; otherwise each of them races to create one.
+        _resolve_membership(firebase_user)
 
     # Upsert user record into Firestore /users collection
     uid = firebase_user.get("uid")

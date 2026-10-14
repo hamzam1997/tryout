@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import requests
 from flask import Blueprint, g, jsonify, request, session
 
 import database as db
@@ -165,27 +164,6 @@ def github_connection(workspace_id: int):
         return error
     connection = db.get_github_connection(workspace_id)
     return jsonify({"connected": connection is not None, **(connection or {})})
-
-
-@bp.post("/<int:workspace_id>/github")
-def connect_github(workspace_id: int):
-    """Share the caller's GitHub sign-in with the workspace."""
-    _, error = member_with_role(workspace_id, WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
-    if error:
-        return error
-    token = session.get("github_token")
-    if not token:
-        return jsonify({"error": "Sign in with GitHub first, then connect it to the workspace."}), 400
-    resp = requests.get(
-        "https://api.github.com/user",
-        headers={"Authorization": f"Bearer {token}", "User-Agent": "tryout-app"},
-        timeout=10,
-    )
-    if resp.status_code != 200:
-        return jsonify({"error": "Your GitHub sign-in has expired. Sign in with GitHub again."}), 400
-    login = resp.json().get("login") or ""
-    db.save_github_connection(workspace_id, token, login, _uid())
-    return jsonify({"connected": True, **db.get_github_connection(workspace_id)})
 
 
 @bp.delete("/<int:workspace_id>/github")

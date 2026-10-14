@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { connectWorkspaceGitHub, disconnectWorkspaceGitHub, getWorkspaceGitHub } from "../api";
+import { disconnectWorkspaceGitHub, getWorkspaceGitHub } from "../api";
 import { formatDate } from "../lib/format";
 
 // One GitHub connection per workspace, so PRs work no matter who approves.
 export default function GitHubCard({ workspaceId, canManage }) {
   const [status, setStatus] = useState(null);
-  const [error, setError] = useState("");
+  // The connect redirect comes back here with ?auth_error= when it fails.
+  const [error, setError] = useState(() => new URLSearchParams(window.location.search).get("auth_error") || "");
 
   const load = useCallback(() => {
     getWorkspaceGitHub(workspaceId).then(setStatus).catch((err) => setError(err.message));
@@ -48,10 +49,9 @@ export default function GitHubCard({ workspaceId, canManage }) {
             <span className="card-hint">Not connected. Attempts use the approver's own GitHub sign-in until it is.</span>
             {canManage && (
               <>
-                <button type="button" className="btn btn-primary" onClick={() => run(() => connectWorkspaceGitHub(workspaceId))}>
-                  Connect my GitHub
-                </button>
-                <a className="link-btn" href="/api/auth/github/login">Sign in with GitHub first</a>
+                <a className="btn btn-primary" href={`/api/auth/github/login?workspace=${workspaceId}`}>
+                  Connect GitHub
+                </a>
               </>
             )}
           </>

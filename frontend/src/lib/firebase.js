@@ -76,13 +76,28 @@ export async function getFirebaseAuth() {
 /**
  * Create (or refresh) the Flask session for a Firebase user.
  */
+let syncInFlight = null;
+
 async function syncSession(user, githubToken) {
-  // The server verifies the ID token and takes the user's identity from it.
-  return fetch("/api/auth/firebase-sync", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id_token: await user.getIdToken(), github_token: githubToken }),
-  });
+  // Sign-in and onAuthStateChanged both sync; never run two at once. A call carrying a
+  // GitHub token waits its turn instead of joining, so the token is never dropped.
+  if (githubToken || !syncInFlight) {
+    const previous = syncInFlight;
+    syncInFlight = (async () => {
+      await previous?.catch(() => {});
+      // The server verifies the ID token and takes the user's identity from it.
+      return fetch("/api/auth/firebase-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_token: await user.getIdToken(), github_token: githubToken }),
+      });
+    })();
+    const mine = syncInFlight;
+    mine.finally(() => {
+      if (syncInFlight === mine) syncInFlight = null;
+    }).catch(() => {});
+  }
+  return (await syncInFlight).clone();
 }
 
 /**

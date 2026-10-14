@@ -6,6 +6,8 @@ Reject keeps the idea for audit without queuing an attempt.
 
 from __future__ import annotations
 
+import functools
+
 from flask import Blueprint, jsonify, request, session
 
 import database as db
@@ -107,7 +109,25 @@ def get_idea(idea_id: int):
     return jsonify(_serialise(idea))
 
 
+def _one_at_a_time(view):
+    """Serialise attempt-starting requests per idea: a double click or two members
+    approving at once would otherwise both pass the status check and open two PRs."""
+
+    @functools.wraps(view)
+    def wrapper(idea_id: int):
+        lock = f"idea-attempt:{idea_id}"
+        if not db.claim(lock):
+            return jsonify({"error": "This idea is already being started."}), 409
+        try:
+            return view(idea_id)
+        finally:
+            db.release(lock)
+
+    return wrapper
+
+
 @bp.post("/<int:idea_id>/approve")
+@_one_at_a_time
 def approve_idea_endpoint(idea_id: int):
     """Approve an idea, persist an attempt, and start background planning."""
     idea = db.get_idea(idea_id)
@@ -153,6 +173,7 @@ def approve_idea_endpoint(idea_id: int):
 
 
 @bp.post("/<int:idea_id>/attempts/retry")
+@_one_at_a_time
 def retry_attempt_endpoint(idea_id: int):
     """Start a fresh attempt after a previous generation or PR failed."""
     idea = db.get_idea(idea_id)
@@ -196,6 +217,7 @@ def retry_attempt_endpoint(idea_id: int):
 
 
 @bp.post("/<int:idea_id>/reject")
+@_one_at_a_time
 def reject_idea(idea_id: int):
     idea = db.get_idea(idea_id)
     if idea is None:

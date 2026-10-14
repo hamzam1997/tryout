@@ -52,6 +52,18 @@ class AuthViewTestCase(unittest.TestCase):
         with client.session_transaction() as sess:
             self.assertEqual(sess["user"]["uid"], "real")
 
+    def test_firebase_sync_creates_exactly_one_personal_workspace(self):
+        client = flask_app.app.test_client()
+        with mock.patch("views.auth.db.upsert_user", return_value=None), mock.patch(
+            "views.auth._verify_id_token", return_value={"uid": "new", "email": "n@x.com"}
+        ):
+            client.post("/api/auth/firebase-sync", json={"id_token": "tok"})
+        for path in ("/api/ideas", "/api/meetings", "/api/repositories"):
+            client.get(path)
+        self.assertEqual(len(db.list_memberships(uid="new")), 1)
+        with client.session_transaction() as sess:
+            self.assertIn("workspace_id", sess)  # later requests reuse it, never create
+
     def test_api_requires_sign_in_but_login_endpoints_do_not(self):
         client = flask_app.app.test_client()
         for path in ("/api/ideas", "/api/meetings", "/api/repositories", "/api/bottlenecks", "/api/attempts/1"):

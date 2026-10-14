@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 from context import current_workspace, set_workspace
 from database.client import (
+    claim,
     force_in_memory_firestore,
     get_firestore_client,
+    release,
     reset_in_memory_firestore,
 )
 from database.documents import (
@@ -130,6 +132,8 @@ def set_database_path(path=None) -> None:
 
 
 __all__ = [
+    "claim",
+    "release",
     "add_member",
     "create_invitation",
     "create_workspace",
