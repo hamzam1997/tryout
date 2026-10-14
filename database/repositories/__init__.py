@@ -56,9 +56,11 @@ from database.repositories.repository import (
 __all__ = [
     "add_member",
     "create_workspace",
+    "delete_workspace",
     "get_membership",
     "get_workspace",
     "list_memberships",
+    "rename_workspace",
     # Repository
     "catalog_is_current",
     "create_repository",
@@ -110,7 +112,9 @@ __all__ = [
 from database.repositories.workspace import (  # noqa: E402
     add_member,
     create_workspace,
+    delete_workspace,
     get_membership,
     get_workspace,
     list_memberships,
+    rename_workspace,
 )

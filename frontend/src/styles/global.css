@@ -2070,3 +2070,9 @@ svg { flex: none; }
 .tour-step.is-done .tour-num { background: var(--ok-container); color: var(--ok); }
 .tour-step.is-current { border-color: transparent; background: var(--primary-container); color: var(--on-primary-container); }
 .tour-step.is-current .tour-num { background: var(--primary); color: var(--on-primary); }
+
+/* ── Workspaces ────────────────────────────────────────── */
+
+.workspace-switcher { display: grid; gap: var(--s-2); margin-bottom: var(--s-5); }
+.settings-form { display: flex; flex-wrap: wrap; align-items: end; gap: var(--s-4); }
+.settings-form .field { flex: 1; min-width: 240px; }

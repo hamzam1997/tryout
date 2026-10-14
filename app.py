@@ -12,6 +12,7 @@ from views.bottlenecks import bp as bottlenecks_bp
 from views.ideas import bp as ideas_bp
 from views.meetings import bp as meetings_bp
 from views.repositories import bp as repositories_bp
+from views.workspaces import bp as workspaces_bp
 
 # Written by the Dockerfile's build stage. Absent in local development, where
 # Vite serves the frontend on its own port and proxies the API here.
@@ -37,6 +38,7 @@ app.register_blueprint(ideas_bp)
 app.register_blueprint(repositories_bp)
 app.register_blueprint(bottlenecks_bp)
 app.register_blueprint(attempts_bp)
+app.register_blueprint(workspaces_bp)
 
 
 @app.get("/health")

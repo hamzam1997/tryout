@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 // URL <-> page state. Flat pages, so history.pushState is enough; no router dependency.
-const PAGES = ["repositories", "meetings", "ideas", "bottlenecks"];
+const PAGES = ["repositories", "meetings", "ideas", "bottlenecks", "settings"];
 
 export function parseRoute({ pathname, search }) {
   const [first, second] = pathname.split("/").filter(Boolean);

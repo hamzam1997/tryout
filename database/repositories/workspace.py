@@ -41,3 +41,20 @@ def list_memberships(*, uid: str | None = None, workspace_id: int | None = None)
         query = query.where("workspace_id", "==", workspace_id)
     memberships = [MembershipDoc.from_doc(d.to_dict()).to_domain() for d in query.stream()]
     return sorted(memberships, key=lambda m: m.workspace_id)
+
+
+def rename_workspace(workspace_id: int, name: str) -> None:
+    get_firestore_client().collection(WORKSPACES).document(str(workspace_id)).set({"name": name}, merge=True)
+
+
+# Collections whose documents carry a workspace_id (see database/scope.py).
+SCOPED_COLLECTIONS = ("repositories", "meetings", "ideas", "attempts", "friction_logs")
+
+
+def delete_workspace(workspace_id: int) -> None:
+    """Delete a workspace with all its records and memberships."""
+    client = get_firestore_client()
+    for collection in (*SCOPED_COLLECTIONS, MEMBERSHIPS):
+        for doc in client.collection(collection).where("workspace_id", "==", workspace_id).stream():
+            client.collection(collection).document(doc.id).delete()
+    client.collection(WORKSPACES).document(str(workspace_id)).delete()

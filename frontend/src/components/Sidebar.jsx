@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { loginWithGoogle, logoutUser, onAuthChanged } from "../lib/firebase";
+import WorkspaceSwitcher from "./WorkspaceSwitcher";
 
 const ICONS = {
   repositories: (
@@ -78,8 +79,10 @@ export default function Sidebar({ view, onNavigate, counts, online, user, onLogo
         </div>
       </div>
 
+      {currentUser && <WorkspaceSwitcher onOpenSettings={() => onNavigate("settings")} />}
+
       <nav className="nav">
-        <p className="nav-label">Workspace</p>
+        <p className="nav-label">Pages</p>
         {NAV.map(({ id, label }) => (
           <button
             key={id}

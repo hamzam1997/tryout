@@ -6,6 +6,7 @@ import MeetingsPage from "./pages/MeetingsPage";
 import IdeasPage from "./pages/IdeasPage";
 import BottlenecksPage from "./pages/BottlenecksPage";
 import ReportPage from "./pages/ReportPage";
+import SettingsPage from "./pages/SettingsPage";
 import LiveAttemptModal from "./components/LiveAttemptModal";
 import TourBanner from "./components/TourBanner";
 import { onAuthChanged } from "./lib/firebase";
@@ -401,6 +402,8 @@ export default function App() {
           />
         ) : view === "bottlenecks" ? (
           <BottlenecksPage />
+        ) : view === "settings" ? (
+          <SettingsPage />
         ) : view === "report" ? (
           <ReportPage attemptId={reportAttemptId} onBack={() => setView("ideas")} />
         ) : (
