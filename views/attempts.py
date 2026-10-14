@@ -10,7 +10,7 @@ from flask import Blueprint, Response, jsonify, request, stream_with_context
 import database as db
 from schemas import AttemptStatus
 
-bp = Blueprint("attempts", __name__, url_prefix="/attempts")
+bp = Blueprint("attempts", __name__, url_prefix="/api/attempts")
 
 _FINISHED = {AttemptStatus.COMPLETE, AttemptStatus.FAILED, AttemptStatus.READY_FOR_REVIEW}
 _POLL_SECONDS = 0.5

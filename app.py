@@ -64,7 +64,7 @@ def frontend_asset(filename: str):
     The fallback is so client-side routes still resolve once the app grows
     past one page.
     """
-    if not FRONTEND_DIST.is_dir():
+    if filename.startswith("api/") or not FRONTEND_DIST.is_dir():
         return jsonify({"error": "not found"}), 404
 
     if (FRONTEND_DIST / filename).is_file():

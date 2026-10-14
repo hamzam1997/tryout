@@ -8,7 +8,7 @@ from flask import Blueprint, jsonify
 
 import database as db
 
-bp = Blueprint("bottlenecks", __name__, url_prefix="/bottlenecks")
+bp = Blueprint("bottlenecks", __name__, url_prefix="/api/bottlenecks")
 
 # Rough engineering weeks a blocker typically costs when found late (mid-sprint)
 # instead of on day 0. An assumption, not a measurement; the UI labels it an estimate.

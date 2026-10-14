@@ -12,7 +12,7 @@ import database as db
 from agents.attempt_jobs import queue_attempt
 from schemas import Attempt, AttemptStatus, IdeaStatus
 
-bp = Blueprint("ideas", __name__, url_prefix="/ideas")
+bp = Blueprint("ideas", __name__, url_prefix="/api/ideas")
 
 _VALID_STATUSES = {status.value for status in IdeaStatus}
 _DEFAULT_APPROVER = "local"

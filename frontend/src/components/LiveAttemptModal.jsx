@@ -9,7 +9,7 @@ export default function LiveAttemptModal({ attemptId, onClose, onDone }) {
 
   useEffect(() => {
     dialogRef.current?.showModal();
-    const source = new EventSource(`/attempts/${attemptId}/stream`);
+    const source = new EventSource(`/api/attempts/${attemptId}/stream`);
     source.addEventListener("status", (e) => setStatus(JSON.parse(e.data).status));
     source.addEventListener("step", (e) => setSteps((current) => [...current, JSON.parse(e.data)]));
     source.addEventListener("done", () => {

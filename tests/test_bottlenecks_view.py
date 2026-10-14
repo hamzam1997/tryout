@@ -19,12 +19,12 @@ class TestBottlenecksView(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_empty_map(self):
-        body = self.client.get("/bottlenecks").get_json()
+        body = self.client.get("/api/bottlenecks").get_json()
         self.assertEqual((body["total"], body["logs"], body["weeks_saved"]), (0, [], 0))
 
     def test_seeded_map_aggregates(self):
         seed_friction_history()
-        body = self.client.get("/bottlenecks").get_json()
+        body = self.client.get("/api/bottlenecks").get_json()
         self.assertEqual(body["total"], 8)
         self.assertEqual(body["attempts"], 4)
         self.assertEqual(body["by_service"][0], {"name": "Stripe", "count": 2})

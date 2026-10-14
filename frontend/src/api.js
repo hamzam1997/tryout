@@ -10,15 +10,15 @@ async function parse(response) {
 
 // Meetings API
 export function listMeetings() {
-  return fetch("/meetings").then(parse);
+  return fetch("/api/meetings").then(parse);
 }
 
 export function getMeeting(id) {
-  return fetch(`/meetings/${id}`).then(parse);
+  return fetch(`/api/meetings/${id}`).then(parse);
 }
 
 export function deleteMeeting(id) {
-  return fetch(`/meetings/${id}`, { method: "DELETE" }).then(async (response) => {
+  return fetch(`/api/meetings/${id}`, { method: "DELETE" }).then(async (response) => {
     if (response.status === 204) return true;
     return parse(response);
   });
@@ -30,11 +30,11 @@ export function uploadTranscript({ file, title, occurredAt }) {
   if (title) form.append("title", title);
   if (occurredAt) form.append("occurred_at", new Date(occurredAt).toISOString());
 
-  return fetch("/meetings/upload", { method: "POST", body: form }).then(parse);
+  return fetch("/api/meetings/upload", { method: "POST", body: form }).then(parse);
 }
 
 export async function extractIdeas(meetingId) {
-  const response = await fetch(`/meetings/${meetingId}/extract-ideas`, { method: "POST" });
+  const response = await fetch(`/api/meetings/${meetingId}/extract-ideas`, { method: "POST" });
   const body = await response.json().catch(() => ({}));
   // 202 = queued in background; still a success for the client.
   if (!response.ok && response.status !== 202) {
@@ -48,25 +48,25 @@ export async function extractIdeas(meetingId) {
 }
 
 export function loadDemoMeeting() {
-  return fetch("/meetings/demo", { method: "POST" }).then(parse);
+  return fetch("/api/meetings/demo", { method: "POST" }).then(parse);
 }
 
 // Ideas API
 export function listIdeas(status) {
   const query = status && status !== "ALL" ? `?status=${encodeURIComponent(status)}` : "";
-  return fetch(`/ideas${query}`).then(parse);
+  return fetch(`/api/ideas${query}`).then(parse);
 }
 
 export function getIdea(id) {
-  return fetch(`/ideas/${id}`).then(parse);
+  return fetch(`/api/ideas/${id}`).then(parse);
 }
 
 export function getIdeaCounts() {
-  return fetch("/ideas/counts").then(parse);
+  return fetch("/api/ideas/counts").then(parse);
 }
 
 export function approveIdea(id, repositoryId) {
-  return fetch(`/ideas/${id}/approve`, {
+  return fetch(`/api/ideas/${id}/approve`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ repository_id: repositoryId }),
@@ -74,15 +74,15 @@ export function approveIdea(id, repositoryId) {
 }
 
 export function retryIdeaAttempt(id) {
-  return fetch(`/ideas/${id}/attempts/retry`, { method: "POST" }).then(parse);
+  return fetch(`/api/ideas/${id}/attempts/retry`, { method: "POST" }).then(parse);
 }
 
 export function rejectIdea(id) {
-  return fetch(`/ideas/${id}/reject`, { method: "POST" }).then(parse);
+  return fetch(`/api/ideas/${id}/reject`, { method: "POST" }).then(parse);
 }
 
 export function deleteIdea(id) {
-  return fetch(`/ideas/${id}`, { method: "DELETE" }).then(async (response) => {
+  return fetch(`/api/ideas/${id}`, { method: "DELETE" }).then(async (response) => {
     if (response.status === 204) return true;
     return parse(response);
   });
@@ -90,19 +90,19 @@ export function deleteIdea(id) {
 
 // Repositories API
 export function listRepositories() {
-  return fetch("/repositories").then(parse);
+  return fetch("/api/repositories").then(parse);
 }
 
 export function getRepository(id) {
-  return fetch(`/repositories/${id}`).then(parse);
+  return fetch(`/api/repositories/${id}`).then(parse);
 }
 
 export function getRepositoryCatalog(id) {
-  return fetch(`/repositories/${id}/catalog`).then(parse);
+  return fetch(`/api/repositories/${id}/catalog`).then(parse);
 }
 
 export function deleteRepository(id) {
-  return fetch(`/repositories/${id}`, { method: "DELETE" }).then(parse);
+  return fetch(`/api/repositories/${id}`, { method: "DELETE" }).then(parse);
 }
 
 export function onboardRepository({ sourceType, repoFullName, branch, path, forceRefresh }) {
@@ -113,7 +113,7 @@ export function onboardRepository({ sourceType, repoFullName, branch, path, forc
     path: path,
     force_refresh: forceRefresh,
   };
-  return fetch("/repositories/onboard", {
+  return fetch("/api/repositories/onboard", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -139,9 +139,9 @@ export function health() {
 
 // Bottleneck map
 export function getBottlenecks() {
-  return fetch("/bottlenecks").then(parse);
+  return fetch("/api/bottlenecks").then(parse);
 }
 
 export function getAttempt(id) {
-  return fetch(`/attempts/${id}`).then(parse);
+  return fetch(`/api/attempts/${id}`).then(parse);
 }
