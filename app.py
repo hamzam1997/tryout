@@ -8,7 +8,7 @@ from database import init_db
 from logging_setup import configure_logging
 from seed_history import seed_friction_history
 from views.attempts import bp as attempts_bp
-from views.auth import bp as auth_bp
+from views.auth import bp as auth_bp, require_login
 from views.bottlenecks import bp as bottlenecks_bp
 from views.ideas import bp as ideas_bp
 from views.meetings import bp as meetings_bp
@@ -36,6 +36,7 @@ try:
 except Exception:  # seeding must never stop the app from booting
     app.logger.exception("history seeding failed")
 
+app.before_request(require_login)
 app.register_blueprint(auth_bp)
 app.register_blueprint(meetings_bp)
 app.register_blueprint(ideas_bp)

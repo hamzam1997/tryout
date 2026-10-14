@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 import database as db
+from auth_helpers import login
 from app import app
 from seed_history import seed_friction_history
 
@@ -12,7 +13,7 @@ class TestBottlenecksView(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         db.set_database_path(Path(self.tmp.name) / "database")
         db.init_db()
-        self.client = app.test_client()
+        self.client = login(app.test_client())
 
     def tearDown(self):
         db.set_database_path(None)

@@ -76,19 +76,12 @@ export async function getFirebaseAuth() {
 /**
  * Create (or refresh) the Flask session for a Firebase user.
  */
-function syncSession(user, githubToken) {
+async function syncSession(user, githubToken) {
+  // The server verifies the ID token and takes the user's identity from it.
   return fetch("/api/auth/firebase-sync", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      github_token: githubToken,
-      user: {
-        uid: user.uid,
-        email: user.email,
-        name: user.displayName || user.email,
-        avatar_url: user.photoURL,
-      },
-    }),
+    body: JSON.stringify({ id_token: await user.getIdToken(), github_token: githubToken }),
   });
 }
 

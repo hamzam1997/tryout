@@ -6,7 +6,9 @@ import logging
 import secrets
 from urllib.parse import urlencode
 
+import firebase_admin
 import requests
+from firebase_admin import auth as firebase_auth
 from flask import Blueprint, jsonify, redirect, request, session
 
 import database as db
@@ -15,6 +17,35 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 bp = Blueprint("auth", __name__, url_prefix="/api/auth")
+
+# API paths a signed-out browser must reach to sign in.
+_PUBLIC_API = {
+    "/api/auth/firebase-config",
+    "/api/auth/firebase-sync",
+    "/api/auth/me",
+    "/api/auth/logout",
+    "/api/auth/github/login",
+    "/api/auth/github/callback",
+    "/api/auth/github/status",
+}
+
+
+def require_login():
+    """`before_request` hook: every /api call needs a server-verified user in the session."""
+    if not request.path.startswith("/api/") or request.path in _PUBLIC_API:
+        return None
+    if not (session.get("user") or {}).get("uid"):
+        return jsonify({"error": "Sign in required."}), 401
+    return None
+
+
+def _verify_id_token(id_token: str) -> dict:
+    """Decoded claims of a Firebase ID token; raises if it is invalid or expired."""
+    try:
+        firebase_admin.get_app()
+    except ValueError:
+        firebase_admin.initialize_app(options={"projectId": settings.firebase_project_id})
+    return firebase_auth.verify_id_token(id_token)
 
 
 def _get_redirect_uri() -> str:
@@ -174,7 +205,18 @@ def firebase_sync():
     """Sync Firebase authenticated user and optional GitHub access token."""
     body = request.get_json(silent=True) or {}
     github_token = body.get("github_token")
-    firebase_user = body.get("user") or {}
+    # Identity comes only from the verified ID token, never from client-sent fields.
+    try:
+        claims = _verify_id_token(body.get("id_token") or "")
+    except Exception as exc:
+        logger.info("Rejected firebase-sync with an invalid ID token: %s", exc)
+        return jsonify({"error": "Invalid or expired sign-in token."}), 401
+    firebase_user = {
+        "uid": claims["uid"],
+        "email": claims.get("email"),
+        "name": claims.get("name") or claims.get("email"),
+        "avatar_url": claims.get("picture"),
+    }
 
     if github_token:
         session["github_token"] = github_token

@@ -1,6 +1,7 @@
 """Tests for GitHub OAuth endpoints."""
 
 import tempfile
+from auth_helpers import login
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -19,21 +20,44 @@ class AuthViewTestCase(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         db.set_database_path(Path(self._tmp.name) / "test.db")
         db.init_db()
-        self.client = flask_app.app.test_client()
+        self.client = login(flask_app.app.test_client())
 
     def tearDown(self):
         db.set_database_path(None)
         self._tmp.cleanup()
 
     def test_firebase_sync_sets_a_persistent_session_cookie(self):
-        with mock.patch("views.auth.db.upsert_user", return_value=None):
-            resp = self.client.post(
-                "/api/auth/firebase-sync", json={"user": {"uid": "u1", "email": "a@x.com"}}
-            )
+        with mock.patch("views.auth.db.upsert_user", return_value=None), mock.patch(
+            "views.auth._verify_id_token", return_value={"uid": "u1", "email": "a@x.com"}
+        ):
+            resp = self.client.post("/api/auth/firebase-sync", json={"id_token": "tok"})
         cookie = resp.headers.get("Set-Cookie", "")
         self.assertIn("Expires=", cookie)  # not a browser-session cookie
         self.assertIn("HttpOnly", cookie)
         self.assertIn("SameSite=Lax", cookie)
+
+    def test_firebase_sync_rejects_a_missing_or_invalid_token(self):
+        client = flask_app.app.test_client()
+        with mock.patch("views.auth._verify_id_token", side_effect=ValueError("bad token")):
+            resp = client.post("/api/auth/firebase-sync", json={"user": {"uid": "admin"}})
+        self.assertEqual(resp.status_code, 401)
+        self.assertEqual(client.get("/api/ideas").status_code, 401)  # no session was created
+
+    def test_firebase_sync_takes_identity_from_the_token_not_the_body(self):
+        client = flask_app.app.test_client()
+        with mock.patch("views.auth.db.upsert_user", return_value=None), mock.patch(
+            "views.auth._verify_id_token", return_value={"uid": "real", "email": "r@x.com"}
+        ):
+            client.post("/api/auth/firebase-sync", json={"id_token": "tok", "user": {"uid": "forged"}})
+        with client.session_transaction() as sess:
+            self.assertEqual(sess["user"]["uid"], "real")
+
+    def test_api_requires_sign_in_but_login_endpoints_do_not(self):
+        client = flask_app.app.test_client()
+        for path in ("/api/ideas", "/api/meetings", "/api/repositories", "/api/bottlenecks", "/api/attempts/1"):
+            self.assertEqual(client.get(path).status_code, 401, path)
+        self.assertEqual(client.get("/api/auth/firebase-config").status_code, 200)
+        self.assertEqual(client.get("/health").status_code, 200)
 
     def test_github_status_unconfigured(self):
         with mock.patch.object(settings, "github_client_id", ""):

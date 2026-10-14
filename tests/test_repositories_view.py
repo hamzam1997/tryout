@@ -1,6 +1,7 @@
 """Tests for repository onboarding and catalog endpoints."""
 
 import tempfile
+from auth_helpers import login
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -47,7 +48,7 @@ class RepositoriesViewTestCase(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         db.set_database_path(Path(self._tmp.name) / "test.db")
         db.init_db()
-        self.client = flask_app.app.test_client()
+        self.client = login(flask_app.app.test_client())
 
     def tearDown(self):
         db.set_database_path(None)
