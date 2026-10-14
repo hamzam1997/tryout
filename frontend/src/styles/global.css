@@ -2032,3 +2032,41 @@ svg { flex: none; }
 }
 .terminal-muted { color: #9aa0a6; }
 .terminal-err { color: #f28b82; }
+
+/* ── Tour banner ───────────────────────────────────────── */
+
+.tour { max-width: var(--content-max); margin: 0 auto var(--s-6); }
+.tour ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  padding: 0;
+  list-style: none;
+}
+.tour-step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  height: 32px;
+  padding: 0 var(--s-3) 0 var(--s-1);
+  border: 1px solid var(--outline-faint);
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--on-surface-variant);
+  font: inherit;
+  font-size: var(--text-label);
+  font-weight: 500;
+  cursor: pointer;
+}
+.tour-step:hover { background: var(--surface-container); }
+.tour-num {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-full);
+  background: var(--surface-container-high);
+}
+.tour-step.is-done .tour-num { background: var(--ok-container); color: var(--ok); }
+.tour-step.is-current { border-color: transparent; background: var(--primary-container); color: var(--on-primary-container); }
+.tour-step.is-current .tour-num { background: var(--primary); color: var(--on-primary); }

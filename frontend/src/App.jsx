@@ -7,6 +7,7 @@ import IdeasPage from "./pages/IdeasPage";
 import BottlenecksPage from "./pages/BottlenecksPage";
 import ReportPage from "./pages/ReportPage";
 import LiveAttemptModal from "./components/LiveAttemptModal";
+import TourBanner from "./components/TourBanner";
 import { onAuthChanged, checkSessionExpired } from "./lib/firebase";
 import {
   approveIdea,
@@ -362,6 +363,17 @@ export default function App() {
       />
 
       <main className="main">
+        <TourBanner
+          view={view}
+          onNavigate={setView}
+          done={[
+            repositories.length > 0,
+            meetings.length > 0,
+            ideaCounts.IN_PROCESS + ideaCounts.DONE > 0,
+            ideaCounts.DONE > 0,
+            false,
+          ]}
+        />
         {view === "repositories" ? (
           <RepositoriesPage
             repositories={repositories}
