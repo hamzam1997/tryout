@@ -4,7 +4,7 @@ from pathlib import Path
 from flask import Flask, jsonify, send_from_directory
 
 from config import settings
-from database import init_db
+from database import get_firestore_client, init_db
 from logging_setup import configure_logging
 from views.attempts import bp as attempts_bp
 from views.auth import bp as auth_bp, require_login
@@ -45,6 +45,10 @@ app.register_blueprint(invitations_bp)
 
 @app.get("/health")
 def health():
+    try:
+        get_firestore_client()
+    except Exception as exc:
+        return jsonify({"status": "error", "error": str(exc)}), 503
     return jsonify({"status": "ok", "ui": FRONTEND_DIST.is_dir()})
 
 

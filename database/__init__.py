@@ -118,7 +118,7 @@ def init_db() -> None:
         client = get_firestore_client()
         logger.info("Firestore database initialized successfully.")
     except Exception as exc:
-        logger.warning("Firestore client initialization deferred: %s", exc)
+        logger.error("Firestore client initialization failed; /health will report 503: %s", exc)
 
 
 def set_database_path(path=None) -> None:
