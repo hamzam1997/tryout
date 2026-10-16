@@ -79,6 +79,7 @@ class TestAttemptJobs(unittest.TestCase):
             pr_title="Change greeting",
             testing_notes="Tested it.",
             diff="fake diff",
+            test_exit_code=0,
         )
         with (
             patch("agents.attempt_jobs.AttemptHarness") as mock_harness_class,
@@ -91,7 +92,7 @@ class TestAttemptJobs(unittest.TestCase):
                     "main",
                     "https://github.com/org/repo/pull/1",
                 ),
-            ),
+            ) as create_pr,
         ):
             mock_harness_instance = mock_harness_class.return_value
             mock_harness_instance.run.return_value = harness_result
@@ -103,5 +104,7 @@ class TestAttemptJobs(unittest.TestCase):
         self.assertEqual(result.plan, self.plan)
         self.assertEqual(mock_harness_class.call_args.kwargs["plan"], self.plan)
         self.assertEqual(result.pull_request_url, "https://github.com/org/repo/pull/1")
+        # The PR description reports the tests the attempt actually ran.
+        self.assertEqual(create_pr.call_args.kwargs["test_exit_code"], 0)
 if __name__ == '__main__':
     unittest.main()
