@@ -4,6 +4,8 @@ import {
   GoogleAuthProvider,
   GithubAuthProvider,
   signInWithPopup,
+  linkWithPopup,
+  reauthenticateWithPopup,
   signOut,
   onAuthStateChanged,
   setPersistence,
@@ -121,7 +123,16 @@ export async function loginWithGitHub({ repoAccess = false } = {}) {
     provider = new GithubAuthProvider();
     provider.addScope("repo");
   }
-  const result = await signInWithPopup(auth, provider);
+  // Connecting while signed in must keep the current identity: a Google user
+  // links GitHub, a GitHub user re-authorizes with the wider scope. A plain
+  // sign-in popup would switch accounts and lose their workspace.
+  const current = repoAccess ? auth.currentUser : null;
+  const hasGitHub = current?.providerData.some((p) => p.providerId === GithubAuthProvider.PROVIDER_ID);
+  const result = !current
+    ? await signInWithPopup(auth, provider)
+    : hasGitHub
+      ? await reauthenticateWithPopup(current, provider)
+      : await linkWithPopup(current, provider);
   const credential = GithubAuthProvider.credentialFromResult(result);
   const githubToken = credential?.accessToken;
   const user = result.user;
