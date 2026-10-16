@@ -356,6 +356,21 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
         self.assertEqual(doc.to_domain().email, "developer@example.com")
 
 
+class FirestoreUnavailableTestCase(unittest.TestCase):
+    def test_unreachable_firestore_raises_outside_debug(self):
+        from unittest import mock
+        import database.client as client
+
+        db.set_database_path(None)  # no in-memory opt-in
+        with mock.patch.object(client.settings, "debug", False), mock.patch.object(
+            client, "_firestore_client", None
+        ), mock.patch.object(
+            client, "_get_live_credentials", side_effect=OSError("no route")
+        ):
+            with self.assertRaisesRegex(RuntimeError, "Firestore is unavailable"):
+                client.get_firestore_client()
+            self.assertIsNone(client._firestore_client)
+
+
 if __name__ == "__main__":
     unittest.main()
-

@@ -92,7 +92,6 @@ def classify_friction(
             system_instruction=_SYSTEM,
             response_mime_type="application/json",
             response_schema=FrictionBatch,
-            temperature=0.1,
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         ),
     )

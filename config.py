@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     )
 
     google_cloud_project: str = ""
-    # "global" serves both the 2.5 and 3.x families; regional endpoints do not.
+    # "global" serves every current Gemini model; regional endpoints do not.
     google_cloud_location: str = "global"
 
     port: int = 8080
@@ -34,10 +34,10 @@ class Settings(BaseSettings):
     # Database settings: Google Cloud Firestore
     firestore_database: str = Field(default="(default)", validation_alias="FIRESTORE_DATABASE")
 
-    model_extraction: str = "gemini-2.5-flash"
-    model_onboarding: str = "gemini-2.5-flash"
-    model_planning: str = "gemini-2.5-pro"
-    model_coding: str = "gemini-2.5-pro"
+    model_extraction: str = "gemini-3.8-flash"
+    model_onboarding: str = "gemini-3.8-flash"
+    model_planning: str = "gemini-3.8-flash"
+    model_coding: str = "gemini-3.8-flash"
 
     execution_timeout_seconds: int = Field(default=60, gt=0)
 

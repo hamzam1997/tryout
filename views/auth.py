@@ -119,7 +119,9 @@ def _verify_id_token(id_token: str) -> dict:
         firebase_admin.get_app()
     except ValueError:
         firebase_admin.initialize_app(options={"projectId": settings.firebase_project_id or settings.google_cloud_project})
-    return firebase_auth.verify_id_token(id_token)
+    # A token minted a moment ago fails "used too early" when this host's clock is a
+    # second behind Google's; judges get one try, so allow a little skew.
+    return firebase_auth.verify_id_token(id_token, clock_skew_seconds=10)
 
 
 def _get_redirect_uri() -> str:
@@ -231,6 +233,7 @@ def github_callback():
         logger.warning("Could not fetch user profile from GitHub: %s", user_err)
 
     session["github_token"] = access_token
+    session["github_repo_access"] = True  # this flow requests the `repo` scope
     if user_data:
         session["github_user"] = user_data
     # Already signed in (e.g. with Google): GitHub is a credential, not a new identity.
@@ -315,12 +318,16 @@ def firebase_sync():
 
     if github_token:
         session["github_token"] = github_token
+        # A plain GitHub sign-in token has no scopes; only the connect step grants `repo`.
+        session["github_repo_access"] = False
         try:
             user_resp = requests.get(
                 "https://api.github.com/user",
                 headers={"Authorization": f"Bearer {github_token}", "User-Agent": "tryout-app"},
                 timeout=10,
             )
+            scopes = [s.strip() for s in user_resp.headers.get("X-OAuth-Scopes", "").split(",")]
+            session["github_repo_access"] = "repo" in scopes
             if user_resp.status_code == 200:
                 user_json = user_resp.json()
                 session["github_user"] = {
@@ -393,12 +400,15 @@ def github_status():
     has_creds = bool(settings.github_client_id and settings.github_client_secret)
     token = session.get("github_token")
     user = session.get("github_user") or session.get("user")
+    # A sign-in-only token can't list private repos or open PRs: report it as not
+    # connected so the onboarding card offers "Connect with GitHub".
+    connected = bool(token) and session.get("github_repo_access", True)
 
     return jsonify(
         {
             "configured": has_creds or bool(token),
-            "authenticated": bool(token),
-            "user": user if token else None,
+            "authenticated": connected,
+            "user": user if connected else None,
         }
     )
 

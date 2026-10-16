@@ -19,7 +19,8 @@ build/
 
 # Environment secrets
 .env
-.env.local
+.env.*
+!.env.example
 
 # Databases & local state
 *.db
@@ -31,6 +32,9 @@ build/
 # Editors
 .idea/
 .vscode/
+
+# Claude Code agent worktrees
+.claude/worktrees/
 
 # Scratch & logs
 scratch/

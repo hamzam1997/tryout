@@ -128,6 +128,22 @@ class AuthViewTestCase(unittest.TestCase):
             self.assertTrue(status_data["authenticated"])
             self.assertEqual(status_data["user"]["login"], "octocat")
 
+    @mock.patch("requests.get")
+    def test_github_sign_in_without_repo_scope_still_offers_connect(self, mock_get):
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = {"login": "octocat"}
+
+        def sync(scopes):
+            mock_get.return_value.headers = {"X-OAuth-Scopes": scopes}
+            with mock.patch("views.auth.db.upsert_user", return_value=None), mock.patch(
+                "views.auth._verify_id_token", return_value={"uid": "u1", "email": "a@x.com"}
+            ):
+                self.client.post("/api/auth/firebase-sync", json={"id_token": "tok", "github_token": "gho"})
+            return self.client.get("/api/auth/github/status").get_json()["authenticated"]
+
+        self.assertFalse(sync(""))  # plain sign-in: no scopes
+        self.assertTrue(sync("repo"))  # after "Connect with GitHub"
+
     def test_github_repos_unauthorized(self):
         resp = self.client.get("/api/auth/github/repos")
         self.assertEqual(resp.status_code, 401)

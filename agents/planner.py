@@ -36,7 +36,6 @@ def generate_plan(idea: Idea, meeting: Meeting, catalog: ArchitectureCatalog, mo
             system_instruction=_SYSTEM,
             response_mime_type="application/json",
             response_schema=TechnicalPlan,
-            temperature=0.2,
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         ),
     )
