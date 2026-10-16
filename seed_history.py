@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 
 import database as db
+from database.documents import utc_now
 from schemas import (
     Attempt, AttemptStatus, FrictionCategory as C, FrictionLog, Idea, IdeaStatus,
     Meeting, MeetingSource, MeetingStatus, ReadinessItem as R, IdeasExtractStatus,
@@ -55,6 +57,33 @@ HISTORY = [
 ]
 
 
+def _mock_diff(blockers) -> tuple[str, list[str]]:
+    """A new-file diff per mock adapter, so the report's mocks and code sections aren't empty."""
+    chunks, services = [], []
+    for _, svc, owner, mock, *_ in blockers:
+        if not mock or f"b/{mock}\n" in "".join(chunks):
+            continue
+        services.append(svc)
+        name = "".join(part.title() for part in svc.replace("-", " ").split())
+        body = [
+            f'"""Staging stand-in for {svc} ({owner}); the attempt could not reach the real one."""',
+            "",
+            "",
+            f"class Mock{name}Client:",
+            "    def __init__(self):",
+            "        self.calls = []",
+            "",
+            "    def send(self, **payload):",
+            "        self.calls.append(payload)",
+            f'        return {{"status": "mocked", "service": "{svc}"}}',
+        ]
+        chunks.append(
+            f"diff --git a/{mock} b/{mock}\nnew file mode 100644\n--- /dev/null\n+++ b/{mock}\n"
+            f"@@ -0,0 +1,{len(body)} @@\n" + "".join(f"+{line}\n" for line in body)
+        )
+    return "".join(chunks), services
+
+
 def seed_friction_history() -> bool:
     """Create the historical data once. Returns True if it was created."""
     if any(m.external_id == SEED_ID for m in db.list_meetings()):
@@ -64,10 +93,18 @@ def seed_friction_history() -> bool:
         external_id=SEED_ID, transcript="Historical planning notes (seeded).",
         status=MeetingStatus.PROCESSED, ideas_status=IdeasExtractStatus.PROCESSED,
     ))
-    for title, blockers in HISTORY:
+    now = utc_now()
+    for i, (title, blockers) in enumerate(HISTORY):
         idea = db.create_idea(Idea(meeting_id=meeting.id, title=title, status=IdeaStatus.DONE))
+        diff, mocked = _mock_diff(blockers)
+        finished = now - timedelta(days=3 * (len(HISTORY) - i))
         attempt = db.create_attempt(Attempt(
             idea_id=idea.id, repository_id=0, status=AttemptStatus.COMPLETE,
+            diff=diff, test_exit_code=0,
+            test_stdout=(f"Prototype tests passed against mocked {', '.join(mocked)}."
+                         if mocked else "Prototype tests passed."),
+            created_at=finished - timedelta(minutes=12),
+            started_at=finished - timedelta(minutes=11), finished_at=finished,
         ))
         for cat, svc, owner, mock, action, tasks in blockers:
             db.create_friction_log(FrictionLog(
