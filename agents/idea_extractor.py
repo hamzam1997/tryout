@@ -116,7 +116,6 @@ def generate_ideas(
                 system_instruction=SYSTEM_INSTRUCTION,
                 response_mime_type="application/json",
                 response_schema=ExtractedIdeaBatch,
-                temperature=0.2,
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(
                     disable=True
                 ),

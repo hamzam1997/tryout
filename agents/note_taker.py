@@ -81,7 +81,6 @@ def generate_minutes(
                 system_instruction=SYSTEM_INSTRUCTION,
                 response_mime_type="application/json",
                 response_schema=MeetingMinutes,
-                temperature=0.2,
                 # The SDK assumes a schema implies function calling and warns.
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(
                     disable=True

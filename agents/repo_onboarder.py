@@ -167,7 +167,6 @@ class RepoOnboarder:
                 system_instruction=REPO_ONBOARDER_SYSTEM_INSTRUCTION,
                 response_mime_type="application/json",
                 response_schema=ArchitectureCatalog,
-                temperature=0.1,
                 # Structured JSON schema is not tool use; disable AFC to avoid
                 # the SDK warning that generate_content + AFC is discouraged.
                 automatic_function_calling=types.AutomaticFunctionCallingConfig(
