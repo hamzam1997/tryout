@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import database as db
+from schemas import AttemptStep
 
 FIXED_TIME = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
@@ -180,6 +181,43 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
         failed = db.get_attempt(attempt2.id)
         self.assertEqual(failed.error, "SyntaxError")
         self.assertIsNotNone(failed.finished_at)
+
+    def test_silent_in_flight_attempt_expires_to_failed(self):
+        """An attempt whose worker died stops showing as running, so it can be retried."""
+        from datetime import timedelta
+
+        repo = db.create_repository(db.Repository(name="repo", source="/tmp/repo3"))
+        meeting = db.create_meeting(db.Meeting(title="Sync", transcript="transcript"))
+        idea = db.create_idea(db.Idea(meeting_id=meeting.id, title="Idea"))
+        now = datetime.now(timezone.utc)
+
+        stale = db.create_attempt(db.Attempt(
+            idea_id=idea.id, repository_id=repo.id, status=db.AttemptStatus.CODING,
+            created_at=now - timedelta(hours=1),
+            events=[AttemptStep(timestamp=now - timedelta(minutes=30), action="edit_file")],
+        ))
+        live = db.create_attempt(db.Attempt(
+            idea_id=idea.id, repository_id=repo.id, status=db.AttemptStatus.CODING,
+            created_at=now - timedelta(hours=1),
+            events=[AttemptStep(timestamp=now - timedelta(minutes=1), action="edit_file")],
+        ))
+        finished = db.create_attempt(db.Attempt(
+            idea_id=idea.id, repository_id=repo.id, status=db.AttemptStatus.COMPLETE,
+            created_at=now - timedelta(days=2),
+        ))
+
+        expired = db.get_attempt(stale.id)
+        self.assertEqual(expired.status, db.AttemptStatus.FAILED)
+        self.assertIn("Retry", expired.error)
+        # Persisted, not just reported on this read.
+        self.assertEqual(
+            {a.id: a.status for a in db.list_attempts(idea_id=idea.id)},
+            {
+                stale.id: db.AttemptStatus.FAILED,
+                live.id: db.AttemptStatus.CODING,
+                finished.id: db.AttemptStatus.COMPLETE,
+            },
+        )
 
     def test_friction_logs_and_bottleneck_aggregation(self):
         """Verify friction log tracking with checklist, safe aggregation, and injection protection."""

@@ -13,7 +13,7 @@ from agents.repo_onboarder import (
     generate_architecture_catalog,
     onboard_repository,
 )
-from config import BASE_DIR
+from config import BASE_DIR, settings
 import database as db
 from repo_scanner import scan_repo
 from schemas import (
@@ -178,7 +178,7 @@ class TestRepoOnboarder(unittest.TestCase):
         # Verify Gemini client called with correct arguments
         mock_client.models.generate_content.assert_called_once()
         call_kwargs = mock_client.models.generate_content.call_args.kwargs
-        self.assertEqual(call_kwargs["model"], "gemini-3.5-flash")
+        self.assertEqual(call_kwargs["model"], settings.model_onboarding)
         self.assertIn("Context of acme store", call_kwargs["contents"])
         self.assertEqual(call_kwargs["config"].system_instruction, REPO_ONBOARDER_SYSTEM_INSTRUCTION)
         self.assertEqual(call_kwargs["config"].response_mime_type, "application/json")

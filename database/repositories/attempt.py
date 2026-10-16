@@ -2,10 +2,39 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 from database.client import get_firestore_client, get_next_id
 from database.scope import exists, scoped
 from database.documents import AttemptDoc, utc_now
 from schemas import Attempt, AttemptStatus
+
+_IN_FLIGHT = {
+    AttemptStatus.QUEUED,
+    AttemptStatus.PLANNING,
+    AttemptStatus.CODING,
+    AttemptStatus.TESTING,
+}
+# A live attempt logs an event every tool call; this much silence means its worker died
+# (instance recycled or crashed), so it would otherwise show as running forever.
+STALE_AFTER = timedelta(minutes=15)
+STALE_ERROR = "The attempt stopped responding (its worker was restarted). Retry to run it again."
+
+
+def _aware(moment: datetime) -> datetime:
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
+def _expire_if_stale(attempt: Attempt) -> Attempt:
+    """Fail an in-flight attempt whose worker has gone silent, so it can be retried."""
+    if attempt.status not in _IN_FLIGHT:
+        return attempt
+    moments = [step.timestamp for step in attempt.events]
+    moments += [m for m in (attempt.started_at, attempt.created_at) if m]
+    if not moments or utc_now() - max(_aware(m) for m in moments) < STALE_AFTER:
+        return attempt
+    set_attempt_status(attempt.id, AttemptStatus.FAILED, error=STALE_ERROR)
+    return attempt.model_copy(update={"status": AttemptStatus.FAILED, "error": STALE_ERROR})
 
 
 def create_attempt(attempt: Attempt) -> Attempt:
@@ -23,7 +52,7 @@ def get_attempt(attempt_id: int) -> Attempt | None:
     doc_ref = client.collection(AttemptDoc.COLLECTION).document(str(attempt_id)).get()
     if not exists(doc_ref):
         return None
-    return AttemptDoc.from_doc(doc_ref.to_dict()).to_domain()
+    return _expire_if_stale(AttemptDoc.from_doc(doc_ref.to_dict()).to_domain())
 
 
 def list_attempts(idea_id: int | None = None) -> list[Attempt]:
@@ -37,7 +66,7 @@ def list_attempts(idea_id: int | None = None) -> list[Attempt]:
     for d in docs:
         data = d.to_dict()
         if data:
-            attempts.append(AttemptDoc.from_doc(data).to_domain())
+            attempts.append(_expire_if_stale(AttemptDoc.from_doc(data).to_domain()))
     attempts.sort(key=lambda x: x.id, reverse=True)
     return attempts
 
