@@ -84,16 +84,16 @@ flowchart LR
         R[GitHub repo]
         T[Meeting transcript]
     end
-    R --> O[Repo onboarder<br/>gemini-2.5-flash] --> C[(Architecture<br/>catalog)]
-    T --> N[Note taker<br/>gemini-2.5-flash] --> M[(Meeting +<br/>minutes)]
-    M --> X[Idea extractor<br/>gemini-2.5-flash]
+    R --> O[Repo onboarder<br/>gemini-3.8-flash] --> C[(Architecture<br/>catalog)]
+    T --> N[Note taker<br/>gemini-3.8-flash] --> M[(Meeting +<br/>minutes)]
+    M --> X[Idea extractor<br/>gemini-3.8-flash]
     C --> X
     X --> I[(Ideas inbox)]
-    I -- human approves --> P[Planner<br/>gemini-2.5-pro]
+    I -- human approves --> P[Planner<br/>gemini-3.8-flash]
     C --> P
-    P --> H[Coding agent harness<br/>gemini-2.5-pro + tools]
+    P --> H[Coding agent harness<br/>gemini-3.8-flash + tools]
     H -- run_tests --> S[Sandbox runner]
-    H --> F[Friction classifier<br/>gemini-2.5-pro]
+    H --> F[Friction classifier<br/>gemini-3.8-flash]
     F --> L[(Friction logs)]
     H --> PR[Pull request<br/>on GitHub]
     L --> B[Bottleneck map]
@@ -114,7 +114,7 @@ Gemini reads the transcript alongside each onboarded repository's catalog and se
 
 ### 4. Planning: `agents/planner.py`
 
-On approval, the planner (gemini-2.5-pro, structured output) produces a `TechnicalPlan` that keeps two kinds of work strictly apart:
+On approval, the planner (gemini-3.8-flash, structured output) produces a `TechnicalPlan` that keeps two kinds of work strictly apart:
 
 - `repo_changes`: ordered files to create or modify *inside* this repository
 - `external_requirements`: every service, credential or other team's system the idea needs that this repo doesn't own, plus a `mock_strategy` for each, so the prototype and its tests run without real credentials
@@ -159,16 +159,16 @@ All friction logs in a workspace, aggregated by category, service and owning tea
 
 ## Where Gemini is used
 
-All model calls go through Vertex AI (`llm.py`) and each one is configurable.
+All model calls go through Vertex AI (`llm.py`). Every stage defaults to `gemini-3.8-flash`, Google's recommended successor to the Gemini 2.5 models that retire on October 20, 2026; it is GA, fast enough for a live 25-step agent loop, and supported until at least September 2027. Each stage can be pointed at another model with its env var, for example `MODEL_CODING=gemini-4-argon`.
 
 | Stage | Default model | Technique |
 |---|---|---|
-| Repo onboarding | `gemini-2.5-flash` (`MODEL_ONBOARDING`) | Long-context repo skeleton → JSON schema (`ArchitectureCatalog`) |
-| Meeting minutes | `gemini-2.5-flash` (`MODEL_EXTRACTION`) | Structured output (`MeetingMinutes`) |
-| Idea extraction | `gemini-2.5-flash` (`MODEL_EXTRACTION`) | Full transcript + catalog → structured candidates with evidence |
-| Planning | `gemini-2.5-pro` (`MODEL_PLANNING`) | Structured output (`TechnicalPlan`) grounded in catalog + meeting |
-| Coding agent | `gemini-2.5-pro` (`MODEL_CODING`) | Multi-turn function calling over 6 workspace tools |
-| Friction classification | `gemini-2.5-pro` (`MODEL_PLANNING`) | Diff + testing notes → structured blockers |
+| Repo onboarding | `gemini-3.8-flash` (`MODEL_ONBOARDING`) | Long-context repo skeleton → JSON schema (`ArchitectureCatalog`) |
+| Meeting minutes | `gemini-3.8-flash` (`MODEL_EXTRACTION`) | Structured output (`MeetingMinutes`) |
+| Idea extraction | `gemini-3.8-flash` (`MODEL_EXTRACTION`) | Full transcript + catalog → structured candidates with evidence |
+| Planning | `gemini-3.8-flash` (`MODEL_PLANNING`) | Structured output (`TechnicalPlan`) grounded in catalog + meeting |
+| Coding agent | `gemini-3.8-flash` (`MODEL_CODING`) | Multi-turn function calling over 6 workspace tools |
+| Friction classification | `gemini-3.8-flash` (`MODEL_PLANNING`) | Diff + testing notes → structured blockers |
 
 ---
 
@@ -298,12 +298,12 @@ Settings are read from the environment, or from `.env` locally (`config.py`).
 | Variable | Default | Purpose |
 |---|---|---|
 | `GOOGLE_CLOUD_PROJECT` | (none) | Project for Vertex AI. Required for every agent stage |
-| `GOOGLE_CLOUD_LOCATION` | `global` | Vertex AI location; `global` serves the 2.5 and 3.x families |
+| `GOOGLE_CLOUD_LOCATION` | `global` | Vertex AI location; `global` serves every current Gemini model |
 | `FIRESTORE_DATABASE` | `(default)` | Firestore database id |
-| `MODEL_ONBOARDING` | `gemini-2.5-flash` | Architecture catalog |
-| `MODEL_EXTRACTION` | `gemini-2.5-flash` | Minutes and idea extraction |
-| `MODEL_PLANNING` | `gemini-2.5-pro` | Planner and friction classifier |
-| `MODEL_CODING` | `gemini-2.5-pro` | Coding agent |
+| `MODEL_ONBOARDING` | `gemini-3.8-flash` | Architecture catalog |
+| `MODEL_EXTRACTION` | `gemini-3.8-flash` | Minutes and idea extraction |
+| `MODEL_PLANNING` | `gemini-3.8-flash` | Planner and friction classifier |
+| `MODEL_CODING` | `gemini-3.8-flash` | Coding agent |
 | `EXECUTION_TIMEOUT_SECONDS` | `60` | Per-command limit for sandbox runs and clones |
 | `SEED_DEMO_DATA` | `0` | `1` seeds demo history into each new workspace |
 | `SECRET_KEY` | dev value | Session signing and the GitHub-token encryption key. **Set a strong value in production** |

@@ -211,7 +211,6 @@ class AttemptHarness:
         config = types.GenerateContentConfig(
             system_instruction=system_instruction,
             tools=[get_tool_declarations()],
-            temperature=0.1,
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True)
         )
 
@@ -260,11 +259,14 @@ class AttemptHarness:
                 
                 args = call.args or {}
                 tool_output = self._execute_tool(call.name, args)
+                # Gemini 3+ matches each response to its call by id; a mismatch can
+                # come back as an empty reply.
                 function_responses.append(
-                    types.Part.from_function_response(
+                    types.Part(function_response=types.FunctionResponse(
+                        id=call.id,
                         name=call.name,
-                        response={"result": tool_output}
-                    )
+                        response={"result": tool_output},
+                    ))
                 )
 
             if completed and result:
