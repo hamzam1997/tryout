@@ -28,6 +28,9 @@ import {
 } from "./api";
 import "./styles/global.css";
 
+// The tour's last step is done once the bottleneck map has been opened.
+const MAP_SEEN_KEY = "tryout.tour.bottlenecks-seen";
+
 const POLL_FIRST_MS = 2500;
 const POLL_MAX_MS = 10000;
 // A job still "running" after this long is stuck; stop instead of polling forever.
@@ -156,6 +159,11 @@ export default function App() {
       .then((isUp) => setOnline((prev) => (prev === null ? isUp : prev || isUp)))
       .catch(() => {});
   }, [refresh, currentUser]);
+
+  useEffect(() => {
+    if (view === "bottlenecks") localStorage.setItem(MAP_SEEN_KEY, "1");
+  }, [view]);
+  const mapSeen = view === "bottlenecks" || localStorage.getItem(MAP_SEEN_KEY) === "1";
 
   // Poll only what the current page shows, and only while its background work runs.
   // Keyed on booleans so each poll's results don't restart the backoff.
@@ -402,7 +410,7 @@ export default function App() {
             meetings.length > 0,
             ideaCounts.IN_PROCESS + ideaCounts.DONE > 0,
             ideaCounts.DONE > 0,
-            false,
+            mapSeen,
           ]}
         />
         {view === "repositories" ? (
