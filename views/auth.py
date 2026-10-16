@@ -119,7 +119,9 @@ def _verify_id_token(id_token: str) -> dict:
         firebase_admin.get_app()
     except ValueError:
         firebase_admin.initialize_app(options={"projectId": settings.firebase_project_id})
-    return firebase_auth.verify_id_token(id_token)
+    # A token minted a moment ago fails "used too early" when this host's clock is a
+    # second behind Google's; judges get one try, so allow a little skew.
+    return firebase_auth.verify_id_token(id_token, clock_skew_seconds=10)
 
 
 def _get_redirect_uri() -> str:

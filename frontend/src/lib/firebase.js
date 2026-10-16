@@ -97,7 +97,14 @@ async function syncSession(user, githubToken) {
       if (syncInFlight === mine) syncInFlight = null;
     }).catch(() => {});
   }
-  return (await syncInFlight).clone();
+  const resp = (await syncInFlight).clone();
+  // No server session means every /api call 401s and bounces back to the landing page
+  // with no message; fail the sign-in here so the user sees why.
+  if (!resp.ok) {
+    const body = await resp.clone().json().catch(() => ({}));
+    throw new Error(body.error || `Sign-in failed on the server (${resp.status}).`);
+  }
+  return resp;
 }
 
 /**
@@ -153,7 +160,9 @@ export function onAuthChanged(callback) {
       unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
         if (user) {
           const me = await fetch("/api/auth/me").catch(() => null);
-          if (!me?.ok) await syncSession(user).catch(() => {});
+          if (!me?.ok && !(await syncSession(user).then(() => true, () => false))) {
+            return callback(null); // signed in to Firebase but not to the server
+          }
         }
         callback(user);
       });
