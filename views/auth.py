@@ -118,7 +118,7 @@ def _verify_id_token(id_token: str) -> dict:
     try:
         firebase_admin.get_app()
     except ValueError:
-        firebase_admin.initialize_app(options={"projectId": settings.firebase_project_id})
+        firebase_admin.initialize_app(options={"projectId": settings.firebase_project_id or settings.google_cloud_project})
     return firebase_auth.verify_id_token(id_token)
 
 
