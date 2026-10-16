@@ -148,12 +148,14 @@ export default function App() {
     return meetingsData;
   }, [view, ideaFilter]);
 
+  // Load once signed in; before that every API call would just 401.
   useEffect(() => {
+    if (!currentUser) return;
     refresh();
     health()
       .then((isUp) => setOnline((prev) => (prev === null ? isUp : prev || isUp)))
       .catch(() => {});
-  }, [refresh]);
+  }, [refresh, currentUser]);
 
   // Poll only what the current page shows, and only while its background work runs.
   // Keyed on booleans so each poll's results don't restart the backoff.
@@ -372,7 +374,7 @@ export default function App() {
   }
 
   if (!currentUser) {
-    return <LandingPage onLoginSuccess={(user) => { setCurrentUser(user); refresh(); }} />;
+    return <LandingPage onLoginSuccess={setCurrentUser} />;
   }
 
   return (
