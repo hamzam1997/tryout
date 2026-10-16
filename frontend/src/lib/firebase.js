@@ -18,8 +18,8 @@ let githubProviderInstance = null;
 let initPromise = null;
 
 /**
- * Fetch Firebase client configuration dynamically from server runtime.
- * Never hardcodes keys, project IDs, or secrets in client source code.
+ * Fetch the Firebase web config from the server, which reads it from FIREBASE_* env vars.
+ * These values are public by design (they ship to every browser); they just aren't in the repo.
  */
 async function fetchServerConfig() {
   const resp = await fetch("/api/auth/firebase-config");

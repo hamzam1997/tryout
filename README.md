@@ -249,7 +249,7 @@ All routes are JSON under `/api`. Everything except the auth bootstrap routes re
 Requirements: Python 3.12, Node 22, git, and a Google Cloud project with Vertex AI and Firestore enabled.
 
 ```bash
-cp .env.example .env            # set GOOGLE_CLOUD_PROJECT (see Configuration)
+cp .env.example .env            # set GOOGLE_CLOUD_PROJECT, SECRET_KEY and FIREBASE_* (see Configuration)
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 gcloud auth application-default login
@@ -270,7 +270,7 @@ Open http://localhost:5173 and sign in (`localhost` is an authorized Firebase do
 ### Tests
 
 ```bash
-python -m unittest discover -s tests
+SECRET_KEY=test python -m unittest discover -s tests
 ```
 
 ```bash
@@ -306,10 +306,10 @@ Settings are read from the environment, or from `.env` locally (`config.py`).
 | `MODEL_CODING` | `gemini-3.8-flash` | Coding agent |
 | `EXECUTION_TIMEOUT_SECONDS` | `60` | Per-command limit for sandbox runs and clones |
 | `SEED_DEMO_DATA` | `0` | `1` seeds demo history into each new workspace |
-| `SECRET_KEY` | dev value | Session signing and the GitHub-token encryption key. **Set a strong value in production** |
+| `SECRET_KEY` | (none) | Session signing and the GitHub-token encryption key. **Required**: the app refuses to start without it unless `FLASK_DEBUG=1`, which uses a random per-run key |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | (none) | GitHub OAuth app for connecting repositories |
 | `GITHUB_REDIRECT_URI` | derived from request | OAuth callback override |
-| `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, `FIREBASE_STORAGE_BUCKET`, `FIREBASE_MESSAGING_SENDER_ID`, `FIREBASE_APP_ID` | project defaults | Firebase web config served to the UI (public by design) |
+| `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, `FIREBASE_STORAGE_BUCKET`, `FIREBASE_MESSAGING_SENDER_ID`, `FIREBASE_APP_ID` | (none) | Firebase web config served to the UI (public by design, but not committed). `FIREBASE_PROJECT_ID` falls back to `GOOGLE_CLOUD_PROJECT` |
 | `PORT` | `8080` | HTTP port |
 | `FLASK_DEBUG` | `0` | Debug mode; also turns off secure-only cookies for local HTTP |
 
@@ -327,6 +327,7 @@ The live service (`tryout-git`, `me-central1`) deploys continuously: a Cloud Bui
 | Instances | `--min-instances=1 --max-instances=3` | A warm instance for demos; attempt state and live streams live in Firestore, so they work across instances |
 | `SEED_DEMO_DATA` | `1` | New workspaces open with a populated bottleneck map |
 | Secrets | `SECRET_KEY`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` from Secret Manager | Never in the image or the repo |
+| Firebase web config | `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, `FIREBASE_STORAGE_BUCKET`, `FIREBASE_MESSAGING_SENDER_ID`, `FIREBASE_APP_ID` as env vars | Sign-in fails without them |
 | Service account | Vertex AI User, Firestore access, Secret Manager accessor | Model calls, data and secrets |
 
 Also add the service's `run.app` domain to Firebase Authentication → Authorized domains, and set the GitHub OAuth app's callback to `https://<service-url>/api/auth/github/callback`.
