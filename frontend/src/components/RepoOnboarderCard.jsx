@@ -114,7 +114,7 @@ export default function RepoOnboarderCard({
   async function handleConnectWithGitHub() {
     setErrorMsg("");
     try {
-      const { user } = await loginWithGitHub();
+      const { user } = await loginWithGitHub({ repoAccess: true });
       const loginName = user.reloadUserInfo?.screenName || user.displayName || user.email;
       setAuthStatus({
         configured: true,
