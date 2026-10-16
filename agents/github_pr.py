@@ -52,6 +52,21 @@ def _github_request(method: str, url: str, token: str, **kwargs):
     return response.json()
 
 
+def pull_request_body(summary: str, idea_id: int, test_exit_code: int | None) -> str:
+    """PR description: the agent's summary plus what actually happened to the tests."""
+    if test_exit_code == 0:
+        tests = "Tests pass: the attempt ran the repository's test suite in its sandbox, against mocks."
+    elif test_exit_code is None:
+        tests = "Tests were not run by the attempt. Run them before merging."
+    else:
+        tests = f"Tests fail (exit {test_exit_code}) in the attempt's sandbox. Review before merging."
+    return (
+        f"## Summary\n{summary[:4000]}\n\n"
+        f"**{tests}**\n\n"
+        f"Generated from approved idea #{idea_id} by tryout."
+    )
+
+
 def create_attempt_pull_request(
     *,
     root: Path,
@@ -63,6 +78,7 @@ def create_attempt_pull_request(
     summary: str,
     repo_ref: str,
     change_paths: list[str],
+    test_exit_code: int | None = None,
 ) -> tuple[str, str, str] | None:
     """Commit generated files and open a PR against the repository's ``main`` branch.
 
@@ -130,12 +146,7 @@ def create_attempt_pull_request(
         env=push_env,
     )
 
-    body = (
-        f"## Summary\n{summary[:4000]}\n\n"
-        f"Generated from approved idea #{idea_id} by Tryout.\n\n"
-        "A prototype test suite is included, with mocks for required external services. "
-        "Generated code was not executed by the attempt worker."
-    )
+    body = pull_request_body(summary, idea_id, test_exit_code)
     pr_title = " ".join(idea_title.split()) or f"Tryout attempt #{attempt_id}"
     if not pr_title.upper().startswith("[TRYOUT]"):
         pr_title = f"[TRYOUT] {pr_title}"

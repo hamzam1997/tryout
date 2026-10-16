@@ -174,6 +174,7 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
                         summary=harness_result.summary[:2500] + readiness_md,
                         repo_ref=repo_ref,
                         change_paths=change_paths,
+                        test_exit_code=harness_result.test_exit_code,
                     )
                 except Exception as exc:
                     logger.exception("Could not publish PR for attempt %s", attempt_id)
