@@ -233,7 +233,7 @@ def _get_live_credentials(project: str | None = None):
 
 
 def get_firestore_client():
-    """Return the Firestore client, using in-memory store if offline/unconfigured."""
+    """Return the Firestore client. Raises if Firestore is unreachable, unless FLASK_DEBUG or tests opt into in-memory."""
     global _firestore_client, _use_memory_fallback
 
     if _use_memory_fallback:
@@ -276,8 +276,11 @@ def get_firestore_client():
             _firestore_client = client
             return _firestore_client
         except Exception as exc:
+            if not settings.debug:
+                # In-memory data vanishes on every Cloud Run restart; fail instead of pretending.
+                raise RuntimeError(f"Firestore is unavailable: {exc}") from exc
             logger.warning(
-                "Could not connect to Google Cloud Firestore (%s). Falling back to in-memory Firestore.",
+                "Could not connect to Google Cloud Firestore (%s). FLASK_DEBUG is on, so falling back to in-memory Firestore.",
                 exc,
             )
             _use_memory_fallback = True
