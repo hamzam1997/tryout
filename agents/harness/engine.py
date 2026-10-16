@@ -3,6 +3,7 @@
 import datetime
 import json
 import logging
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,12 @@ from agents.harness.tools import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Tool calls per attempt. Each one is a model turn of a few seconds on Flash.
+MAX_STEPS = 40
+# With this many steps left the agent is told to stop exploring and finish.
+WRAP_UP_STEPS = 6
+UNTESTED_NOTE = "Files changed after the last test run, so the final code was not tested."
 
 
 def get_tool_declarations() -> types.Tool:
@@ -120,8 +127,10 @@ class AttemptHarness:
         self.idea = idea
         self.attempt = attempt
         self.plan = plan
-        self.max_steps = 25
+        self.max_steps = MAX_STEPS
         self.last_run = None
+        # True when files changed after the last test run, so its result is stale.
+        self.changed_since_test = False
         self.client = get_client()
 
     def _log_step(self, action: str, detail: str, status: str = "completed"):
@@ -157,19 +166,35 @@ class AttemptHarness:
         elif name == "view_file":
             return view_file(self.workspace, args["path"], args.get("start_line", 1), args.get("end_line", 500))
         elif name == "edit_file":
+            self.changed_since_test = True
             return edit_file(self.workspace, args["path"], args["target_chunk"], args["replacement_chunk"])
         elif name == "create_file":
+            self.changed_since_test = True
             return create_file(self.workspace, args["path"], args["content"])
         elif name == "run_tests":
             # ponytail: last run wins; it is the test suite when the agent finishes by testing.
             self.last_run = run_tests(self.workspace, args["command"])
+            self.changed_since_test = False
             return self.last_run.to_text()
         return f"Unknown tool {name}"
 
     def _test_outcome(self) -> dict:
         if self.last_run is None:
             return {}
+        if self.changed_since_test:
+            # A run from before the edits says nothing about the code being shipped.
+            return {"test_exit_code": None, "test_output": UNTESTED_NOTE}
         return {"test_exit_code": self.last_run.exit_code, "test_output": self.last_run.to_text()}
+
+    def _budget_note(self, steps_left: int) -> str | None:
+        if steps_left <= 1:
+            return "Last step: call complete_attempt now and explain anything unfinished in testing_notes."
+        if steps_left <= WRAP_UP_STEPS:
+            return (
+                f"Only {steps_left} steps left: stop exploring, make only the edits you still need, "
+                "run the tests once, then call complete_attempt (explain anything unfinished in testing_notes)."
+            )
+        return None
 
     def _staged_diff(self) -> str:
         """Stage every change (incl. new files) and return the staged diff."""
@@ -185,11 +210,14 @@ class AttemptHarness:
         system_instruction = (
             "You are an autonomous senior SWE working inside a repository workspace.\n"
             "Your goal is to implement the approved idea, ground it in the architecture, and write tests.\n"
-            "Explore the codebase, surgically edit files (avoid rewriting huge files), run test commands, "
-            "and fix any errors before calling complete_attempt.\n"
+            f"You have {self.max_steps} steps in total; each of your turns (one or more tool calls) uses "
+            "one, and each tool result says how many are left. The catalog and plan below already describe the repository, so read only the "
+            "files you will change. Then surgically edit files (avoid rewriting huge files), run the tests, "
+            "and fix any errors before calling complete_attempt, well within budget.\n"
             "Match the repo's existing style, framework and file layout.\n"
             "For every external service the idea needs (SMS, email, payments, webhooks, ...), create a "
-            "runnable mock adapter named after it (e.g. mock_twilio_client.py) whose methods RETURN realistic "
+            "runnable mock adapter named after it, once, next to the repo's other integrations (e.g. "
+            "integrations/mock_twilio_client.py) whose methods RETURN realistic "
             "response payloads (ids, status fields, like the real API would) and record calls. Code under test must take the adapter by injection so "
             "tests never need real credentials or network access.\n"
             "Always create test_prototype.py that exercises the new logic against those mocks, run it, and "
@@ -259,13 +287,17 @@ class AttemptHarness:
                 
                 args = call.args or {}
                 tool_output = self._execute_tool(call.name, args)
+                steps_left = self.max_steps - step_idx - 1
+                response = {"result": tool_output, "steps_left": steps_left}
+                if note := self._budget_note(steps_left):
+                    response["budget_note"] = note
                 # Gemini 3+ matches each response to its call by id; a mismatch can
                 # come back as an empty reply.
                 function_responses.append(
                     types.Part(function_response=types.FunctionResponse(
                         id=call.id,
                         name=call.name,
-                        response={"result": tool_output},
+                        response=response,
                     ))
                 )
 
@@ -279,13 +311,29 @@ class AttemptHarness:
                     parts=function_responses
                 ))
 
-        self._log_step("timeout", "Reached max steps without completing attempt", status="failed")
-        # Fallback completion
+        self._log_step(
+            "timeout", f"Reached the {self.max_steps}-step budget before finishing", status="failed"
+        )
+        # Fallback completion: keep the work so far reviewable and say plainly what is missing.
+        diff = self._staged_diff()
+        files = re.findall(r"^diff --git a/\S+ b/(\S+)$", diff, flags=re.M)
+        outcome = self._test_outcome()
+        if outcome.get("test_exit_code") == 0:
+            tests = "The last test run passed."
+        elif outcome.get("test_exit_code") is not None:
+            tests = f"The last test run failed (exit {outcome['test_exit_code']})."
+        else:
+            tests = outcome.get("test_output") or "Tests were not run."
         return HarnessResult(
             success=False,
-            summary="Timed out after maximum iterations. Incomplete.",
+            summary=(
+                f"The agent reached its {self.max_steps}-step budget before finishing. "
+                + (f"Changes so far ({len(files)} files: {', '.join(files)}) are included for review. "
+                   if files else "It made no changes. ")
+                + tests
+            ),
             pr_title=self.idea.title,
-            testing_notes="",
-            diff=self._staged_diff(),
-            **self._test_outcome(),
+            testing_notes=tests,
+            diff=diff,
+            **outcome,
         )
