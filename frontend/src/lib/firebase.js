@@ -54,9 +54,9 @@ export async function getFirebaseAuth() {
       await setPersistence(authInstance, browserLocalPersistence).catch(() => {});
 
       googleProviderInstance = new GoogleAuthProvider();
+      // Sign-in asks for no extra scopes (public profile only). Repo access is
+      // requested only when the user connects GitHub for repositories.
       githubProviderInstance = new GithubAuthProvider();
-      githubProviderInstance.addScope("repo");
-      githubProviderInstance.addScope("read:user");
 
       return {
         auth: authInstance,
@@ -111,13 +111,17 @@ export async function loginWithGoogle() {
 }
 
 /**
- * Sign in using GitHub OAuth via Firebase.
- * Automatically obtains the GitHub OAuth Access Token so repository onboarding
- * works immediately without separate OAuth authorization.
+ * Sign in using GitHub OAuth via Firebase. `repoAccess` adds the `repo` scope, for
+ * the repository connect step only; plain sign-in requests no scopes.
  */
-export async function loginWithGitHub() {
+export async function loginWithGitHub({ repoAccess = false } = {}) {
   const { auth, githubProvider } = await getFirebaseAuth();
-  const result = await signInWithPopup(auth, githubProvider);
+  let provider = githubProvider;
+  if (repoAccess) {
+    provider = new GithubAuthProvider();
+    provider.addScope("repo");
+  }
+  const result = await signInWithPopup(auth, provider);
   const credential = GithubAuthProvider.credentialFromResult(result);
   const githubToken = credential?.accessToken;
   const user = result.user;

@@ -49,7 +49,7 @@ export default function GitHubCard({ workspaceId, canManage }) {
           <>
             <span className="connection-status">
               <span className="dot" />
-              Not connected. Attempts use the approver's own GitHub sign-in until it is.
+              Not connected. Connect GitHub to onboard private repositories and open pull requests.
             </span>
             {canManage && (
               <>
