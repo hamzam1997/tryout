@@ -183,7 +183,8 @@ def _download_and_extract_tarball(
             if "/" in member.name:
                 member.name = member.name.split("/", 1)[1]
                 if member.name:
-                    tar.extract(member, path=target_dir)
+                    # "data" refuses absolute paths, ".." escapes, links out and device files.
+                    tar.extract(member, path=target_dir, filter="data")
 
     return commit_sha or "tarball-head"
 

@@ -24,7 +24,7 @@ def search_code(workspace: Path, query: str) -> str:
     """Use grep to search code inside the workspace."""
     try:
         result = subprocess.run(
-            ["grep", "-rnI", query, "."],
+            ["grep", "-rnI", "-e", query, "."],  # -e: a query starting with "-" is a pattern, not an option
             cwd=workspace,
             capture_output=True,
             text=True,

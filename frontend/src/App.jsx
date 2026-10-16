@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import LandingPage from "./components/LandingPage";
 import RepositoriesPage from "./pages/RepositoriesPage";
@@ -28,19 +28,23 @@ import {
 } from "./api";
 import "./styles/global.css";
 
-const PIPELINE_POLL_MS = 2500;
+const POLL_FIRST_MS = 2500;
+const POLL_MAX_MS = 10000;
+// A job still "running" after this long is stuck; stop instead of polling forever.
+const POLL_GIVE_UP_MS = 20 * 60 * 1000;
 
-function pipelineStillRunning(meetings, ideas) {
-  return (
-    meetings.some(
-      (meeting) =>
-        meeting.status === "PROCESSING" ||
-        meeting.status === "PENDING" ||
-        meeting.ideas_status === "PROCESSING"
-    ) ||
-    ideas.some((idea) =>
-      ["QUEUED", "PLANNING", "CODING", "TESTING"].includes(idea.latest_attempt?.status)
-    )
+function meetingsInFlight(meetings) {
+  return meetings.some(
+    (meeting) =>
+      meeting.status === "PROCESSING" ||
+      meeting.status === "PENDING" ||
+      meeting.ideas_status === "PROCESSING"
+  );
+}
+
+function attemptsInFlight(ideas) {
+  return ideas.some((idea) =>
+    ["QUEUED", "PLANNING", "CODING", "TESTING"].includes(idea.latest_attempt?.status)
   );
 }
 
@@ -64,7 +68,6 @@ export default function App() {
   const [retryingId, setRetryingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [online, setOnline] = useState(null);
-  const pollRef = useRef(null);
 
   // Render nothing until Firebase reports whether a user is restored.
   useEffect(() => {
@@ -145,44 +148,67 @@ export default function App() {
     return meetingsData;
   }, [view, ideaFilter]);
 
+  // Load once signed in; before that every API call would just 401.
   useEffect(() => {
+    if (!currentUser) return;
     refresh();
     health()
       .then((isUp) => setOnline((prev) => (prev === null ? isUp : prev || isUp)))
       .catch(() => {});
-  }, [refresh]);
+  }, [refresh, currentUser]);
 
-  // Poll while minutes or idea extraction is running in the background.
+  // Poll only what the current page shows, and only while its background work runs.
+  // Keyed on booleans so each poll's results don't restart the backoff.
+  const meetingsBusy = meetingsInFlight(meetings);
+  const attemptsBusy = attemptsInFlight(ideas);
   useEffect(() => {
-    if (!pipelineStillRunning(meetings, ideas)) {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-      return undefined;
-    }
+    const watchMeetings = (view === "meetings" || view === "ideas") && meetingsBusy;
+    // Extraction finishing on the ideas page adds new ideas, so watch those too.
+    const watchIdeas = view === "ideas" && (attemptsBusy || meetingsBusy);
+    if (!watchMeetings && !watchIdeas) return undefined;
 
-    if (pollRef.current) return undefined;
+    const startedAt = Date.now();
+    let delay = POLL_FIRST_MS;
+    let timer = null;
+    let cancelled = false;
+    let running = false;
 
-    pollRef.current = setInterval(async () => {
-      const nextMeetings = await refresh({ quiet: true });
-      if (nextMeetings && !pipelineStillRunning(nextMeetings, ideas)) {
-        const [nextIdeas, nextCounts] = await Promise.all([
-          listIdeas(ideaFilter).catch(() => null),
-          getIdeaCounts().catch(() => null),
+    async function tick() {
+      running = true;
+      if (!document.hidden) {
+        const [nextMeetings, nextIdeas, nextCounts] = await Promise.all([
+          watchMeetings ? listMeetings().catch(() => null) : null,
+          watchIdeas ? listIdeas(ideaFilter).catch(() => null) : null,
+          watchIdeas ? getIdeaCounts().catch(() => null) : null,
         ]);
+        if (cancelled) return;
+        if (nextMeetings) setMeetings(nextMeetings);
         if (nextIdeas) setIdeas(nextIdeas);
         if (nextCounts) setIdeaCounts(nextCounts);
+        delay = Math.min(delay * 1.5, POLL_MAX_MS);
       }
-    }, PIPELINE_POLL_MS);
+      running = false;
+      if (!cancelled && Date.now() - startedAt < POLL_GIVE_UP_MS) {
+        timer = setTimeout(tick, delay);
+      }
+    }
 
+    // Catch up as soon as a hidden tab comes back instead of waiting out the delay.
+    function onVisible() {
+      if (document.hidden || cancelled || running) return;
+      clearTimeout(timer);
+      delay = POLL_FIRST_MS;
+      tick();
+    }
+
+    timer = setTimeout(tick, delay);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
+      cancelled = true;
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [meetings, ideas, refresh, ideaFilter]);
+  }, [view, meetingsBusy, attemptsBusy, ideaFilter]);
 
   function handleUploaded(result) {
     setMeetings((current) => {
@@ -348,7 +374,7 @@ export default function App() {
   }
 
   if (!currentUser) {
-    return <LandingPage onLoginSuccess={(user) => { setCurrentUser(user); refresh(); }} />;
+    return <LandingPage onLoginSuccess={setCurrentUser} />;
   }
 
   return (

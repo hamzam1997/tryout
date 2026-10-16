@@ -73,12 +73,19 @@ export default function RepoOnboarderCard({
   }, [fetchUserRepos]);
 
   // Background polling: If any repo is currently onboarding, poll every 2.5 seconds
+  // while the tab is visible, giving up on an onboarding that never finishes.
   const hasOnboardingRepo = repositories?.some((r) => r.catalog_status === "onboarding");
 
   useEffect(() => {
     if (!hasOnboardingRepo) return;
 
+    const startedAt = Date.now();
     const interval = setInterval(async () => {
+      if (Date.now() - startedAt > 20 * 60 * 1000) {
+        clearInterval(interval);
+        return;
+      }
+      if (document.hidden) return;
       try {
         const latestRepos = await listRepositories();
         latestRepos.forEach((repo) => {
