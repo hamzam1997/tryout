@@ -30,7 +30,9 @@ _PUBLIC_API = {
     "/api/auth/github/login",
     "/api/auth/github/callback",
     "/api/auth/github/status",
+    "/api/auth/evaluator",
 }
+EVALUATOR_PROVIDER = "evaluator"
 
 
 def require_login():
@@ -105,7 +107,9 @@ def _create_personal_workspace(user: dict):
             return memberships[0]  # created between our check and the claim
         name = f"{user.get('name') or user.get('email') or 'My'}'s workspace"
         workspace = db.create_workspace(name, uid)
-        if settings.seed_demo_data:
+        # Evaluators start empty so they walk the whole flow themselves; their
+        # bottleneck map fills from their own attempts.
+        if settings.seed_demo_data and user.get("provider") != EVALUATOR_PROVIDER:
             db.set_workspace(workspace.id)
             seed_friction_history()
         return db.get_membership(workspace.id, uid)
@@ -293,8 +297,40 @@ def firebase_config():
             "storageBucket": settings.firebase_storage_bucket or (f"{project_id}.firebasestorage.app" if project_id else ""),
             "messagingSenderId": settings.firebase_messaging_sender_id,
             "appId": settings.firebase_app_id,
+            # Not Firebase config: tells the landing page to offer evaluator sign-in.
+            "evaluatorLogin": settings.evaluator_login,
         }
     )
+
+
+@bp.post("/evaluator")
+def evaluator_login():
+    """Sign in as a throwaway evaluator: no Google or GitHub account needed.
+
+    Every sign-in is a new evaluator with an empty workspace, so each judge (or each
+    run by the same judge) walks the whole flow from the start.
+    """
+    if not settings.evaluator_login:
+        return jsonify({"error": "Evaluator sign-in is not enabled."}), 404
+    suffix = secrets.token_hex(4)
+    user = {
+        "uid": f"evaluator-{suffix}",
+        "email": None,
+        "name": f"Evaluator {suffix[:4]}",
+        "avatar_url": None,
+        "provider": EVALUATOR_PROVIDER,
+    }
+    session.clear()  # drop any earlier evaluator or half-finished Google/GitHub session
+    session["user"] = user
+    session.permanent = True
+    membership = _resolve_membership(user)
+    if membership is None:
+        return jsonify({"error": "Could not create the evaluator workspace. Try again."}), 503
+    try:
+        db.upsert_user(uid=user["uid"], name=user["name"], provider=EVALUATOR_PROVIDER)
+    except Exception as exc:
+        logger.warning("Could not persist evaluator %s: %s", user["uid"], exc)
+    return jsonify({"ok": True, "user": user, "workspace_id": membership.workspace_id})
 
 
 @bp.post("/firebase-sync")

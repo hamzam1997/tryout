@@ -160,10 +160,12 @@ export default function App() {
       .catch(() => {});
   }, [refresh, currentUser]);
 
+  // Per user: a new evaluator in the same browser starts the tour from step 1.
+  const mapSeenKey = `${MAP_SEEN_KEY}:${currentUser?.uid ?? ""}`;
   useEffect(() => {
-    if (view === "bottlenecks") localStorage.setItem(MAP_SEEN_KEY, "1");
-  }, [view]);
-  const mapSeen = view === "bottlenecks" || localStorage.getItem(MAP_SEEN_KEY) === "1";
+    if (view === "bottlenecks") localStorage.setItem(mapSeenKey, "1");
+  }, [view, mapSeenKey]);
+  const mapSeen = view === "bottlenecks" || localStorage.getItem(mapSeenKey) === "1";
 
   // Poll only what the current page shows, and only while its background work runs.
   // Keyed on booleans so each poll's results don't restart the backoff.
@@ -382,7 +384,15 @@ export default function App() {
   }
 
   if (!currentUser) {
-    return <LandingPage onLoginSuccess={setCurrentUser} />;
+    return (
+      <LandingPage
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          // A fresh evaluator starts the tour at step 1, not wherever the last one left off.
+          if (user?.isEvaluator) navigate({ view: "repositories" });
+        }}
+      />
+    );
   }
 
   return (
@@ -420,6 +430,7 @@ export default function App() {
             error={error}
             onOnboarded={handleRepoOnboarded}
             onDeleted={handleRepoDeleted}
+            isEvaluator={Boolean(currentUser?.isEvaluator)}
           />
         ) : view === "meetings" ? (
           <MeetingsPage

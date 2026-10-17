@@ -67,7 +67,7 @@ It mocks the notification client, gets the tests passing, and opens a pull reque
 
 The app has a five-step tour banner at the top of every page. Follow it:
 
-1. **Sign in** at the [live demo](https://tryout-git-bhhkaqw34q-ww.a.run.app) with Google or GitHub. A first-time account gets its own workspace pre-seeded with historical attempts, so the bottleneck map already has data. (Signing in with GitHub also connects your repositories.)
+1. **Sign in** at the [live demo](https://tryout-git-bhhkaqw34q-ww.a.run.app). **Judges: click _Continue as evaluator_**: no account needed, and every click starts a brand-new evaluator with an empty workspace, so you can run the whole flow from step 1 as many times as you like. (Google or GitHub sign-in also works; a first-time account gets a workspace pre-seeded with historical attempts.)
 2. **Onboard repo:** Repositories → **Demo repository** tab → **Connect demo repository** (`hamzam1997/acme-store`), or pick one of your own repos on the **GitHub** tab and click **Onboard repository**. Gemini builds the architecture catalog in the background; open it with **View catalog** on the repository card.
 3. **Ingest meeting:** Meetings → **Load demo transcript**, or upload `fixtures/meetings/2026-09-17-weekly-ops.vtt`. Minutes and ideas are extracted in the background.
 4. **Approve idea:** Ideas → open a proposal (each shows who said it, the quote and the timestamp) → choose the repository → **Approve**. A live view opens and streams the agent's steps: plan, file views and edits, test runs, friction. Close it and reopen any time with **Watch live**.
@@ -305,7 +305,9 @@ Settings are read from the environment, or from `.env` locally (`config.py`).
 | `MODEL_PLANNING` | `gemini-3.8-flash` | Planner and friction classifier |
 | `MODEL_CODING` | `gemini-3.8-flash` | Coding agent |
 | `EXECUTION_TIMEOUT_SECONDS` | `60` | Per-command limit for sandbox runs and clones |
-| `SEED_DEMO_DATA` | `0` | `1` seeds demo history into each new workspace |
+| `SEED_DEMO_DATA` | `0` | `1` seeds demo history into each new workspace (not evaluator workspaces, which start empty) |
+| `EVALUATOR_LOGIN` | `0` | `1` offers "Continue as evaluator": a new throwaway evaluator and empty workspace per click, no Google or GitHub account |
+| `DEMO_GITHUB_TOKEN` | (none) | GitHub token limited to the demo repo; lets attempts by users without GitHub open real pull requests there |
 | `SECRET_KEY` | (none) | Session signing and the GitHub-token encryption key. **Required**: the app refuses to start without it unless `FLASK_DEBUG=1`, which uses a random per-run key |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | (none) | GitHub OAuth app for connecting repositories |
 | `GITHUB_REDIRECT_URI` | derived from request | OAuth callback override |
@@ -326,6 +328,8 @@ The live service (`tryout-git`, `me-central1`) deploys continuously: a Cloud Bui
 | CPU allocation | always on (`--no-cpu-throttling`) | Agent jobs run in background threads after the request returns |
 | Instances | `--min-instances=1 --max-instances=3` | A warm instance for demos; attempt state and live streams live in Firestore, so they work across instances |
 | `SEED_DEMO_DATA` | `1` | New workspaces open with a populated bottleneck map |
+| `EVALUATOR_LOGIN` | `1` | Judges sign in with one click and always start from an empty workspace |
+| `DEMO_GITHUB_TOKEN` | from Secret Manager | Evaluators' attempts on `acme-store` open real pull requests |
 | Secrets | `SECRET_KEY`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` from Secret Manager | Never in the image or the repo |
 | Firebase web config | `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, `FIREBASE_STORAGE_BUCKET`, `FIREBASE_MESSAGING_SENDER_ID`, `FIREBASE_APP_ID` as env vars | Sign-in fails without them |
 | Service account | Vertex AI User, Firestore access, Secret Manager accessor | Model calls, data and secrets |
