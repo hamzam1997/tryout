@@ -129,6 +129,7 @@ class AttemptHarness:
         self.plan = plan
         self.max_steps = MAX_STEPS
         self.last_run = None
+        self.last_test_command: str | None = None
         # True when files changed after the last test run, so its result is stale.
         self.changed_since_test = False
         self.client = get_client()
@@ -173,6 +174,7 @@ class AttemptHarness:
             return create_file(self.workspace, args["path"], args["content"])
         elif name == "run_tests":
             # ponytail: last run wins; it is the test suite when the agent finishes by testing.
+            self.last_test_command = args["command"]
             self.last_run = run_tests(self.workspace, args["command"])
             self.changed_since_test = False
             return self.last_run.to_text()
@@ -181,8 +183,13 @@ class AttemptHarness:
     def _test_outcome(self) -> dict:
         if self.last_run is None:
             return {}
+        if self.changed_since_test and self.last_test_command:
+            # A run from before the edits says nothing about the code being shipped,
+            # so re-run the agent's own test command once against the final files.
+            self.last_run = run_tests(self.workspace, self.last_test_command)
+            self.changed_since_test = False
+            self._log_step("run_tests", f"Re-ran `{self.last_test_command}` on the final code (exit {self.last_run.exit_code})")
         if self.changed_since_test:
-            # A run from before the edits says nothing about the code being shipped.
             return {"test_exit_code": None, "test_output": UNTESTED_NOTE}
         return {"test_exit_code": self.last_run.exit_code, "test_output": self.last_run.to_text()}
 

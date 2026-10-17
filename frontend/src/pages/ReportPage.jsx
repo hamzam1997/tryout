@@ -117,7 +117,7 @@ export default function ReportPage({ attemptId, onBack }) {
 
           <Section title="Test results" hint="The prototype's own tests, run against the mocks.">
             {attempt.test_exit_code === null ? (
-              <p className="card-hint">Tests have not run yet.</p>
+              <p className="card-hint">The agent didn&apos;t run any tests.</p>
             ) : (
               <>
                 <span className={`badge ${passed ? "badge-ok" : "badge-err"}`}>

@@ -99,14 +99,17 @@ class TestHarnessToolLoop(unittest.TestCase):
         self.assertIn("Only 2 steps left", notes[0])
         self.assertIn("Last step: call complete_attempt now", notes[1])
 
-    def test_edits_after_the_last_test_run_are_not_reported_as_passing(self):
-        result, _, _ = self._run([
+    def test_edits_after_the_last_test_run_are_retested_before_reporting(self):
+        result, _, attempt = self._run([
             _reply(types.FunctionCall(id="t", name="run_tests", args={"command": "true"})),
             _reply(types.FunctionCall(id="e", name="create_file", args={"path": "new.py", "content": "x = 1\n"})),
             _reply(types.FunctionCall(id="d", name="complete_attempt", args={"summary": "s", "pr_title": "t"})),
         ])
-        self.assertIsNone(result.test_exit_code)
-        self.assertEqual(result.test_output, UNTESTED_NOTE)
+        # The stale pre-edit result is replaced by a fresh run of the same command.
+        self.assertEqual(result.test_exit_code, 0)
+        self.assertNotEqual(result.test_output, UNTESTED_NOTE)
+        reruns = [e for e in attempt.events if e.action == "run_tests" and "final code" in e.detail]
+        self.assertEqual(len(reruns), 1)
 
     def test_timeout_keeps_the_work_and_says_what_is_missing(self):
         result, _, attempt = self._run([
