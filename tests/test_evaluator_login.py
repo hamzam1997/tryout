@@ -43,6 +43,10 @@ class EvaluatorLoginTestCase(unittest.TestCase):
         user = resp.get_json()["user"]
         self.assertTrue(user["uid"].startswith("evaluator-"))
         self.assertEqual(user["provider"], "evaluator")
+        # Plain names for judges; uniqueness lives in the uid.
+        self.assertEqual(user["name"], "Evaluator")
+        names = [w["name"] for w in self.client.get("/api/workspaces").get_json()["workspaces"]]
+        self.assertEqual(names, ["Evaluator's workspace"])
 
         me = self.client.get("/api/auth/me").get_json()
         self.assertEqual(me["user"]["uid"], user["uid"])
@@ -65,6 +69,32 @@ class EvaluatorLoginTestCase(unittest.TestCase):
         self.assertNotEqual(first["user"]["uid"], second["user"]["uid"])
         self.assertNotEqual(first["workspace_id"], second["workspace_id"])
         self.assertEqual(self.client.get("/api/meetings").get_json(), [])
+
+    @mock.patch("requests.get")
+    @mock.patch("requests.post")
+    def test_connecting_github_keeps_the_evaluator_and_workspace(self, mock_post, mock_get):
+        """The onboarding card sends evaluators through the server OAuth flow."""
+        mock_post.return_value.json.return_value = {"access_token": "gho_judge"}
+        mock_get.return_value.status_code = 200
+        mock_get.return_value.json.return_value = {"login": "judge", "name": "A Judge"}
+        login = self.client.post("/api/auth/evaluator").get_json()
+
+        with mock.patch("views.auth.settings.github_client_id", "id"), \
+                mock.patch("views.auth.settings.github_client_secret", "secret"):
+            start = self.client.get("/api/auth/github/login")
+            self.assertEqual(start.status_code, 302)
+            with self.client.session_transaction() as sess:
+                state = sess["oauth_state"]
+            done = self.client.get(f"/api/auth/github/callback?state={state}&code=c")
+        self.assertIn("auth_success=1", done.headers["Location"])
+
+        # Still the same evaluator in the same workspace, now with GitHub repo access.
+        me = self.client.get("/api/auth/me").get_json()["user"]
+        self.assertEqual(me["uid"], login["user"]["uid"])
+        self.assertEqual(db.list_memberships(uid=me["uid"])[0].workspace_id, login["workspace_id"])
+        status = self.client.get("/api/auth/github/status").get_json()
+        self.assertTrue(status["authenticated"])
+        self.assertEqual(status["user"]["login"], "judge")
 
     def test_logout_ends_the_evaluator_session(self):
         self.client.post("/api/auth/evaluator")

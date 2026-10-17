@@ -22,8 +22,7 @@ export default function RepoOnboarderCard({
   onDeleted,
   isEvaluator = false,
 }) {
-  // Evaluators have no GitHub account here; the demo repo is their path.
-  const [tab, setTab] = useState(isEvaluator ? "demo" : "github"); // "github" | "demo"
+  const [tab, setTab] = useState("github"); // "github" | "demo"
   const [authStatus, setAuthStatus] = useState({ configured: false, authenticated: false, user: null });
   const [deletingId, setDeletingId] = useState(null);
   const [ghRepos, setGhRepos] = useState([]);
@@ -115,6 +114,13 @@ export default function RepoOnboarderCard({
 
   async function handleConnectWithGitHub() {
     setErrorMsg("");
+    if (isEvaluator) {
+      // Evaluators have no Firebase account, and the Firebase popup would sign them in
+      // as the GitHub user, leaving their workspace. The server flow adds GitHub to
+      // the current session without changing who they are.
+      window.location.href = "/api/auth/github/login";
+      return;
+    }
     try {
       const { user } = await loginWithGitHub({ repoAccess: true });
       const loginName = user.reloadUserInfo?.screenName || user.displayName || user.email;
@@ -266,20 +272,7 @@ export default function RepoOnboarderCard({
         {/* Tab 1: GitHub Connection */}
         {tab === "github" && (
           <div className="tab-pane">
-            {isEvaluator && !authStatus.authenticated ? (
-              <div className="github-connect-box">
-                <div className="connect-prompt">
-                  <h3>Use the demo repository</h3>
-                  <p>
-                    Evaluator sessions don't connect GitHub. The Acme Store demo repository has
-                    everything the tour needs: open the Demo repository tab to connect it.
-                  </p>
-                </div>
-                <button type="button" onClick={() => setTab("demo")} className="btn btn-primary">
-                  Go to demo repository
-                </button>
-              </div>
-            ) : !authStatus.authenticated ? (
+            {!authStatus.authenticated ? (
               <div className="github-connect-box">
                 <div className="connect-prompt">
                   <h3>Connect with GitHub</h3>
