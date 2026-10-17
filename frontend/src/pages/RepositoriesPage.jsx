@@ -9,6 +9,7 @@ export default function RepositoriesPage({
   error,
   onOnboarded,
   onDeleted,
+  isEvaluator,
 }) {
   const [selectedRepo, setSelectedRepo] = useState(null);
   const [loadingCatalogId, setLoadingCatalogId] = useState(null);
@@ -85,6 +86,7 @@ export default function RepositoriesPage({
         onDeleted={onDeleted}
         onViewCatalog={handleViewCatalog}
         loadingCatalogId={loadingCatalogId}
+        isEvaluator={isEvaluator}
       />
 
       {selectedRepo && (

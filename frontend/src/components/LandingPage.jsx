@@ -1,11 +1,34 @@
-import { useState } from "react";
-import { loginWithGitHub, loginWithGoogle } from "../lib/firebase";
+import { useEffect, useState } from "react";
+import { evaluatorLoginEnabled, loginAsEvaluator, loginWithGitHub, loginWithGoogle } from "../lib/firebase";
 import Icon, { Logo } from "./Icon";
 
 export default function LandingPage({ onLoginSuccess }) {
   const [loadingGoogle, setLoadingGoogle] = useState(false);
   const [loadingGitHub, setLoadingGitHub] = useState(false);
+  const [loadingEvaluator, setLoadingEvaluator] = useState(false);
+  const [evaluatorOffered, setEvaluatorOffered] = useState(false);
   const [error, setError] = useState("");
+  const busy = loadingGoogle || loadingGitHub || loadingEvaluator;
+
+  useEffect(() => {
+    evaluatorLoginEnabled().then(setEvaluatorOffered);
+  }, []);
+
+  async function handleEvaluatorLogin() {
+    setError("");
+    setLoadingEvaluator(true);
+    try {
+      const user = await loginAsEvaluator();
+      if (user && onLoginSuccess) {
+        onLoginSuccess(user);
+      }
+    } catch (err) {
+      console.error("Evaluator sign-in failed:", err);
+      setError(err.message || "Failed to start an evaluator session.");
+    } finally {
+      setLoadingEvaluator(false);
+    }
+  }
 
   async function handleGoogleLogin() {
     setError("");
@@ -96,7 +119,7 @@ export default function LandingPage({ onLoginSuccess }) {
               type="button"
               className="btn btn-dark btn-lg btn-block"
               onClick={handleGoogleLogin}
-              disabled={loadingGoogle || loadingGitHub}
+              disabled={busy}
             >
               <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true">
                 <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.616z" />
@@ -111,14 +134,33 @@ export default function LandingPage({ onLoginSuccess }) {
               type="button"
               className="btn btn-secondary btn-lg btn-block btn-neutral"
               onClick={handleGitHubLogin}
-              disabled={loadingGitHub || loadingGoogle}
+              disabled={busy}
             >
               <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor" aria-hidden="true">
                 <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
               </svg>
               <span>{loadingGitHub ? "Connecting…" : "Continue with GitHub"}</span>
             </button>
+
+            {evaluatorOffered && (
+              <button
+                type="button"
+                className="btn btn-primary btn-lg btn-block"
+                onClick={handleEvaluatorLogin}
+                disabled={busy}
+              >
+                <Icon name="shield" size={18} />
+                <span>{loadingEvaluator ? "Setting up your workspace…" : "Continue as evaluator"}</span>
+              </button>
+            )}
           </div>
+
+          {evaluatorOffered && (
+            <p className="landing-footer-note">
+              Judging tryout? Continue as evaluator: no account needed. Each sign-in gets a fresh,
+              empty workspace, so you can run the full 5-step tour from the start.
+            </p>
+          )}
 
           <p className="landing-footer-note">
             Sign-in never asks for repository access. You grant that separately when you connect GitHub to a workspace.

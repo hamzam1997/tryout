@@ -12,6 +12,9 @@ from flask import Blueprint, jsonify, request, session
 
 import database as db
 from agents.attempt_jobs import queue_attempt
+from agents.git_utils import parse_github_slug
+from config import settings
+from views.repositories import DEMO_REPO_SLUG
 from views.workspaces import request_github_token
 from schemas import Attempt, AttemptStatus, IdeaStatus
 
@@ -19,6 +22,19 @@ bp = Blueprint("ideas", __name__, url_prefix="/api/ideas")
 
 _VALID_STATUSES = {status.value for status in IdeaStatus}
 _DEFAULT_APPROVER = "local"
+
+
+def _attempt_github_token(repository) -> str | None:
+    """The user's GitHub credential; for the demo repo only, the server's demo token
+    as a fallback, so evaluators without GitHub still get a real pull request."""
+    token = request_github_token()
+    if token or not settings.demo_github_token:
+        return token
+    try:
+        slug = "/".join(parse_github_slug(repository.source)).lower()
+    except ValueError:
+        return None
+    return settings.demo_github_token if slug == DEMO_REPO_SLUG.lower() else None
 
 
 def _serialise(idea) -> dict:
@@ -163,7 +179,7 @@ def approve_idea_endpoint(idea_id: int):
         raise
 
     try:
-        queue_attempt(attempt.id, request_github_token())
+        queue_attempt(attempt.id, _attempt_github_token(repository))
     except Exception as exc:
         db.set_attempt_status(attempt.id, AttemptStatus.FAILED, error=str(exc))
 
@@ -207,7 +223,7 @@ def retry_attempt_endpoint(idea_id: int):
         idea.status = IdeaStatus.IN_PROCESS
         db.update_idea(idea)
     try:
-        queue_attempt(attempt.id, request_github_token())
+        queue_attempt(attempt.id, _attempt_github_token(repository))
     except Exception as exc:
         db.set_attempt_status(attempt.id, AttemptStatus.FAILED, error=str(exc))
 

@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     port: int = 8080
     # Seed demo history into each new workspace (SEED_DEMO_DATA=1). Off by default.
     seed_demo_data: bool = False
+    # "Continue as evaluator" on the landing page (EVALUATOR_LOGIN=1): a throwaway
+    # account with a seeded workspace, for judges who can't use Google or GitHub sign-in.
+    evaluator_login: bool = False
+    # Lets attempts on the demo repo open real pull requests for users with no GitHub
+    # connection, i.e. evaluators (DEMO_GITHUB_TOKEN). Scope it to the demo repo only.
+    demo_github_token: str = ""
     debug: bool = Field(default=False, validation_alias="FLASK_DEBUG")
 
     # Database settings: Google Cloud Firestore

@@ -150,10 +150,51 @@ export async function loginWithGitHub({ repoAccess = false } = {}) {
   return { user, githubToken, syncData };
 }
 
+// Set while this browser holds an evaluator session, so signed-out visitors don't
+// probe /api/auth/me (a 401 in their console) on every page load.
+const EVALUATOR_KEY = "tryout.evaluator";
+
+/** An evaluator, shaped like the Firebase user the UI reads; null for anyone else. */
+function asEvaluator(user) {
+  return user?.provider === "evaluator"
+    ? { uid: user.uid, displayName: user.name, email: null, photoURL: null, isEvaluator: true }
+    : null;
+}
+
+/** Whether the server offers "Continue as evaluator". */
+export async function evaluatorLoginEnabled() {
+  const config = await fetchServerConfig().catch(() => null);
+  return Boolean(config?.evaluatorLogin);
+}
+
+/**
+ * Sign in as a throwaway evaluator: no Google or GitHub account. The server creates
+ * the evaluator and a workspace seeded with demo history.
+ */
+export async function loginAsEvaluator() {
+  const resp = await fetch("/api/auth/evaluator", { method: "POST" });
+  const body = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    throw new Error(body.error || `Evaluator sign-in failed (${resp.status}).`);
+  }
+  localStorage.setItem(EVALUATOR_KEY, "1");
+  return asEvaluator(body.user);
+}
+
+/** The evaluator this browser is still signed in as, if any. */
+async function restoreEvaluator() {
+  if (!localStorage.getItem(EVALUATOR_KEY)) return null;
+  const me = await fetch("/api/auth/me").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const evaluator = asEvaluator(me?.user);
+  if (!evaluator) localStorage.removeItem(EVALUATOR_KEY);
+  return evaluator;
+}
+
 /**
  * Log out from Firebase and clear the Flask session and local session storage.
  */
 export async function logoutUser() {
+  localStorage.removeItem(EVALUATOR_KEY);
   try {
     const { auth } = await getFirebaseAuth();
     await signOut(auth).catch(() => {});
@@ -173,18 +214,18 @@ export function onAuthChanged(callback) {
   getFirebaseAuth()
     .then(({ auth }) => {
       unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-        if (user) {
-          const me = await fetch("/api/auth/me").catch(() => null);
-          if (!me?.ok && !(await syncSession(user).then(() => true, () => false))) {
-            return callback(null); // signed in to Firebase but not to the server
-          }
+        if (!user) return callback(await restoreEvaluator());
+        const me = await fetch("/api/auth/me").catch(() => null);
+        if (!me?.ok && !(await syncSession(user).then(() => true, () => false))) {
+          return callback(null); // signed in to Firebase but not to the server
         }
         callback(user);
       });
     })
-    .catch((err) => {
+    .catch(async (err) => {
       console.warn("Firebase Auth listener initialization error:", err);
-      callback(null);
+      // Evaluators don't use Firebase, so they can still get in.
+      callback(await restoreEvaluator());
     });
 
   return () => {
