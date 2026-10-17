@@ -53,7 +53,7 @@ def bottleneck_map():
 
     return jsonify({
         "total": len(rows),
-        "attempts": len(titles),
+        "attempts": len(db.list_attempts()),
         "by_category": _ranked(Counter(r["category"] for r in rows)),
         "by_service": _ranked(Counter(r["service_name"] for r in rows if r["service_name"])),
         "by_team": _ranked(Counter(r["owning_team"] for r in rows if r["owning_team"] != "unknown")),

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { disconnectWorkspaceGitHub, getWorkspaceGitHub } from "../api";
+import { disconnectWorkspaceGitHub, getGithubAuthStatus, getWorkspaceGitHub } from "../api";
 import { formatDate } from "../lib/format";
 
 // One GitHub connection per workspace, so PRs work no matter who approves.
 export default function GitHubCard({ workspaceId, canManage }) {
   const [status, setStatus] = useState(null);
+  // The signed-in user's own GitHub login; PRs fall back to it when the workspace has none.
+  const [personal, setPersonal] = useState(null);
   // The connect redirect comes back here with ?auth_error= when it fails.
   const [error, setError] = useState(() => new URLSearchParams(window.location.search).get("auth_error") || "");
 
@@ -12,6 +14,9 @@ export default function GitHubCard({ workspaceId, canManage }) {
     getWorkspaceGitHub(workspaceId).then(setStatus).catch((err) => setError(err.message));
   }, [workspaceId]);
   useEffect(load, [load]);
+  useEffect(() => {
+    getGithubAuthStatus().then((s) => setPersonal(s.authenticated ? s.user : null)).catch(() => {});
+  }, []);
 
   async function run(action) {
     setError("");
@@ -43,6 +48,18 @@ export default function GitHubCard({ workspaceId, canManage }) {
               <button type="button" className="btn btn-secondary" onClick={() => run(() => disconnectWorkspaceGitHub(workspaceId))}>
                 Disconnect
               </button>
+            )}
+          </>
+        ) : personal?.login ? (
+          <>
+            <span className="connection-status">
+              <span className="dot is-up" />
+              Connected as <strong>{personal.login}</strong> (your account). Connect the workspace to use it for every member.
+            </span>
+            {canManage && (
+              <a className="btn btn-primary" href={`/api/auth/github/login?workspace=${workspaceId}`}>
+                Connect GitHub
+              </a>
             )}
           </>
         ) : (

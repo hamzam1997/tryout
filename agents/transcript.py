@@ -24,7 +24,10 @@ _CUE_RANGE = re.compile(
 )
 # WebVTT voice span: <v Ana>text</v>, optionally <v.loud Ana>
 _VOICE_TAG = re.compile(r"<v(?:\.[^\s>]+)?\s+(?P<speaker>[^>]+)>", re.IGNORECASE)
-_ANY_TAG = re.compile(r"</?[^>]+>")
+_ANY_TAG = re.compile(
+    r"</?(?:v|c|i|b|u|ruby|rt|lang)(?:[.\s][^>]*)?>|<\d{1,2}:\d{2}(?::\d{2})?[.,]\d{1,3}>",
+    re.IGNORECASE,
+)
 # "Ana: text" or "Ana Whitfield: text", but not "12: text" or a bare URL
 _SPEAKER_PREFIX = re.compile(r"^(?P<speaker>[A-Za-z][\w .'-]{0,40}):\s+(?P<text>.+)$")
 _SRT_INDEX = re.compile(r"^\d+$")

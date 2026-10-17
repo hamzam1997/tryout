@@ -1,6 +1,6 @@
 """RepoOnboarder agent for generating and caching architecture catalogs.
 
-Uses Gemini 2.5 Flash with structured output to analyze repository skeletons
+Uses Gemini with structured output to analyze repository skeletons
 and synthesize high-fidelity ArchitectureCatalog instances, persisted to SQLite.
 """
 
@@ -149,7 +149,7 @@ class RepoOnboarder:
         self,
         skeleton: RepoSkeleton | str | Path,
     ) -> ArchitectureCatalog:
-        """Synthesize an ArchitectureCatalog from a repository skeleton using Gemini 2.5 Flash."""
+        """Synthesize an ArchitectureCatalog from a repository skeleton using Gemini."""
         if isinstance(skeleton, (str, Path)):
             skeleton_obj = scan_repo(skeleton)
         else:

@@ -198,20 +198,19 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
     except Exception as exc:
         logger.exception("Attempt %s completed with a limitation: %s", attempt_id, exc)
         attempt = db.get_attempt(attempt_id) or attempt
-        limitation = f"Attempt limitation: {exc}"
         attempt.test_stdout = "\n".join(
-            part for part in (attempt.test_stdout, limitation) if part
+            part for part in (attempt.test_stdout, f"Attempt failed: {exc}") if part
         )
         db.update_attempt(attempt)
-        db.set_attempt_status(attempt_id, AttemptStatus.COMPLETE)
+        db.set_attempt_status(attempt_id, AttemptStatus.FAILED, error=str(exc))
         if idea is None:
             idea = db.get_idea(attempt.idea_id)
         if idea:
-            idea.status = IdeaStatus.DONE
+            idea.status = IdeaStatus.IN_PROCESS  # not Done; the retry endpoint accepts it
             db.update_idea(idea)
         log_event(
             logger,
-            "attempt_jobs.completed_with_limitations",
+            "attempt_jobs.failed",
             level=logging.WARNING,
             attempt_id=attempt_id,
             idea_id=attempt.idea_id,

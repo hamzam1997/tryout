@@ -174,10 +174,13 @@ class AttemptHarness:
             return create_file(self.workspace, args["path"], args["content"])
         elif name == "run_tests":
             # ponytail: last run wins; it is the test suite when the agent finishes by testing.
-            self.last_test_command = args["command"]
-            self.last_run = run_tests(self.workspace, args["command"])
-            self.changed_since_test = False
-            return self.last_run.to_text()
+            run = run_tests(self.workspace, args["command"])
+            # Exit 127 = tool not installed (e.g. flake8); it must not override a real test run.
+            if run.exit_code != 127:
+                self.last_test_command = args["command"]
+                self.last_run = run
+                self.changed_since_test = False
+            return run.to_text()
         return f"Unknown tool {name}"
 
     def _test_outcome(self) -> dict:
