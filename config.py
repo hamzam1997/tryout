@@ -42,8 +42,8 @@ class Settings(BaseSettings):
 
     model_extraction: str = "gemini-3.8-flash"
     model_onboarding: str = "gemini-3.8-flash"
-    model_planning: str = "gemini-3.8-flash"
-    model_coding: str = "gemini-3.8-flash"
+    model_planning: str = "gemini-3.1-pro"
+    model_coding: str = "gemini-3.1-pro"
 
     execution_timeout_seconds: int = Field(default=60, gt=0)
 
