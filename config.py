@@ -62,6 +62,18 @@ class Settings(BaseSettings):
     github_redirect_uri: str = ""
     repos_cache_dir: Path = BASE_DIR / "cloned_repos"
 
+    # Slack and notifications settings
+    slack_bot_token: str = Field(default="", validation_alias="SLACK_BOT_TOKEN")
+    slack_channel: str = Field(default="#tryout-attempts", validation_alias="SLACK_CHANNEL")
+    notifications_service_url: str = Field(
+        default="https://notifications-service.internal",
+        validation_alias="NOTIFICATIONS_SERVICE_URL",
+    )
+    app_base_url: str = Field(
+        default="http://localhost:8080",
+        validation_alias="APP_BASE_URL",
+    )
+
     def require_project(self) -> str:
         """Return the Cloud project, raising if it is not configured."""
         if not self.google_cloud_project:

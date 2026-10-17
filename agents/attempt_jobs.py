@@ -19,6 +19,7 @@ from agents.git_utils import fetch_github_repository
 from agents.github_pr import create_attempt_pull_request
 from agents.repo_onboarder import compute_source_ref
 from config import settings
+from integrations.mock_notifications import MockNotificationsService
 from logging_setup import log_event
 from schemas import AttemptStatus, AttemptStep, IdeaStatus, RepoSource, TechnicalPlan
 
@@ -103,7 +104,46 @@ def _plan(attempt, idea, catalog) -> TechnicalPlan | None:
     return plan
 
 
-def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
+def notify_attempt_completion(
+    attempt_id: int,
+    notifications_client: MockNotificationsService | None = None,
+) -> dict | None:
+    """Send an automated Slack notification with attempt report URL and friction summary."""
+    try:
+        client = notifications_client or MockNotificationsService(
+            bot_token=settings.slack_bot_token,
+            default_channel=settings.slack_channel,
+            service_url=settings.notifications_service_url,
+            base_url=settings.app_base_url,
+        )
+        attempt = db.get_attempt(attempt_id)
+        if attempt is None:
+            return None
+        idea = db.get_idea(attempt.idea_id)
+        friction_logs = db.list_friction_logs(attempt_id=attempt_id)
+        response = client.send_attempt_notification(
+            attempt=attempt,
+            idea=idea,
+            friction_logs=friction_logs,
+        )
+        log_event(
+            logger,
+            "attempt_jobs.slack_notification_sent",
+            attempt_id=attempt_id,
+            notification_id=response.get("notification_id"),
+            status=response.get("status"),
+        )
+        return response
+    except Exception as exc:
+        logger.exception("Failed to dispatch completion notification for attempt %s: %s", attempt_id, exc)
+        return None
+
+
+def execute_attempt(
+    attempt_id: int,
+    github_token: str | None = None,
+    notifications_client: MockNotificationsService | None = None,
+) -> None:
     attempt = db.get_attempt(attempt_id)
     if attempt is None:
         return
@@ -195,6 +235,7 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
         idea.status = IdeaStatus.DONE
         db.update_idea(idea)
         log_event(logger, "attempt_jobs.completed", attempt_id=attempt_id, idea_id=attempt.idea_id)
+        notify_attempt_completion(attempt_id, notifications_client=notifications_client)
     except Exception as exc:
         logger.exception("Attempt %s completed with a limitation: %s", attempt_id, exc)
         attempt = db.get_attempt(attempt_id) or attempt
@@ -217,14 +258,19 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
             idea_id=attempt.idea_id,
             error=str(exc),
         )
+        notify_attempt_completion(attempt_id, notifications_client=notifications_client)
 
 
-def queue_attempt(attempt_id: int, github_token: str | None = None) -> None:
+def queue_attempt(
+    attempt_id: int,
+    github_token: str | None = None,
+    notifications_client: MockNotificationsService | None = None,
+) -> None:
     """Start the attempt worker without blocking the approval request."""
     worker = threading.Thread(
         # copy_context: the job runs in the starting request's workspace
         target=contextvars.copy_context().run,
-        args=(execute_attempt, attempt_id, github_token),
+        args=(execute_attempt, attempt_id, github_token, notifications_client),
         name=f"idea-attempt-{attempt_id}",
         daemon=True,
     )
