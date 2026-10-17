@@ -10,6 +10,8 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
+from flask import request
+
 import database as db
 
 from agents.friction_classifier import readiness_markdown, record_friction
@@ -103,7 +105,11 @@ def _plan(attempt, idea, catalog) -> TechnicalPlan | None:
     return plan
 
 
-def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
+def execute_attempt(
+    attempt_id: int, 
+    github_token: str | None = None,
+    notification_client=None
+) -> None:
     attempt = db.get_attempt(attempt_id)
     if attempt is None:
         return
@@ -217,6 +223,21 @@ def execute_attempt(attempt_id: int, github_token: str | None = None) -> None:
             idea_id=attempt.idea_id,
             error=str(exc),
         )
+    finally:
+        if notification_client is None:
+            from integrations.slack_client import SlackClient
+            notification_client = SlackClient()
+        try:
+            from flask import request
+            host_url = request.host_url.rstrip("/")
+        except Exception:
+            host_url = "http://localhost:8080"
+            
+        report_link = f"{host_url}/attempts/{attempt_id}"
+        try:
+            notification_client.notify_attempt_completed(attempt_id, report_link)
+        except Exception as exc:
+            logger.exception("Failed to send completion notification for attempt %s: %s", attempt_id, exc)
 
 
 def queue_attempt(attempt_id: int, github_token: str | None = None) -> None:
