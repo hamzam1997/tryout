@@ -316,7 +316,7 @@ def evaluator_login():
     user = {
         "uid": f"evaluator-{suffix}",
         "email": None,
-        "name": f"Evaluator {suffix[:4]}",
+        "name": "Evaluator",  # the unique part lives in the uid; judges see a plain name
         "avatar_url": None,
         "provider": EVALUATOR_PROVIDER,
     }
