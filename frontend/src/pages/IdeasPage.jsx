@@ -54,6 +54,7 @@ export default function IdeasPage({
               type="button"
               role="tab"
               aria-selected={filter === item.id}
+              data-tour={`filter-${item.id}`}
               className={`filter-chip${filter === item.id ? " is-active" : ""}`}
               onClick={() => onFilterChange?.(item.id)}
             >

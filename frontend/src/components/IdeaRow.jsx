@@ -77,7 +77,18 @@ export default function IdeaRow({
   }
 
   return (
-    <article className={`row idea-row${open ? " is-open" : ""}`}>
+    <article
+      className={`row idea-row${open ? " is-open" : ""}`}
+      data-idea-status={idea.status}
+      data-attempt-status={idea.latest_attempt?.status || ""}
+      data-attempt-running={RUNNING.includes(idea.latest_attempt?.status) ? "true" : "false"}
+      data-attempt-failed={
+        ["FAILED", "READY_FOR_REVIEW"].includes(idea.latest_attempt?.status) &&
+        !idea.latest_attempt?.pull_request_url
+          ? "true"
+          : "false"
+      }
+    >
       <button
         type="button"
         className="row-header"
@@ -247,6 +258,7 @@ export default function IdeaRow({
                   <button
                     type="button"
                     className="btn btn-secondary"
+                    data-tour="retry-attempt"
                     disabled={busy || deleting}
                     onClick={(event) => {
                       event.stopPropagation();
@@ -273,6 +285,7 @@ export default function IdeaRow({
                 <button
                   type="button"
                   className="btn btn-secondary"
+                  data-tour="view-report"
                   onClick={(event) => {
                     event.stopPropagation();
                     onOpenReport?.(latestAttempt.id);
@@ -375,6 +388,7 @@ export default function IdeaRow({
                 <button
                   type="button"
                   className="btn btn-primary"
+                  data-tour="approve"
                   disabled={busy || deleting || !selectedRepositoryId}
                   onClick={handleApprove}
                 >

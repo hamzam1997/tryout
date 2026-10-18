@@ -10,6 +10,8 @@ import SettingsPage from "./pages/SettingsPage";
 import InvitePage from "./pages/InvitePage";
 import LiveAttemptModal from "./components/LiveAttemptModal";
 import TourBanner from "./components/TourBanner";
+import { TourChecklist, TourOverlay } from "./components/GuidedTour";
+import { useGuidedTour } from "./lib/useGuidedTour";
 import { Logo } from "./components/Icon";
 import { onAuthChanged } from "./lib/firebase";
 import { useRoute } from "./lib/route";
@@ -167,15 +169,30 @@ export default function App() {
   }, [view, mapSeenKey]);
   const mapSeen = view === "bottlenecks" || localStorage.getItem(mapSeenKey) === "1";
 
+  // Live evaluator guide: reacts to the workspace's real state.
+  const tour = useGuidedTour({
+    enabled: Boolean(currentUser?.isEvaluator),
+    uid: currentUser?.uid,
+    view,
+    repositories,
+    meetings,
+    ideas,
+    counts: ideaCounts,
+    mapSeen,
+  });
+
   // Poll only what the current page shows, and only while its background work runs.
   // Keyed on booleans so each poll's results don't restart the backoff.
   const meetingsBusy = meetingsInFlight(meetings);
   const attemptsBusy = attemptsInFlight(ideas);
+  const reposBusy = repositories.some((repo) => repo.catalog_status === "onboarding");
   useEffect(() => {
     const watchMeetings = (view === "meetings" || view === "ideas") && meetingsBusy;
     // Extraction finishing on the ideas page adds new ideas, so watch those too.
     const watchIdeas = view === "ideas" && (attemptsBusy || meetingsBusy);
-    if (!watchMeetings && !watchIdeas) return undefined;
+    // The Repositories page polls its own cards; elsewhere an analysis would never finish on screen.
+    const watchRepos = view !== "repositories" && reposBusy;
+    if (!watchMeetings && !watchIdeas && !watchRepos) return undefined;
 
     const startedAt = Date.now();
     let delay = POLL_FIRST_MS;
@@ -186,12 +203,14 @@ export default function App() {
     async function tick() {
       running = true;
       if (!document.hidden) {
-        const [nextMeetings, nextIdeas, nextCounts] = await Promise.all([
+        const [nextMeetings, nextIdeas, nextCounts, nextRepos] = await Promise.all([
           watchMeetings ? listMeetings().catch(() => null) : null,
           watchIdeas ? listIdeas(ideaFilter).catch(() => null) : null,
           watchIdeas ? getIdeaCounts().catch(() => null) : null,
+          watchRepos ? listRepositories().catch(() => null) : null,
         ]);
         if (cancelled) return;
+        if (nextRepos) setRepositories(nextRepos);
         if (nextMeetings) setMeetings(nextMeetings);
         if (nextIdeas) setIdeas(nextIdeas);
         if (nextCounts) setIdeaCounts(nextCounts);
@@ -218,7 +237,7 @@ export default function App() {
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [view, meetingsBusy, attemptsBusy, ideaFilter]);
+  }, [view, meetingsBusy, attemptsBusy, reposBusy, ideaFilter]);
 
   function handleUploaded(result) {
     setMeetings((current) => {
@@ -408,6 +427,7 @@ export default function App() {
         online={online}
         user={currentUser}
         onLogout={() => setCurrentUser(null)}
+        tourSlot={<TourChecklist tour={tour} />}
       />
 
       <main className="main">
@@ -480,6 +500,7 @@ export default function App() {
         )}
         </div>
       </main>
+      <TourOverlay tour={tour} suspended={Boolean(liveAttemptId)} />
       {liveAttemptId && (
         <LiveAttemptModal
           attemptId={liveAttemptId}

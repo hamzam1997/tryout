@@ -261,6 +261,7 @@ export default function RepoOnboarderCard({
             className={`tab-btn ${tab === "demo" ? "is-active" : ""}`}
             role="tab"
             aria-selected={tab === "demo"}
+            data-tour="demo-tab"
             onClick={() => { setTab("demo"); setErrorMsg(""); }}
           >
             Demo repository
@@ -402,6 +403,7 @@ export default function RepoOnboarderCard({
               <button
                 type="button"
                 className="btn btn-primary"
+                data-tour="demo-connect"
                 onClick={handleOnboardDemo}
                 disabled={onboarding}
               >
@@ -439,7 +441,7 @@ export default function RepoOnboarderCard({
                 const isFailed = repo.catalog_status === "failed";
 
                 return (
-                  <div key={repo.id} className="repo-summary-card">
+                  <div key={repo.id} className="repo-summary-card" data-tour="repo-card">
                     <div className="repo-card-head">
                       <div className="repo-card-title">
                         <strong className="repo-card-name">{repo.name}</strong>
@@ -501,6 +503,7 @@ export default function RepoOnboarderCard({
                         <button
                           type="button"
                           className="btn btn-secondary btn-sm"
+                          data-tour="repo-retry"
                           onClick={() => handleRetry(repo)}
                           disabled={onboarding}
                         >
