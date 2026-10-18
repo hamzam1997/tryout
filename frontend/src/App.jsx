@@ -169,6 +169,8 @@ export default function App() {
   }, [view, mapSeenKey]);
   const mapSeen = view === "bottlenecks" || localStorage.getItem(mapSeenKey) === "1";
 
+  const [catalogOpen, setCatalogOpen] = useState(false);
+
   // Live evaluator guide: reacts to the workspace's real state.
   const tour = useGuidedTour({
     enabled: Boolean(currentUser?.isEvaluator),
@@ -179,6 +181,7 @@ export default function App() {
     ideas,
     counts: ideaCounts,
     mapSeen,
+    catalogOpen,
   });
 
   // Poll only what the current page shows, and only while its background work runs.
@@ -451,6 +454,7 @@ export default function App() {
             onOnboarded={handleRepoOnboarded}
             onDeleted={handleRepoDeleted}
             isEvaluator={Boolean(currentUser?.isEvaluator)}
+            onCatalogOpenChange={setCatalogOpen}
           />
         ) : view === "meetings" ? (
           <MeetingsPage

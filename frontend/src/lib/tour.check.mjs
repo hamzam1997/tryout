@@ -10,7 +10,11 @@ assert.equal(id({ view: "meetings" }), "repo-nav");
 assert.equal(id({ view: "repositories" }), "repo-connect");
 assert.equal(id({ view: "repositories", repositories: [repo("onboarding")] }), "repo-wait");
 assert.equal(id({ view: "repositories", repositories: [repo("failed")] }), "repo-failed");
-assert.equal(id({ view: "repositories", repositories: [repo("ready")] }), "meet-nav");
+assert.equal(id({ view: "repositories", repositories: [repo("ready")] }), "repo-catalog");
+assert.equal(id({ view: "repositories", repositories: [repo("ready")], catalogOpen: true }), "repo-catalog-close");
+assert.equal(id({ view: "repositories", repositories: [repo("ready")], catalogSeen: true }), "meet-nav");
+assert.equal(id({ view: "ideas", repositories: [repo("ready")] }), "meet-nav", "catalog is optional off the Repositories page");
+assert.equal(id({ view: "repositories", repositories: [repo("ready")], meetings: [meeting()], catalogSeen: false, counts: counts({ PENDING: 1 }) }), "idea-nav");
 assert.equal(id({ view: "meetings", repositories: [repo("ready")] }), "meet-load");
 assert.equal(
   id({ view: "meetings", repositories: [repo("ready")], meetings: [meeting({ status: "PROCESSING" })] }),

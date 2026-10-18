@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ArchitectureCatalogDrawer from "../components/ArchitectureCatalogDrawer";
 import RepoOnboarderCard from "../components/RepoOnboarderCard";
 import { getRepositoryCatalog } from "../api";
@@ -10,6 +10,7 @@ export default function RepositoriesPage({
   onOnboarded,
   onDeleted,
   isEvaluator,
+  onCatalogOpenChange,
 }) {
   const [selectedRepo, setSelectedRepo] = useState(null);
   const [loadingCatalogId, setLoadingCatalogId] = useState(null);
@@ -18,6 +19,13 @@ export default function RepositoriesPage({
   const analyzingCount = repositories.filter(
     (repo) => repo.catalog_status === "onboarding"
   ).length;
+
+  // Lets the evaluator guide know the catalog drawer is open.
+  const drawerOpen = Boolean(selectedRepo);
+  useEffect(() => {
+    onCatalogOpenChange?.(drawerOpen);
+    return () => onCatalogOpenChange?.(false);
+  }, [drawerOpen, onCatalogOpenChange]);
 
   async function handleViewCatalog(repo) {
     setLoadingCatalogId(repo.id);
