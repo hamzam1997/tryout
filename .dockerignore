@@ -1,6 +1,8 @@
 # Secrets. Cloud Run supplies configuration as environment variables.
 .env
-.env.local
+.env.*
+!.env.example
+cloud-run.env.yaml
 
 # Virtualenv: the image installs from requirements.txt instead.
 venv/
@@ -33,6 +35,8 @@ __pycache__/
 .claude/
 
 # Not needed at runtime
+demo/
+cloned_repos/
 tests/
 *.log
 .DS_Store
