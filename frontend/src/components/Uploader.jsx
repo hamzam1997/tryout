@@ -108,6 +108,7 @@ export default function Uploader({ onUploaded }) {
         <button
           type="button"
           className="btn btn-secondary btn-sm"
+          data-tour="load-demo"
           onClick={handleLoadDemo}
         >
           Load demo transcript

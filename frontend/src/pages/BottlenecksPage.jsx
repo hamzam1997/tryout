@@ -87,7 +87,7 @@ export default function BottlenecksPage() {
 
       {data && (
         <>
-          <div className="stat-grid">
+          <div className="stat-grid" data-tour="bottleneck-stats">
             <Stat value={data.total} name="Blockers found" hint="Before any work was committed" />
             <Stat value={data.attempts} name="Attempts analysed" />
             <Stat

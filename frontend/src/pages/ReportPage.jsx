@@ -59,7 +59,7 @@ export default function ReportPage({ attemptId, onBack }) {
 
   return (
     <div className="container">
-      <header className="page-head">
+      <header className="page-head" data-tour="report-summary">
         <div>
           <button type="button" className="back-link" onClick={onBack}>
             <Icon name="arrowLeft" size={14} />

@@ -62,7 +62,7 @@ export default function MeetingsPage({
           </p>
         </div>
       ) : (
-        <div className="rows">
+        <div className="rows" data-tour="meeting-list">
           {meetings.map((meeting) => (
             <MeetingRow
               key={meeting.id}

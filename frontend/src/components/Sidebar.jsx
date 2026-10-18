@@ -10,7 +10,7 @@ const NAV = [
   { id: "bottlenecks", label: "Bottleneck map" },
 ];
 
-export default function Sidebar({ view, onNavigate, counts, online, user, onLogout }) {
+export default function Sidebar({ view, onNavigate, counts, online, user, onLogout, tourSlot }) {
   const [currentUser, setCurrentUser] = useState(user || null);
 
   useEffect(() => {
@@ -62,6 +62,7 @@ export default function Sidebar({ view, onNavigate, counts, online, user, onLogo
             key={id}
             type="button"
             className="nav-item"
+            data-tour={`nav-${id}`}
             aria-current={view === id ? "page" : undefined}
             onClick={() => onNavigate(id)}
           >
@@ -86,6 +87,8 @@ export default function Sidebar({ view, onNavigate, counts, online, user, onLogo
           </button>
         )}
       </nav>
+
+      {tourSlot}
 
       <div className="sidebar-foot">
         {currentUser ? (
