@@ -518,6 +518,7 @@ export default function RepoOnboarderCard({
                         <button
                           type="button"
                           className="btn btn-ghost btn-sm repo-catalog-link"
+                          data-tour="view-catalog"
                           onClick={() => onViewCatalog(repo)}
                           disabled={loadingCatalogId === repo.id}
                         >

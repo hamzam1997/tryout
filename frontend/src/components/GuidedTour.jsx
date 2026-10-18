@@ -194,7 +194,7 @@ export function TourOverlay({ tour, suspended = false }) {
     if (!guided) return undefined;
     function onKey(event) {
       if (event.key !== "Escape" || event.defaultPrevented) return;
-      if (document.querySelector("dialog[open]")) return;
+      if (document.querySelector("dialog[open], .drawer-overlay")) return;
       tour.setMode("paused");
     }
     document.addEventListener("keydown", onKey);

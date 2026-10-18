@@ -42,6 +42,8 @@ export function deriveTour({
   counts = {},
   reportSeen = false,
   mapSeen = false,
+  catalogOpen = false,
+  catalogSeen = false,
   finished = false,
 }) {
   const repoReady = repositories.some((r) => r.catalog_status === "ready");
@@ -109,12 +111,28 @@ export function deriveTour({
         ],
       };
     }
+  } else if (catalogOpen) {
+    step = {
+      id: "repo-catalog-close", kind: "do", stage: 0,
+      title: "This is what tryout learned",
+      body: "Modules, routes, models and owners. Every idea is checked against this catalog. Close it when you are done looking.",
+      hint: "Click the X to close",
+      targets: [t('[data-tour="catalog-close"]')],
+    };
+  } else if (!hasMeeting && !catalogSeen && view === "repositories") {
+    step = {
+      id: "repo-catalog", kind: "do", stage: 0,
+      title: "Catalog ready",
+      body: "acme-store is mapped. Open the catalog to see what tryout learned about the codebase.",
+      hint: "Click View catalog",
+      targets: [t('[data-tour="view-catalog"]')],
+    };
   } else if (!hasMeeting) {
     step = view !== "meetings"
       ? {
           id: "meet-nav", kind: "do", stage: 1,
-          title: "Catalog ready",
-          body: "acme-store is mapped. Every idea will be checked against it. Now give tryout a meeting to listen to.",
+          title: "Now give it a meeting",
+          body: "Every idea will be checked against the acme-store catalog. Give tryout a meeting to listen to.",
           hint: "Open Meetings",
           targets: [t(nav("meetings"))],
         }

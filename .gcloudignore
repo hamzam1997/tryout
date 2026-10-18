@@ -1,0 +1,7 @@
+.gcloudignore
+.git/
+#!include:.gitignore
+.claude/
+demo/
+cloned_repos/
+cloud-run.env.yaml

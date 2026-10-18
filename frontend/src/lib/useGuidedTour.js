@@ -16,10 +16,11 @@ function writeFlag(key, value) {
   }
 }
 
-export function useGuidedTour({ enabled, uid, view, repositories, meetings, ideas, counts, mapSeen }) {
+export function useGuidedTour({ enabled, uid, view, repositories, meetings, ideas, counts, mapSeen, catalogOpen = false }) {
   const key = (name) => `tryout.tour.${name}:${uid ?? ""}`;
   const [mode, setModeState] = useState(() => readFlag(key("mode"))); // null | guided | paused | done
   const [reportSeen, setReportSeen] = useState(() => readFlag(key("report-seen")) === "1");
+  const [catalogSeen, setCatalogSeen] = useState(() => readFlag(key("catalog-seen")) === "1");
   const [finished, setFinished] = useState(() => readFlag(key("finished")) === "1");
 
   // A different evaluator in the same browser has their own progress.
@@ -28,6 +29,7 @@ export function useGuidedTour({ enabled, uid, view, repositories, meetings, idea
     setLoadedFor(uid);
     setModeState(readFlag(key("mode")));
     setReportSeen(readFlag(key("report-seen")) === "1");
+    setCatalogSeen(readFlag(key("catalog-seen")) === "1");
     setFinished(readFlag(key("finished")) === "1");
   }
 
@@ -49,6 +51,16 @@ export function useGuidedTour({ enabled, uid, view, repositories, meetings, idea
     return () => markReportSeen();
   }, [enabled, view, markReportSeen]);
 
+  // Closing the catalog counts as having looked at it.
+  useEffect(() => {
+    if (!enabled || !catalogOpen) return undefined;
+    return () => {
+      writeFlag(key("catalog-seen"), "1");
+      setCatalogSeen(true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, catalogOpen, uid]);
+
   const finish = useCallback(() => {
     writeFlag(key("finished"), "1");
     writeFlag(key("mode"), "done");
@@ -58,8 +70,8 @@ export function useGuidedTour({ enabled, uid, view, repositories, meetings, idea
   }, [uid]);
 
   const derived = useMemo(
-    () => deriveTour({ view, repositories, meetings, ideas, counts, reportSeen, mapSeen, finished }),
-    [view, repositories, meetings, ideas, counts, reportSeen, mapSeen, finished]
+    () => deriveTour({ view, repositories, meetings, ideas, counts, reportSeen, mapSeen, catalogOpen, catalogSeen, finished }),
+    [view, repositories, meetings, ideas, counts, reportSeen, mapSeen, catalogOpen, catalogSeen, finished]
   );
 
   return { enabled, mode, setMode, markReportSeen, finish, ...derived };
